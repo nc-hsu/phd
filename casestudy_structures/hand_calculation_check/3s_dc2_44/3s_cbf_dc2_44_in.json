@@ -1,0 +1,121 @@
+{
+    "design_inputs": {
+        "geometry": {
+            "structure": "CBF-Diagonal",
+            "construction": {
+                "gussets": "welded-stub-with-beam-hinge",
+                "beam_splice": "hinge-webplate",
+                "bc_connection": "hinge-finplate",
+                "column_base": "pinned"
+            },
+            "spans_x": [
+                7000,
+                7000,
+                7000
+            ],
+            "spans_y": [],
+            "heights": [
+                3500,
+                3500,
+                3500
+            ],
+            "braces_x_pos": [
+                1
+            ],
+            "braces_x_neg": [
+                3
+            ],
+            "length_y": 24000,
+            "tension_only": false,
+            "design_gussets": true,
+            "gusset_parameters": {
+                "gusset_type": "ec8-linear-clearance",
+                "slab_isolation": true,
+                "connection_type": "bolt",
+                "net_area_reinforced": true,
+                "e_1_factor": 3.0,
+                "e_2_factor": 1.5,
+                "p_1_factor": 3.0,
+                "p_2_factor": 3.0,
+                "connection_parameters": {
+                    "shear_planes": 2,
+                    "thread_in_shear": false,
+                    "strength_class": "10.9"
+                }
+            },
+            "beam_splice_parameters": {
+                "splice_type": "ec8-double-web-plate",
+                "connection_type": "bolt",
+                "minimum_thickness": 6,
+                "g_h": 10,
+                "e_y_factor": 2.0,
+                "e_z_factor": 1.5,
+                "p_y_factor": 3.0,
+                "p_z_factor": 2.4,
+                "connection_parameters": {
+                    "pattern": "grid",
+                    "shear_planes": 2,
+                    "thread_in_shear": false,
+                    "strength_class": "10.9"
+                }
+            }
+        },
+        "materials": {
+            "fy": 235,
+            "E": 210000
+        },
+        "load_parameters": {
+            "g_floors": [
+                0.0075,
+                0.0075,
+                0.0075
+            ],
+            "q_floors": [
+                0.003,
+                0.003,
+                0
+            ],
+            "q_floor_types": [
+                "QB",
+                "QB",
+                "QH"
+            ],
+            "tw_vertical_loads": 3000,
+            "tw_beams": 1500,
+            "tw_lateral_loads": 6000,
+            "wind_parameters": {
+                "vb_0": 25000,
+                "c0": 1,
+                "z0": 1000.0,
+                "kI": 1,
+                "z_min": 10000.0,
+                "c_dir": 1,
+                "c_season": 1
+            },
+            "snow_parameters": {
+                "load_category": "S1",
+                "roof_type": "single_pitch",
+                "s_k": 0.00085,
+                "C_e": 1.0,
+                "C_t": 1.0,
+                "alpha_1": 0.0
+            },
+            "eq_parameters": {
+                "ductility_class": 2,
+                "S_alpha_RP": 0.44,
+                "load_shape": "ec8:2010",
+                "site_category": "C",
+                "F_T": 1.0
+            }
+        },
+        "design_rules": [
+            "columns harmonise_storey",
+            "columns harmonise_vertical 3",
+            "beams harmonise_storey",
+            "beams harmonise_vertical 3",
+            "braces harmonise_storey",
+            "gussets harmonise_all"
+        ],
+        "enforce_regularity": false
+    }
+}

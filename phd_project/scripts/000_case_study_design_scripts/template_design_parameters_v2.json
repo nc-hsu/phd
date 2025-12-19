@@ -1,0 +1,97 @@
+{	"design_inputs": {
+		"geometry": {
+			"structure": "CBF-Diagonal",
+            "construction": {
+                "gussets": "welded-stub-with-beam-hinge",
+                "bc_connection": "hinge-endplate",
+                "beam_splice": "hinge-endplate",
+                "column_base": "pinned"
+            },
+			"spans_x": [7000, 7000, 7000],
+			"spans_y": [],
+			"heights": [],
+			"braces_x_pos": [1],
+			"braces_x_neg": [3],
+			"length_y": 21000,
+            "tension_only": false,
+            "design_gussets": true,
+            "gusset_parameters": {
+                "gusset_type": "ec8-linear-clearance",
+                "slab_isolation": true,
+                "minimum_thickness": 6,
+                "slope_option": 1,
+                "connection_type": "bolt",
+                "e_1_factor": 2.0,
+                "e_2_factor": 1.5,
+                "p_1_factor": 3.0,
+                "p_2_factor": 2.4, 
+                "connection_parameters": {
+                    "pattern": "grid",
+                    "shear_planes": 2,
+                    "thread_in_shear": true,
+                    "strength_class": "8.8"
+                }
+            }
+		},
+		
+		"materials": {
+			"fy": 235,
+            "E": 210000
+		},
+		
+		"load_parameters": {
+            "slab_loads": [
+                {
+                    "tag": "G_slab",
+                    "case_type": "G",
+                    "slab_load": []
+                },
+                {
+                    "tag": "QB",
+                    "case_type": "QB",
+                    "slab_load": []
+                },
+                {
+                    "tag": "S",
+                    "case_type": "S1",
+                    "slab_load": []
+                }
+            ],
+
+            "tw_beams_vertical_loads": 1500,
+            "tw_nodes_vertical_loads": 1500,
+			"tw_lateral_loads": 10500,
+			
+            "wind_parameters": {
+				"vb_0": 25000,
+				"cpe_wind": 0.8,
+				"cpe_lee": -0.7,
+				"c0": 1,
+				"z0": 50,
+				"kI": 1,
+				"z_min": 2000,
+				"c_dir": 1,
+				"c_season": 1
+			},
+			"eq_parameters": {
+                "ductility_class": 0,
+				"S_alpha_RP": 0,
+				"load_shape": "ec8:2010",
+				"site_category": "C",
+				"F_T": 1.0
+			}
+		},
+
+        "design_rules":[
+                "columns harmonise_storey", 
+                "columns harmonise_vertical 3", 
+                "beams harmonise_storey", 
+                "braces harmonise_storey",
+                "gussets harmonise_all"
+            ]
+        
+	}
+}	
+		
+		
+	

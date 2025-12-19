@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phd_project"
+version = "0.1.0"
+description = "PhD research package"
+requires-python = ">=3.8"
+
+[tool.setuptools]
+packages = ["phd_project"]     # ← Tell setuptools the ONLY package
+include-package-data = true

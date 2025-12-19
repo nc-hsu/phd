@@ -1,0 +1,20 @@
+project_root: "../../"
+
+data:
+  root: "data"
+  gm_flatfiles: "data/gm_flatfiles"
+  eshm20_hmaps: "data/eshm20_hazard_maps"
+  eu_shapefile: "data/eu_shapfile"
+  WP01: "data/WP01"
+  eshm20_site_model: "data/eshm20_oq_models/eshm20_site_model_v06d.csv"
+
+models:
+  case_study: "casestudy_structures"
+  examples: "calculation_examples"
+
+notebooks:
+  root: "notebooks"
+  figs: "notebooks/figures"
+
+outputs:
+  images: "images"
