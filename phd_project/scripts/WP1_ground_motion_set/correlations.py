@@ -109,6 +109,19 @@ def _calculate_fhp_dependent_residuals(
     return delta_Bis, delta_Wijs, masks 
 
 
+def _get_fhp_dependent_masks(
+        min_fhps: np.ndarray,
+        fhp_limits: np.ndarray) -> dict[float, np.ndarray]:
+    
+    # min_fhps: the minimum high pass frequency for horizontal motion for each
+    # record
+    masks = {}
+    for fhp in fhp_limits:
+        valid_mask = min_fhps <= fhp
+        masks[fhp] = valid_mask
+    return masks 
+
+
 def derive_correlation_model(
         observed_df, metadata, site_rup_ctxs, gmm_map, fhp_cutoff=0.8):
     
@@ -122,7 +135,7 @@ def derive_correlation_model(
     phis = []
     
     for col in cols:
-        _, imt, T = col   # use only the imt and period. component is not needed
+        com, imt, T = col   # use only the imt and period. component is not needed
         if imt == "SA":
             im = IMT_MAP[imt](T) 
         elif (imt.startswith("AvgSA")):
@@ -141,7 +154,7 @@ def derive_correlation_model(
         f_hp_limits.append(f_hp)
         
         # Get predictions for the ENTIRE dataset once
-        gmm_out = _get_predicted_im_values(im, gmm_map[imt], site_rup_ctxs)
+        gmm_out = _get_predicted_im_values(im, gmm_map[com][imt], site_rup_ctxs)
         pred, _, tau_vec, phi_vec = gmm_out
 
         # Calculate residuals for all rows (we will mask them later)
@@ -155,11 +168,11 @@ def derive_correlation_model(
     min_fhp_values = metadata[["U_hp", "V_hp"]].min(axis=1).to_numpy()
     # Convert data list to 2D arrays (Rows x Columns)
     Delta_ij = np.vstack(residuals).T
-    tau = np.vstack(taus).T
-    phi = np.vstack(phis).T 
+    tau = np.vstack(taus).T 
+    phi = np.vstack(phis).T
     
     # get the between-event and within-event residuals:
-    event_index = pd.Index(metadata["event_id"])
+    # event_index = pd.Index(metadata["event_id"]) # ! only for dB/dW calc
     
     # unlike the total residual the values of delta Bi are dependent on the
     # the number of records for each event. For each period the number of 
@@ -167,16 +180,16 @@ def derive_correlation_model(
     # seismometer.
 
     # precalculate delta_Bi and delta_Wij for each possible high_pass limit
-    delta_Bis, delta_Wijs, masks = _calculate_fhp_dependent_residuals(
-        event_index, Delta_ij, tau, phi, min_fhp_values, f_hp_limits)
-    # delta_Bi = _calculate_delta_Bi(event_index, Delta_ij, tau, phi)
-    # delta_Wij = _calculate_delta_Wij(Delta_ij, delta_Bi)
+    masks = _get_fhp_dependent_masks(min_fhp_values, f_hp_limits)
+    # ! commented out because only used in dB/dW calc
+    # delta_Bis, delta_Wijs, masks = _calculate_fhp_dependent_residuals(
+    #     event_index, Delta_ij, tau, phi, min_fhp_values, f_hp_limits)
 
     # Prepare the Output Arrays
-    rho_total_A = np.eye(num_cols) # Diagonal is always 1.0
+    # rho_total_A = np.eye(num_cols) # Diagonal is always 1.0 # ! only for dB/dW calc 
     rho_total_B = np.eye(num_cols) # Diagonal is always 1.0
-    rho_dB = np.eye(num_cols)
-    rho_dW = np.eye(num_cols)
+    # rho_dB = np.eye(num_cols) # ! only for dB/dW calc
+    # rho_dW = np.eye(num_cols) # ! only for dB/dW calc
 
     # We only compute the upper triangle (j > i)
     for i in range(num_cols):
@@ -184,8 +197,10 @@ def derive_correlation_model(
         
         for j in range(i + 1, num_cols):
             # Check component match once at the start or assume valid
-            if cols[i][0] != cols[j][0]:
-                continue
+            # !!! I have commented this out because I want to be able to calculate 
+            # !!! the correlation between rotD50 PGA/SA/AvgSA and GM RSD595
+            # if cols[i][0] != cols[j][0]:
+            #     continue
                 
             f_hp_j = f_hp_limits[j]
             
@@ -194,36 +209,50 @@ def derive_correlation_model(
 
             # Vectorized Masking
             valid_mask = masks[f_hp_limit]
-            # valid_mask = min_fhp_values <= f_hp_limit
-            # valid_mask = (metadata["U_hp"].values <= f_hp_limit) & \
-            #              (metadata["V_hp"].values <= f_hp_limit)
             
             # calculate the correlations:
             # between-event: use the dB array corresponding to f_hp_limit 
-            r_dB = pairwise_correlation(
-                delta_Bis[f_hp_limit][:, i], delta_Bis[f_hp_limit][:, j])
-            rho_dB[i, j] = r_dB
-            rho_dB[j, i] = r_dB # Exploiting Symmetry
+            # ! I have block commented out the code below that is used to 
+            # ! calculate the correlations based on dB and dW
+            # ! for several reasons:
+            # !   1. The indirect AvgSA GMM can only returns sigma (total std. dev) 
+            # !      and not phi or tau which are needed to calculate dB and dW
+            # !   2. The calculation seems incorrect; possibly as a result of
+            # !      using the average tau and phi to calculate the correlation.
+            # !      See the comment below
+            # !      
+            # r_dB = pairwise_correlation(
+            #     delta_Bis[f_hp_limit][:, i], delta_Bis[f_hp_limit][:, j])
+            # rho_dB[i, j] = r_dB
+            # rho_dB[j, i] = r_dB # Exploiting Symmetry
             
-            # within-event
-            r_dW = pairwise_correlation(
-                delta_Wijs[f_hp_limit][:, i], delta_Wijs[f_hp_limit][:, i])
-            rho_dW[i, j] = r_dW
-            rho_dW[j, i] = r_dW # Exploiting Symmetry
+            # # within-event
+            # r_dW = pairwise_correlation(
+            #     delta_Wijs[f_hp_limit][:, i], delta_Wijs[f_hp_limit][:, i])
+            # rho_dW[i, j] = r_dW
+            # rho_dW[j, i] = r_dW # Exploiting Symmetry
             
-            # total A - from between- and within-event residuals
-            # event averaged values for tau and phi
-            tau_bar_i = tau[valid_mask, i].mean()
-            tau_bar_j = tau[valid_mask, j].mean()
-            phi_bar_i = phi[valid_mask, i].mean()
-            phi_bar_j = phi[valid_mask, j].mean()
-            sig_i = np.sqrt(tau_bar_i ** 2 + phi_bar_i ** 2)
-            sig_j = np.sqrt(tau_bar_j ** 2 + phi_bar_j ** 2)
+            # # total A - from between- and within-event residuals
+            # # event averaged values for tau and phi
+            # # ! This is an approximation needed to get a single values for tau_i 
+            # # ! tau_j, phi_i and phi_j for use in the correlation equation
+            # # ! I'm pretty sure it leads to wrong correlation values because
+            # # ! they are not even close to the ones derived from the total
+            # # ! standard deviation (which are somewhat similar to other values)
+            # # ! from the literature
 
-            r_tot_A = pairwise_correlation_from_dB_and_dW(
-                r_dB, r_dW, tau_bar_i, tau_bar_j, phi_bar_i, phi_bar_j, sig_i, sig_j)
-            rho_total_A[i, j] = r_tot_A
-            rho_total_A[j, i] = r_tot_A # Exploiting Symmetry
+            # tau_bar_i = tau[valid_mask, i].mean()
+            # tau_bar_j = tau[valid_mask, j].mean()
+            # phi_bar_i = phi[valid_mask, i].mean()
+            # phi_bar_j = phi[valid_mask, j].mean()
+            # sig_i = np.sqrt(tau_bar_i ** 2 + phi_bar_i ** 2)
+            # sig_j = np.sqrt(tau_bar_j ** 2 + phi_bar_j ** 2)
+
+            # r_tot_A = pairwise_correlation_from_dB_and_dW(
+            #     r_dB, r_dW, tau_bar_i, tau_bar_j, phi_bar_i, phi_bar_j, sig_i, sig_j)
+            # rho_total_A[i, j] = r_tot_A
+            # rho_total_A[j, i] = r_tot_A # Exploiting Symmetry
+            # ! end of block commented out code
 
             # total B - from total residual
             r_tot_B = pairwise_correlation(
@@ -231,56 +260,12 @@ def derive_correlation_model(
             rho_total_B[i, j] = r_tot_B
             rho_total_B[j, i] = r_tot_B # Exploiting Symmetry
 
-    rho_total_A = pd.DataFrame(rho_total_A, index=cols, columns=cols)
-    rho_dB = pd.DataFrame(rho_dB, index=cols, columns=cols)
-    rho_dW = pd.DataFrame(rho_dW, index=cols, columns=cols)
+    # ! because we aren't calculating rho_total_A, rho_dB or rho_dW just return
+    # ! an empty dataframe
+    rho_total_A = pd.DataFrame()
+    rho_dB = pd.DataFrame()
+    rho_dW = pd.DataFrame()
     rho_total_B = pd.DataFrame(rho_total_B, index=cols, columns=cols)
 
     return rho_total_A, rho_dB, rho_dW, rho_total_B 
 
-
-if __name__ == "__main__":
-    import pickle
-    import time
-    from phd_project.config.loader import load_config
-    from openquake.hazardlib.gsim.bahrampouri_2021_duration import BahrampouriEtAldm2021Asc
-    from pickagm.avgSA import indirect_AvgSA_GMPE
-    from openquake.hazardlib.gsim.kotha_2020 import KothaEtAl2020ESHM20
-    
-    cfg = load_config()
-    idx = pd.IndexSlice
-
-    with open(cfg["data"]["root"] / "test_data.pkl", "rb") as f:
-        df_observed = pickle.load(f)
-    with open(cfg["data"]["root"] / "test_data_ctxs.pkl", "rb") as f:
-        site_rup_ctxs = pickle.load(f)
-    with open(cfg["data"]["root"] / "test_metadata.pkl", "rb") as f:
-        metadata = pickle.load(f)
-    with open(cfg["data"]["root"] / "test_cg26.pkl", "rb") as f:
-        rho_cg26 = pickle.load(f)
-
-    periods_0_3 = list(np.round(np.linspace(0.0, 3.0, 10), 3))
-    periods_0_6 = list(np.round(np.linspace(0.0, 6.0, 10), 3))
-
-    correlations_for_AvgSA_03 = rho_cg26.loc[idx["rotD50", ["PGA", "SA"], periods_0_3], 
-                                    idx["rotD50", ["PGA", "SA"], periods_0_3]].to_numpy()
-    correlations_for_AvgSA_06 = rho_cg26.loc[idx["rotD50", ["PGA", "SA"], periods_0_6], 
-                                    idx["rotD50", ["PGA", "SA"], periods_0_6]].to_numpy()
-    AvgSA_GMPE_03 = indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(),
-                                        correlations_for_AvgSA_03)
-    AvgSA_GMPE_06 = indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(),
-                                        correlations_for_AvgSA_06)
-
-    gmm_map = {"SA": KothaEtAl2020ESHM20(),
-               "PGA": KothaEtAl2020ESHM20(),
-               "RSD595": BahrampouriEtAldm2021Asc(),
-               "AvgSA[0,3]": AvgSA_GMPE_03,
-               "AvgSA[0,6]": AvgSA_GMPE_06}
-
-    start = time.time()
-    rho_out = derive_correlation_model(df_observed, metadata, site_rup_ctxs, gmm_map)
-    rho, rho_dB, rho_dW, rho_tot = rho_out
-    end = time.time()
-    print(end-start)
-
-    pass
