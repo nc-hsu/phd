@@ -1,0 +1,105 @@
+Last update: 02-09-2017
+All geographic coordinates in Lat/Lon, Datum WGS84, positive N/E
+
+File Regions_Tectonics_Geo_HDF5.txt format:
+Column 1 | String | Delimiter ":" | ID | Region unique identifier
+Column 2 | String | Delimiter "," | Name | Region name
+Column n>2 | Float | Delimiter "," + "EOR"| Lon Lat | Longitude and Latitude coordinate pairs of all polygon vertexes
+
+File Regions_Tectonics_Settings_HDF5.txt format:
+Column 1 | String | Delimiter ":" | ID | Region unique identifier
+Column 2 | Integer| Delimiter "," | Tectonic_Code | Code of the tectonic setting 
+Column 3 | String | Delimiter "EOR" | Tectonic_Setting | Name of the tectonic setting
+
+File Regions_Completeness_Geo_HDF5.txt format:
+Column 1 | String | Delimiter ":" | ID | Region for Completeness unique identifier
+Column 2 | String | Delimiter "," | Name | Region name
+Column 3 | String | Delimiter "," | Catalog | Acronym of earthquake catalog used for the completeness analysis
+Column n>3 | Float | Delimiter "," + "EOR"| Lon Lat | Longitude and Latitude coordinate pairs of all polygon vertexes
+
+File Regions_Completeness_Values_HDF5.txt format:
+Column 1 | String | Delimiter ":" | ID | Region for Completeness unique identifier
+Column 2 | String | Delimiter "," | Name | Region name
+Column 3 | String | Delimiter "," | Catalog | Acronym of earthquake catalog used for the completeness analysis
+Column 4 | Integer| Delimiter "," | M35 | Year of completeness in the magnitude bin (Mw > 3.5), NaN = -1 
+Column 5 | Integer| Delimiter "," | M40 | Year of completeness in the magnitude bin (Mw > 4.0), NaN = -1
+Column 6 | Integer| Delimiter "," | M45 | Year of completeness in the magnitude bin (Mw > 4.5), NaN = -1
+Column 7 | Integer| Delimiter "," | M50 | Year of completeness in the magnitude bin (Mw > 5.0), NaN = -1
+Column 8 | Integer| Delimiter "," | M55 | Year of completeness in the magnitude bin (Mw > 5.5), NaN = -1
+Column 9 | Integer| Delimiter "," | M60 | Year of completeness in the magnitude bin (Mw > 6.0), NaN = -1
+Column 10 | Integer| Delimiter "," | M65 | Year of completeness in the magnitude bin (Mw > 6.5), NaN = -1
+Column 11 | Integer| Delimiter "," | M70 | Year of completeness in the magnitude bin (Mw > 7.0), NaN = -1
+Column 12 | Integer| Delimiter "," | M75 | Year of completeness in the magnitude bin (Mw > 7.5), NaN = -1
+Column 13 | Integer| Delimiter "EOR" | M80 | Year of completeness in the magnitude bin (Mw > 8.0), NaN = -1
+
+File Regions_Tectonics_Completeness_Values_HDF5.txt format:
+Column 1 | String | Delimiter ":" | ID | Region unique identifier
+Column 2 | String | Delimiter "," | Catalog | Acronym of earthquake catalog used for the completeness analysis
+Column 3 | String | Delimiter "," | ID | Region for Completeness unique identifier
+Column 4 | Integer| Delimiter "," | M35 | Year of completeness in the magnitude bin (Mw > 3.5), NaN = -1 
+Column 5 | Integer| Delimiter "," | M40 | Year of completeness in the magnitude bin (Mw > 4.0), NaN = -1
+Column 6 | Integer| Delimiter "," | M45 | Year of completeness in the magnitude bin (Mw > 4.5), NaN = -1
+Column 7 | Integer| Delimiter "," | M50 | Year of completeness in the magnitude bin (Mw > 5.0), NaN = -1
+Column 8 | Integer| Delimiter "," | M55 | Year of completeness in the magnitude bin (Mw > 5.5), NaN = -1
+Column 9 | Integer| Delimiter "," | M60 | Year of completeness in the magnitude bin (Mw > 6.0), NaN = -1
+Column 10 | Integer| Delimiter "," | M65 | Year of completeness in the magnitude bin (Mw > 6.5), NaN = -1
+Column 11 | Integer| Delimiter "," | M70 | Year of completeness in the magnitude bin (Mw > 7.0), NaN = -1
+Column 12 | Integer| Delimiter "," | M75 | Year of completeness in the magnitude bin (Mw > 7.5), NaN = -1
+Column 13 | Integer| Delimiter "EOR" | M80 | Year of completeness in the magnitude bin (Mw > 8.0), NaN = -1
+
+File Regions_Tectonics_MwMax_Values_HDF5.txt format:
+Column 1 | String | Delimiter ":" | IDHDF5 | NEAM region unique identifier
+Column 2 | Integer | Delimiter "," | Tectonic_code | Code of the tectonic setting
+Column 3 | Float | Delimiter "," | SHEEC_Mw | Maximum observed Mw from the SHEEC catalogue
+Column 4 | Float | Delimiter "," | NOA_Mw | Maximum observed Mw from the NOA catalogue
+Column 5 | Float | Delimiter "," | ISCGEM_Mw | Maximum observed Mw from the ISCGEM catalogue
+Column 6 | Float | Delimiter "," | GCMT_Mw | Maximum observed Mw from the GCMT catalogue
+Column 7 | Float | Delimiter "," | All_CAT | Maximum observed Mw from all catalogues (SHEEC, NOA, ISCGEM, GCMT)
+Column 8 | Integer | Delimiter "," | SUPER_ZONE | Identifier of the SHARE superzone overlapping the region
+Column 9 | Float | Delimiter "," | SHASZ_Mw | Maximum Mw from the overlapping SHARE superzone
+Column 10 | Float | Delimiter "," | SHASZ_MwU | Maximum Mw from the overlapping SHARE superzone plus uncertainty
+Column 11 | Float | Delimiter "," | EDSFSZ_Mw | Maximum Mw from the overlapping SHARE superzone inferred from EDSF
+Column 12 | Float | Delimiter "," | All_SRC | Maximum Mw from all sources (catalogues and SHARE superzones)
+Column 13 | Float | Delimiter "," | All_CAT_Sett | Maximum observed Mw in all tectonic settings from all catalogues
+Column 14 | Float | Delimiter "," | All_SRC_Sett | Maximum Mw in all tectonic settings from all sources (catalogues and SHARE superzones)
+Column 15 | Float | Delimiter "," | MmaxCrustOnly | Maximum Mw to be used for crustal regions only, obtained as: CEILING(If All_SRC < 6.5 Then MmaxToBeUsed = 6.5 Else MmaxToBeUsed = All_SRC End If; 0.1) 
+Column 16 | Float | Delimiter "EOR" | MmaxCrustSubd | Maximum Mw to be used considering also the presence of subduction (Mmax = 9.00 according to Woessner et al., 2015, SHARE ESHM13, adopted also for the Caribbean, and the Cadiz region treated as SpecialBS)
+
+File Mmax_Tectonic_Settings_Values_HDF5.txt format:
+Column 1 | Integer | Delimiter ":" | Tectonic_code | Code of the tectonic setting
+Column 2 | String | Delimiter "," | Tectonic_setting | Name of the tectonic setting
+Column 3 | Float | Delimiter "," | SHEEC_Mw_max | Maximum observed Mw from the SHEEC catalogue in all regions with the same tectonic setting
+Column 4 | Float | Delimiter "," | SHEEC_Mw_min | Minimum observed Mw from the SHEEC catalogue in all regions with the same tectonic setting
+Column 5 | Float | Delimiter "," | NOA_Mw_max | Maximum observed Mw from the NOA catalogue in all regions with the same tectonic setting
+Column 6 | Float | Delimiter "," | NOA_Mw_min | Minimum observed Mw from the NOA catalogue in all regions with the same tectonic setting
+Column 7 | Float | Delimiter "," | ISCGEM_Mw_max | Maximum observed Mw from the ISCGEM catalogue in all regions with the same tectonic setting
+Column 8 | Float | Delimiter "," | ISCGEM_Mw_min | Minimum observed Mw from the ISCGEM catalogue in all regions with the same tectonic setting
+Column 9 | Float | Delimiter "," | GCMT_Mw_max | Maximum observed Mw from the GCMT catalogue in all regions with the same tectonic setting
+Column 10 | Float | Delimiter "," | GCMT_Mw_min | Minimum observed Mw from the GCMT catalogue in all regions with the same tectonic setting
+Column 11 | Float | Delimiter "," | All_CAT_max | Maximum observed Mw from all catalogues (SHEEC, NOA, ISCGEM, GCMT) in all regions with the same tectonic setting
+Column 12 | Float | Delimiter "," | All_CAT_min | Minimum observed Mw from all catalogues (SHEEC, NOA, ISCGEM, GCMT) in all regions with the same tectonic setting
+Column 13 | Float | Delimiter "," | SHASZ_Mw_max | Maximum Mw from the overlapping SHARE superzone in all regions with the same tectonic setting
+Column 14 | Float | Delimiter "," | SHASZ_Mw_min | Minimum Mw from the overlapping SHARE superzone in all regions with the same tectonic setting
+Column 15 | Float | Delimiter "," | SHASZ_MwU_max | Maximum Mw from the overlapping SHARE superzone plus uncertainty in all regions with the same tectonic setting
+Column 16 | Float | Delimiter "," | SHASZ_MwU_min | Minimum Mw from the overlapping SHARE superzone plus uncertainty in all regions with the same tectonic setting
+Column 17 | Float | Delimiter "," | EDSFSZ_Mw_max | Maximum Mw from the overlapping SHARE superzone inferred from EDSF in all regions with the same tectonic setting
+Column 18 | Float | Delimiter "," | EDSFSZ_Mw_min | Minimum Mw from the overlapping SHARE superzone inferred from EDSF in all regions with the same tectonic setting
+Column 19 | Float | Delimiter "," | All_SRC_max | Maximum Mw from all sources (catalogues and SHARE superzones) in all regions with the same tectonic setting
+Column 20 | Float | Delimiter "EOR" | All_SRC_min | Minimum Mw from all sources (catalogues and SHARE superzones) in all regions with the same tectonic setting
+
+File Regions_Tectonics_FSL_HDF5.txt format: (Fault Scaling Laws)
+Column 1 | String | Delimiter ":" | ID | Region unique identifier
+Column 2 | Integer| Delimiter "," | FSL_TectoCode | Code of the tectonic setting for the Fault Scaling Laws
+Column 3 | String | Delimiter "EOR" | FSL_LawCode | Code of the Fault Scaling Law
+
+File Regions_Tectonics_BSPS_HDF5.txt format: (BS-PS separation)
+Column 1 | String | Delimiter ":" | ID | Region unique identifier
+Column 2 | Integer | Delimiter "EOR" | BSPS | Code 0-5 with the following meanings:
+0: Nothing
+1: BS only (Gaussians)
+2: PS Crustal only 
+3: PS Subduction only (Caribbean)
+4: BS+PS Crustal
+5: BS+PS Subduction (Mediterranean)
+
+

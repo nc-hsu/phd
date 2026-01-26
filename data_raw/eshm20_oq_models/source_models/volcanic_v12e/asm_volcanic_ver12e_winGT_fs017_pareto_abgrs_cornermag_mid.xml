@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nrml xmlns="http://openquake.org/xmlns/nrml/0.4" xmlns:gml="http://www.opengis.net/gml">
+ <sourceModel name="as_model eshm20">
+<areaSource id="allmidITAS733" name="allmidpITAS733" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>14.2852 40.9778 14.5721 40.7207 14.4860 40.6196 13.9141 40.5921 13.7891 40.8315 14.2852 40.9778</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<incrementalMFD minMag="4.60" binWidth="0.2">
+  <occurRates>0.016918460071369896 0.009744729871950419 0.005617645022790474 0.0032433736698778953 0.0018767638210589947 0.0010877427066173923 0.0006266385204392077 0.0003475199173845193 0.00016872736482066253 5.761003501140907E-05 9.132749142110076E-06</occurRates>
+</incrementalMFD>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+<areaSource id="allmidITAS739" name="allmidpITAS739" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>14.8378 37.8357 14.9937 37.9076 15.2950 37.7945 15.1750 37.5134 14.8590 37.5700 14.7940 37.7433 14.8378 37.8357</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<incrementalMFD minMag="4.60" binWidth="0.2">
+  <occurRates>0.028050081561241665 0.014058012841217769 0.0070450425275852685 0.0035295972475488015 0.0017664846310277015 0.0008805934766503069 0.0004327929498099603 0.00020296936862586367 8.296785304533525E-05 2.396659016177944E-05 3.2555049260620713E-06</occurRates>
+</incrementalMFD>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="-90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+<areaSource id="allmidITAS740" name="allmidpITAS740" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>12.6508 41.3338 12.3499 41.7131 12.6731 41.9093 13.0538 41.6362 12.6508 41.3338</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<incrementalMFD minMag="4.60" binWidth="0.2">
+  <occurRates>0.020133205796709148 0.011070319476972379 0.006090131046149543 0.003353150613089048 0.0018480090649823154 0.0010179866331634843 0.0005557014059776907 0.0002911011445742487 0.00013331742453926104 4.3022609917743076E-05 6.4759882916937305E-06</occurRates>
+</incrementalMFD>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+ </sourceModel>
+</nrml>

@@ -1,0 +1,15 @@
+The correlation model in this folder is that described in the paper:
+Baker and Bradley (2017). Intensity Measure Correlations Observed in the NGA-West2 Database, and Dependence
+of Correlations on Rupture and Site Parameters. Earthquake Spectra, Vol. 33 No. 1, 145-156
+
+The data was downloaded on 06.01.2026 from the Supplementary Material provided with the Paper.
+
+Note: There was a correction to the paper and the correlations have changed slightly. 
+The new RSD595 correlations are:
+- rhoPredictedPD_corrected.csv
+- rhoDataPD_corrected.csv
+- rhoPredicted_corrected.csv
+- rhoData_corrected.csv
+
+They were calculated using the matlab code provided by the authors of the original paper. 
+The code and its licence can be found here: https://github.com/bakerjw/NGAW2_correlations
