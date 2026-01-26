@@ -1,12 +1,31 @@
+executables:
+  rscript: "C:/Program Files/R/R-4.5.2/bin/Rscript.exe"
+
+
 project_root: "../../"
 
-data:
-  root: "data"
-  gm_flatfiles: "data/gm_flatfiles"
-  eshm20_hmaps: "data/eshm20_hazard_maps"
-  eu_shapefile: "data/eu_shapfile"
-  WP01: "data/WP01"
-  eshm20_site_model: "data/eshm20_oq_models/eshm20_site_model_v06d.csv"
+raw_data:
+  root: "data_raw"
+  gm_flatfiles: "data_raw/gm_flatfiles"
+  esm_flatfile: data_raw/gm_flatfiles/ESM_flatfile_SA.csv
+  eshm20_hmaps: "data_raw/eshm20_hazard_maps"
+  eshm20_site_model: "data_raw/eshm20_oq_models/eshm20_site_model_v06d.csv"
+  eu_shapefile: "data_raw/eu_shapfile"
+  rho_models: "data_raw/correlation_models"
+  
+proc_data:
+  root: "data_processed"
+  site_selection: "01_site_selection"
+  corr_model: "data_processed/02_im_correlation_model"
+
+results:
+  root: "results"
+  site_selection: "01_site_selection"
+  corr_model: "data_processed/02_im_correlation_model"
+
+scripts: 
+  root: "phd_project/scripts"
+  residual_partitioning: "phd_project/scripts/WP1_ground_motion_set/residual_partitioning"
 
 models:
   case_study: "casestudy_structures"
