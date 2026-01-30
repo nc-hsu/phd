@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nrml xmlns="http://openquake.org/xmlns/nrml/0.4" xmlns:gml="http://www.opengis.net/gml">
+ <sourceModel name="as_model eshm20">
+<areaSource id="all_mid_uppITAS733" name="all_mid_upppITAS733" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>14.2852 40.9778 14.5721 40.7207 14.4860 40.6196 13.9141 40.5921 13.7891 40.8315 14.2852 40.9778</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<truncGutenbergRichterMFD aValue="4.0002 " bValue="1.2000" minMag="4.5" maxMag="6.4"/>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+<areaSource id="all_mid_uppITAS739" name="all_mid_upppITAS739" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>14.8378 37.8357 14.9937 37.9076 15.2950 37.7945 15.1750 37.5134 14.8590 37.5700 14.7940 37.7433 14.8378 37.8357</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<truncGutenbergRichterMFD aValue="5.4998 " bValue="1.5000" minMag="4.5" maxMag="6.4"/>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="-90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+<areaSource id="all_mid_uppITAS740" name="all_mid_upppITAS740" tectonicRegion="Volcanic">
+<areaGeometry>
+ <gml:Polygon>
+  <gml:exterior>
+   <gml:LinearRing>
+    <gml:posList>12.6508 41.3338 12.3499 41.7131 12.6731 41.9093 13.0538 41.6362 12.6508 41.3338</gml:posList>
+   </gml:LinearRing>
+  </gml:exterior>
+ </gml:Polygon>
+ <upperSeismoDepth>1.0</upperSeismoDepth>
+ <lowerSeismoDepth>5.0</lowerSeismoDepth>
+</areaGeometry>
+   <magScaleRel>PointMSR</magScaleRel>
+   <ruptAspectRatio>1.0</ruptAspectRatio>
+<truncGutenbergRichterMFD aValue="4.4998 " bValue="1.3000" minMag="4.5" maxMag="6.4"/>
+    <nodalPlaneDist>
+
+<nodalPlane strike="0.00" dip="90.00" rake="90" probability="1.00" />
+    </nodalPlaneDist>
+    <hypoDepthDist>
+      <hypoDepth depth="2.8" probability="1.0" />
+    </hypoDepthDist>
+</areaSource>
+ </sourceModel>
+</nrml>
