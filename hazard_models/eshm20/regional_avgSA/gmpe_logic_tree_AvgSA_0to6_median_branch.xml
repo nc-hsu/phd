@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nrml
+xmlns="http://openquake.org/xmlns/nrml/0.5"
+xmlns:gml="http://www.opengis.net/gml"
+>
+    <logicTree
+    logicTreeID="ESHM20 Logic Tree - Median Branch"
+    >
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Shallow Default"
+        branchSetID="ASC"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="ASC:AvgSA[0,3]">
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "KothaEtAl2020ESHM20"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_asc"
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Craton"
+        branchSetID="Craton"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Craton:AvgSA[0,3]" >
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "KothaEtAl2020ESHM20"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_asc"
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Subduction Interface"
+        branchSetID="SubInter"
+        uncertaintyType="gmpeModel" >
+            <logicTreeBranch branchID="SubInter:AvgSA[0,3]">
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "BCHydroESHM20SInter"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_sinter"
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Subduction Inslab"
+        branchSetID="SubSlab"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="SubSlab:AvgSA[0,3]">
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "BCHydroESHM20SSlab"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_sslab"
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                    </uncertaintyModel>
+                    <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Non-Subduction Deep"
+        branchSetID="Vrancea"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Vrancea">
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "BCHydroESHM20SSlab"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_vrancea"
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Volcanic"
+        branchSetID="Volcanic"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Volcanic:AvgSA[0,3]">
+                <uncertaintyModel>
+                    [GenericGmpeAvgSA]
+                    gmpe_name = "KothaEtAl2020ESHM20"
+                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    corr_func = "clemett_asc"
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+    </logicTree>
+</nrml>

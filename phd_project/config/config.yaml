@@ -8,9 +8,9 @@ raw_data:
   root: "data_raw"
   gm_flatfiles: "data_raw/gm_flatfiles"
   esm_flatfile: data_raw/gm_flatfiles/ESM_flatfile_SA.csv
+  eshm20_attenuation_regions: data_raw/eshm20_attenuation_regions
   eshm20_hmaps: "data_raw/eshm20_hazard_maps"
-  eshm20_site_model: "data_raw/eshm20_oq_models/eshm20_site_model_v06d.csv"
-  eu_shapefile: "data_raw/eu_shapfile"
+  eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
   
 proc_data:
@@ -20,8 +20,17 @@ proc_data:
 
 results:
   root: "results"
-  site_selection: "01_site_selection"
+  site_selection: "results/01_site_selection"
+  selected_sites_csv: "results/01_site_selection/sites.csv"
   corr_model: "results/02_im_correlation_model"
+
+hazard_models:
+  root: "hazard_models"
+  eshm20: "hazard_models/eshm20"
+  eshm20_site_model: "hazard_models/eshm20/original/eshm20_site_model_v06d.csv"
+  eshm20_AvgSA: "hazard_models/eshm20/regional_AvgSA/"
+  eshm20_AvgSA_site_model_all: "hazard_models/eshm20/regional_AvgSA/site_model_all_sites.csv"
+  eshm20_AvgSA_03_jobfile: "hazard_models/eshm20/regional_AvgSA/config_eshm20_AvgSA_0to3.ini"
 
 scripts: 
   root: "phd_project/scripts"
