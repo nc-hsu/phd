@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import pandas as pd
 
 def get_hcurve_from_dstore(dstore, site, im , stat):
     # TODO
@@ -13,9 +14,11 @@ def get_imtls(dstore):
     return dstore["oqparam"].hazard_imtls
 
 
-def get_hcurves_from_dstore(dstore):
+def get_hcurves_from_dstore(dstore, mafe:bool=True):
+    # if mafe == True then the poe from OQ is converted to a MAFE
     site_hcs = {}
 
+    investigation_time = dstore["oqparam"].investigation_time
     hc_data = dstore["hcurves-stats"]
     hc_metadata = get_hc_metadata(dstore)
     all_imtls = get_imtls(dstore)
@@ -28,8 +31,12 @@ def get_hcurves_from_dstore(dstore):
             stat_hcs = {}
             for stat_i, stat in enumerate(hc_metadata["stat"]):
                 # get the hc
+                y_data = s_data[stat_i, imt_i, :].reshape(-1, 1)
+                if mafe:
+                    y_data = -np.log(1-y_data) / investigation_time
+                
                 hc = np.hstack([np.array(imtls).reshape(-1, 1),
-                                s_data[stat_i, imt_i, :].reshape(-1, 1)])
+                                y_data])
                 stat_hcs[stat] = hc
             
             imt_hcs[imt] = stat_hcs
@@ -45,13 +52,12 @@ def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
     The return dict has the following structure:
     return_dict[site_id][imt][poe] = pd.DataFrame of disaggregation results
     """
+    investigation_time = dstore["oqparam"].investigation_time
     site_disaggs = {}
     disagg_data = dstore["disagg-stats"][disagg_type]
     shape_descr = disagg_data.attrs["shape_descr"]
 
     disagg_bins = get_bins(dstore, disagg_type)
-
-    # TODO:: get the iml from the datastore / hazard maps as well
 
     # extract the hazard curves based on the index
     for site_i in range(disagg_data.shape[0]): # loop through the sites
@@ -60,7 +66,12 @@ def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
             poe_disagg = {}
             for poe_i, poe in enumerate(disagg_bins["poe"]):
                 disagg_slice = _build_slice(site_i, poe_i, imt_i, shape_descr)
-                poe_disagg[poe] = disagg_data[disagg_slice]
+                df = _disagg_array_to_df(disagg_data[disagg_slice], 
+                                         disagg_type, disagg_bins)
+                if traditional:
+                    df = _get_traditional_disagg(df, investigation_time)
+                poe_disagg[poe] = df
+            poe_disagg
             imt_disagg[imt] = poe_disagg
         site_disaggs[site_i] = imt_disagg
 
@@ -90,6 +101,7 @@ def get_probability(dstore, disagg_type,
                     site_idx, imt_bin, poe_bin, trt_bin, mag_bin, 
                     dist_bin, eps_bin):
     
+    # todo:: replace with get_bins
     mag_bins = _bins_from_edges(dstore["disagg-bins/Mag"])
     eps_bins = _bins_from_edges(dstore["disagg-bins/Eps"])
     dist_bins = _bins_from_edges(dstore["disagg-bins/Dist"])
@@ -124,3 +136,38 @@ def _build_slice(site_id, poe_idx, imt_idx, shape_descr):
         slice(None)
     ) 
     return index
+
+
+def _disagg_array_to_df(arr, disagg_type, disagg_bins):
+    idx = np.indices(arr.shape)
+    flat_indices = idx.reshape(len(arr.shape), -1).T
+    flat_data = arr.ravel()[:, np.newaxis]
+    combined_data = np.hstack((flat_indices, flat_data))
+    cols = [s for s in disagg_type.split("_") ] + ["Z", 'P(X>x|T,m)']
+    df = pd.DataFrame(combined_data, columns=cols)
+
+    # replace the idx values with the actual data
+    value_map = {}
+    for bin, bin_vals in disagg_bins.items():
+        if bin in disagg_type.split("_"):
+            value_map[bin] = {ii:v for ii, v in enumerate(bin_vals)}
+
+    for col, map in value_map.items():
+        df[col] = df[col].map(map)
+
+    return df
+
+
+def _get_traditional_disagg(df, investigation_time):
+    # calculate the traditional disaggregation results, P(m|X>x) from the 
+    # the outputs of 
+    df["nu_m"] = -np.log(1-df["P(X>x|T,m)"]) / investigation_time
+    P_X_gt_x = 1 - np.prod(1-df["P(X>x|T,m)"])
+    nu = -np.log(1-P_X_gt_x) / investigation_time
+    df["P(m|X>x)"] = df["nu_m"] / nu
+    return df
+
+
+def get_imtl_from_hmap(dstore, site_idx, imt_idx, poe_idx, stat_idx=0):
+    # only works if the poe has a hmap. Interpolation not supported
+    return dstore["hmaps-stats"][site_idx, stat_idx, imt_idx, poe_idx]

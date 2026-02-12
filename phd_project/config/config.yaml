@@ -15,7 +15,8 @@ raw_data:
   
 proc_data:
   root: "data_processed"
-  site_selection: "01_site_selection"
+  site_selection: "data_processed/01_site_selection"
+  site_hazard_disaggregation: "data_processed/03_site_hazard_disaggregation"
   corr_model: "data_processed/02_im_correlation_model"
 
 results:
