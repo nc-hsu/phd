@@ -21,7 +21,7 @@ cfg = load_config()
 
 flatfile_folder = cfg["raw_data"]["gm_flatfiles"]
 esm_flatfile_fp = flatfile_folder / "ESM_flatfile_SA.csv"
-site_model_fp = cfg["raw_data"]["eshm20_site_model"]
+site_model_fp = cfg["hazard_models"]["eshm20_site_model"]
 
 def load_esm_flatfile(file_path) -> pd.DataFrame:
     # load all columns as strings to prevent any unintended formatting changes
@@ -290,67 +290,6 @@ def set_new_rake(df, new_rake_angle):
     # sets a new rake angle for all records where one is not already specified
     df["rake"] = df["es_rake"].fillna(new_rake_angle)
     return df
-
-
-# def rename_SA_data(sa_df: pd.DataFrame):
-#     new_names = eqdb.expand_SA_column_names(sa_df.columns)
-#     sa_df.columns = new_names
-#     return sa_df
-
-
-# def rename_im_columns(im_df: pd.DataFrame):
-#     im_df = eqdb.rename_sa_columns_esm(im_df)
-#     im_df = im_df.rename(columns={c: (c.split("_")[0], c.split("_")[1]) 
-#                                 for c in im_df.columns})
-#     im_df.columns = pd.MultiIndex.from_tuples(im_df.columns)
-#     im_df.columns = pd.MultiIndex.from_tuples(
-#         [(l1, l2, "None") for l1, l2 in im_df.columns]) #  make it three level
-
-#     # for each component expand the SA ims out to three levels
-#     pattern = re.compile(rf"SA\(([\d.]+)\)")
-
-#     new_labels = []
-#     for c in im_df.columns:
-#         if c[1].startswith("SA"):
-#             im = "SA"
-#             m = pattern.search(c[1])
-#             if m:
-#                 t = float(m.group(1))
-#             else:
-#                 t = "None"
-#         else:
-#             im = eqdb.esm_nonSA_im_translations[c[1]]
-#             t = "None"
-
-#         new_labels.append((c[0], im, t))
-
-#     im_df.columns = pd.MultiIndex.from_tuples(new_labels)
-
-    # name_mapper = {}
-    # for component in components:
-    #     if component == "GM":
-    #         continue
-    #     keys = dfops.extract_keys_from_labels(
-    #         pattern, im_df[component], return_keys=True)
-    #     name_mapper = name_mapper | {(component, v[0], v[1]): (component, "SA", k) for k,v in keys.items()} 
-        
-    # im_df.columns = im_df.columns.to_flat_index()
-    # im_df = im_df.rename(columns=name_mapper)
-
-    # return im_df
-
-
-
-
-# def expand_names():
-#     im_df = eqdb.rename_sa_columns_esm(im_df)
-#     im_df = im_df.dropna(axis=0)
-#     im_df = im_df.rename(columns={c: (c.split("_")[0], c.split("_")[1]) 
-#                                 for c in im_df.columns})
-#     im_df.columns = pd.MultiIndex.from_tuples(im_df.columns)
-#     im_df.columns = pd.MultiIndex.from_tuples(
-#         [(l1, l2, "None") for l1, l2 in im_df.columns]) #  make it three level
-
 
 
 

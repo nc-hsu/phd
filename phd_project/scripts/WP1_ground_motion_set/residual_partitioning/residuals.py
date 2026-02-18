@@ -37,8 +37,12 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
             f"    GMM AvgSA :  {gmm_AvgSA}\n")
 
     ims = {"pga": "PGA", "T90": "RSD595", "SA":"SA", 
-            "AvgSA[0,3]":"AvgSA[0,3]", "AvgSA[0,6]":"AvgSA[0,6]"}
+            "AvgSA([0, 3])":"AvgSA([0, 3])", "AvgSA[0, 6]":"AvgSA([0, 6])"}
     
+    n_periods = 10
+    upper_periods = {"AvgSA([0, 3])": 3.0,
+                     "AvgSA([0, 6])": 6.0}
+
     df = load_flatfile(flatfile_fp)
     im_df, metadata = organise_database_for_residual_calculations(df, ims)
     ctxs = create_site_rup_ctx(metadata)
@@ -71,10 +75,12 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
     obs[("GM", "RSD595", "None")] = np.log(im_df.loc[:, idx["GM", "RSD595", "None"]])
     pred[("GM", "RSD595", "None")] = pred_rsd595[0,:]
 
-    # calculate the residuals for AvgSA[0,3] and AvgSA[0,6] and append to dataframes
+    # calculate the residuals for AvgSA([0, 3]) and AvgSA([0, 6]) and append to dataframes
     AvgSA_cols = [c for c in im_df if "AvgSA" in c[1]]
     for AvgSA_col in AvgSA_cols:
-        imts = [PGA()] + [SA(t) for t in np.linspace(0, AvgSA_col[2])[1:]]
+        # get the upper period periods
+        T_upper = upper_periods[AvgSA_col[1]]
+        imts = [PGA()] + [SA(t) for t in np.linspace(0, T_upper, n_periods)[1:]]
         pred_AvgSA = np.zeros((1, len(ctxs)))
         gmm_AvgSA.compute(ctxs, imts, pred_AvgSA)
 
@@ -132,7 +138,7 @@ def organise_database_for_residual_calculations(df: pd.DataFrame, ims:dict[str, 
 
     # for each component expand the SA and AvgSA ims out to three levels
     SA_pattern = re.compile(rf"SA\(([\d.]+)\)")
-    AvgSA_pattern = re.compile(rf"AvgSA\[\d*\.?\d+,(\d*\.?\d+)\]")
+    AvgSA_pattern = re.compile(rf"AvgSA\(\[\d*\.?\d+,\s*(\d*\.?\d+)\]\)")
     
     new_labels = []
     for c in im_df.columns:
@@ -164,8 +170,8 @@ def organise_database_for_residual_calculations(df: pd.DataFrame, ims:dict[str, 
 
     # perform unit conversions of the ims that remain
     unit_conv = eqdb.esm_unit_conversions
-    unit_conv["AvgSA[0,3]"] = 1/981.0       # from cm/s2 to g
-    unit_conv["AvgSA[0,6]"] = 1/981.0       # from cm/s2 to g
+    unit_conv["AvgSA([0, 3])"] = 1/981.0       # from cm/s2 to g
+    unit_conv["AvgSA([0, 6])"] = 1/981.0       # from cm/s2 to g
 
     for im, sf in unit_conv.items():
         columns_to_scale = im_df.loc[:, idx[:, im, :]].columns
@@ -203,28 +209,49 @@ def create_site_rup_ctx(metadata: pd.DataFrame):
 def unmangle_AvgSA_column_names(column_name):
     # R mangles the AvgSA column names becuase [] and , are not allowed.
     # This function unmangles the _AvgSA.x.x._3.0 column name and returns it to
-    # _AvgSA[x,x]_
+    # _AvgSA[(x,x)]_
     """
     A robust version for Earthquake Engineering data.
     Uses regex to identify numbers (including decimals) and preserves them,
     only replacing the dots that act as delimiters.
     """
-    # Pattern: match prefix, then '.', then a number, then '.', 
-    # then another number, then '.' followed by the rest.
-    # We use (\d+\.?\d*) to capture numbers like '0' or '0.5'
-    pattern = r'(.*_AvgSA)\.(\d+\.?\d*)\.(\d+\.?\d*)\.(.*)'
+    # Pattern Breakdown:
+    # (.*_AvgSA)           -> Group 1: Prefix
+    # \.+                  -> One or more dots (delimiter)
+    # (\d+\.\d+|\d+)       -> Group 2: x1 (either float with digits after dot OR int)
+    # \.+                  -> One or more dots (delimiter)
+    # (\d+\.\d+|\d+)       -> Group 3: x2 (either float with digits after dot OR int)
+    # \.+                  -> One or more dots (delimiter)
+    # (.*)                 -> Group 4: Suffix
+    pattern = r'(.*_AvgSA)\.+(\d+(?:\.\d+)?)\.+(\d+(?:\.\d+)?)\.+(.*)'
     
     match = re.match(pattern, column_name)
     if match:
         prefix, x1, x2, suffix = match.groups()
-        return f"{prefix}[{x1},{x2}]{suffix}"
+        return f"{prefix}([{x1}, {x2}]){suffix}"
     
     return column_name
 
 
 
 if __name__ == "__main__":  
-    mangled = "rotD50_AvgSA.0.5.2.5._3.0_Delta"
-    unmangled = unmangle_AvgSA_column_names(mangled)
-    print(unmangled)
+    # from openquake.hazardlib.gsim.kotha_2020 import KothaEtAl2020ESHM20
+    # from openquake.hazardlib.gsim.bahrampouri_2021_duration import BahrampouriEtAldm2021Asc
+    # from pickagm.avgSA import indirect_AvgSA_GMPE 
+    # flatfile_fp = Path(r"C:/Users/clemettn/Documents/phd/data_processed/02_im_correlation_model/reverse/flatfiles/asc_reverse_flatfile.csv")
+    # residuals_fp = Path(r"C:/Users/clemettn/Documents/phd/data_processed/02_im_correlation_model/reverse/residual_partitioning/asc_reverse_total_residuals.csv")
+    # gmms = {
+    #     "file": "",
+    #     "gmm_PGA_SA": KothaEtAl2020ESHM20(),
+    #     "gmm_RSD595": BahrampouriEtAldm2021Asc(),
+    #     "gmm_AvgSA": indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(), mean_only=True)
+    #     }
+    # calculate_residuals(flatfile_fp, gmms, residuals_fp)
+    # pass
+
+    test_input = "rotD50_AvgSA..0..3.._None_dBe"
+    output = unmangle_AvgSA_column_names(test_input)
+
+    print(f"Input:  {test_input}")
+    print(f"Output: {output}")
     ...

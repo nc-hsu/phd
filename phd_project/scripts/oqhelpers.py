@@ -1,6 +1,8 @@
 import json
 import numpy as np
 import pandas as pd
+import xml.etree.ElementTree as ET
+import ast
 
 def get_hcurve_from_dstore(dstore, site, im , stat):
     # TODO
@@ -45,7 +47,7 @@ def get_hcurves_from_dstore(dstore, mafe:bool=True):
 
 
 def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps", 
-                              traditional=False):
+                              traditional=False, occurence=False):
     """
     Returns a dict. Each value corresponds to a site (key) and contains
     the dissaggreation results. 
@@ -68,8 +70,12 @@ def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
                 disagg_slice = _build_slice(site_i, poe_i, imt_i, shape_descr)
                 df = _disagg_array_to_df(disagg_data[disagg_slice], 
                                          disagg_type, disagg_bins)
-                if traditional:
+                if occurence:
+                    df =  _get_occurence_disagg(df)
+
+                if traditional and not occurence:
                     df = _get_traditional_disagg(df, investigation_time)
+                
                 poe_disagg[poe] = df
             poe_disagg
             imt_disagg[imt] = poe_disagg
@@ -160,7 +166,7 @@ def _disagg_array_to_df(arr, disagg_type, disagg_bins):
 
 def _get_traditional_disagg(df, investigation_time):
     # calculate the traditional disaggregation results, P(m|X>x) from the 
-    # the outputs of 
+    # the outputs of OQ. m = rupture
     df["nu_m"] = -np.log(1-df["P(X>x|T,m)"]) / investigation_time
     P_X_gt_x = 1 - np.prod(1-df["P(X>x|T,m)"])
     nu = -np.log(1-P_X_gt_x) / investigation_time
@@ -168,6 +174,92 @@ def _get_traditional_disagg(df, investigation_time):
     return df
 
 
+def _get_occurence_disagg(df, investigation_time, imtl, delta=0.001):
+    # calculate the disaggregation results based on occurence, P(m|X=x)
+
+    # first do the traditional disaggregation
+    df = _get_traditional_disagg(df, investigation_time)
+    delta_im = delta * imtl
+    lambda_im1 = ... # lambda_im
+    lambda_im2 = ... # lambda_(im + delta_im)
+    delta_lambda = lambda_im1 - lambda_im2
+    df["P(m|X=x)"] = (df["P(m|X>x)"] * lambda_im1 - df["P(m|X>x)"] * lambda_im2) / delta_lambda
+
+
 def get_imtl_from_hmap(dstore, site_idx, imt_idx, poe_idx, stat_idx=0):
     # only works if the poe has a hmap. Interpolation not supported
     return dstore["hmaps-stats"][site_idx, stat_idx, imt_idx, poe_idx]
+
+
+def parse_value(val_str):
+    """Converts string values to appropriate Python types."""
+    val_str = val_str.strip()
+    
+    # Handle Strings: "value" or 'value'
+    if (val_str.startswith('"') and val_str.endswith('"')) or \
+       (val_str.startswith("'") and val_str.endswith("'")):
+        return val_str[1:-1]
+    
+    # Handle Lists: [1, 2, 3]
+    if val_str.startswith('[') and val_str.endswith(']'):
+        try:
+            return ast.literal_eval(val_str)
+        except (ValueError, SyntaxError):
+            return val_str
+            
+    # Handle Numbers: 1.0, -2.85
+    try:
+        return float(val_str)
+    except ValueError:
+        return val_str
+
+def parse_nrml_logic_tree(file_path):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+    results = {}
+
+    # Iterate through each tectonic region branch set
+    for branch_set in root.findall('.//{*}logicTreeBranchSet'):
+        region_type = branch_set.get('applyToTectonicRegionType')
+        
+        if region_type not in results:
+            results[region_type] = {}
+        
+        for branch in branch_set.findall('{*}logicTreeBranch'):
+            branch_id = branch.get('branchID')
+            
+            # Extract and convert weight
+            weight_elem = branch.find('{*}uncertaintyWeight')
+            weight = float(weight_elem.text.strip()) if weight_elem is not None else 1.0
+            
+            model_elem = branch.find('{*}uncertaintyModel')
+            params = {}
+            if model_elem is not None and model_elem.text:
+                model_text = model_elem.text.strip()
+                for line in model_text.split('\n'):
+                    line = line.strip()
+                    # Skip the [GenericGmpeAvgSA] or [ModelName] headers
+                    if not line or (line.startswith('[') and ']' in line and '=' not in line):
+                        continue
+                    
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        params[k.strip()] = parse_value(v.strip())
+                    else:
+                        # Fallback for simple model names like 'LanzanoLuzi2019'
+                        params['model_name'] = line
+            
+            results[region_type][branch_id] = {
+                'weight': weight,
+                'params': params
+            }
+            
+    return results
+
+
+if __name__ == "__main__":
+    from phd_project.config.config import load_config
+    cfg = load_config()
+    fp = cfg["hazard_models"]["eshm20_AvgSA"] / "gmpe_logic_tree_AvgSA_0to3_median_branch.xml"
+    output = parse_nrml_logic_tree(file_path=fp)
+    pass
