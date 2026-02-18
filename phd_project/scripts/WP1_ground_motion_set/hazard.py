@@ -1,3 +1,4 @@
+import xml.etree.ElementTree as ET
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -123,54 +124,62 @@ def get_disagg_stats_from_groups(groups_disagg, site_metadata, hmaps,
     return df
 
 
-def plot_disaggregation_3d(ax, df, catx, caty, catz, colour_map, dx, dy):
-    agg_df = df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
 
-    # Get unique sorted values for axes
-    x_vals = np.array(sorted(agg_df[catx].unique()))
-    y_vals = np.array(sorted(agg_df[caty].unique()))
-    catz_vals = np.array(sorted(agg_df[catz].unique()))
+
+
+
+
+
+
+
+
+
+# def plot_disaggregation_3d(ax, df, catx, caty, catz, colour_map, dx, dy):
+#     agg_df = df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
+
+#     # Get unique sorted values for axes
+#     x_vals = np.array(sorted(agg_df[catx].unique()))
+#     y_vals = np.array(sorted(agg_df[caty].unique()))
+#     catz_vals = np.array(sorted(agg_df[catz].unique()))
     
-    # Create mappings for grid placement
-    # x_map = {val: i for i, val in enumerate(x_vals)}
-    # y_map = {val: i for i, val in enumerate(y_vals)} 
+#     # Create mappings for grid placement
+#     # x_map = {val: i for i, val in enumerate(x_vals)}
+#     # y_map = {val: i for i, val in enumerate(y_vals)} 
 
-    # Track the "bottom" height for stacking
-    bottom = np.zeros((len(x_vals), len(y_vals)))
+#     # Track the "bottom" height for stacking
+#     bottom = np.zeros((len(x_vals), len(y_vals)))
     
-    # Standard color map for Epsilon bins
-    colors = colour_map  
+#     # Standard color map for Epsilon bins
+#     colors = colour_map  
 
-    # 2. Plot each Epsilon bin as a layer
-    for i, catz_val in enumerate(catz_vals):
-        # subset = agg_df[agg_df[catz] == catz_val]
+#     # 2. Plot each Epsilon bin as a layer
+#     for i, catz_val in enumerate(catz_vals):
+#         # subset = agg_df[agg_df[catz] == catz_val]
         
-        # Height of current epsilon layer
-        dz = agg_df[agg_df[catz] == catz_val].pivot_table(index=catx, 
-                columns=caty, values='P(m|X>x)', aggfunc='sum')
-        dz = dz.reindex(index=x_vals, columns=y_vals).fillna(0).values
+#         # Height of current epsilon layer
+#         dz = agg_df[agg_df[catz] == catz_val].pivot_table(index=catx, 
+#                 columns=caty, values='P(m|X>x)', aggfunc='sum')
+#         dz = dz.reindex(index=x_vals, columns=y_vals).fillna(0).values
         
-        # Flatten for bar3d
-        xpos, ypos = np.meshgrid(x_vals - dx/2, y_vals - dy/2, indexing='ij')
-        xpos = xpos.ravel()
-        ypos = ypos.ravel()
-        zpos = bottom.ravel()
-        dz_flat = dz.ravel()
+#         # Flatten for bar3d
+#         xpos, ypos = np.meshgrid(x_vals - dx/2, y_vals - dy/2, indexing='ij')
+#         xpos = xpos.ravel()
+#         ypos = ypos.ravel()
+#         zpos = bottom.ravel()
+#         dz_flat = dz.ravel()
         
-        # Draw the 3D bars for this Eps slice
-        ax.bar3d(xpos, ypos, zpos, dx, dy, dz_flat, 
-                 color=colors[i], label=f'{catz}: {catz_val}', alpha=1)
+#         # Draw the 3D bars for this Eps slice
+#         ax.bar3d(xpos, ypos, zpos, dx, dy, dz_flat, 
+#                  color=colors[i], label=f'{catz}: {catz_val}', alpha=1)
         
-        # Update bottom for the next Eps layer
-        bottom += dz 
+#         # Update bottom for the next Eps layer
+#         bottom += dz 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from openquake.commonlib.datastore import read
     from phd_project.scripts.oqhelpers import get_bins
-    from phd_project.config.config import load_config
-    import pyvista as pv
-    cfg = load_config()
+    
     
     # load the site model and the sites
     sel_sites = pd.read_csv(cfg["results"]["selected_sites_csv"])
@@ -190,53 +199,24 @@ if __name__ == "__main__":
     disagg_stats = get_disagg_stats_from_groups(groups_disagg, site_metadata,
                                                 hmaps, geodf=False)
     
-    # Matplotlib
-    # Plot a disaggregation plot 1x2.
-    # Left side shows colours for TRT and the right for Eps
-    cmap = plt.get_cmap("jet", len(bins["Eps"]))
-    bounds = np.linspace(-3, 3, 7)
-    # cmaplist = [cmap(i) for i in range(cmap.N)]
-    # # create the new map
-    # cmap = mpl.colors.LinearSegmentedColormap.from_list(
-    # 'Custom cmap', cmaplist, cmap.N)
+    # # Matplotlib
+    # # Plot a disaggregation plot 1x2.
+    # # Left side shows colours for TRT and the right for Eps
+    # cmap = plt.get_cmap("jet", len(bins["Eps"]))
+    # bounds = np.linspace(-3, 3, 7)
+    # # cmaplist = [cmap(i) for i in range(cmap.N)]
+    # # # create the new map
+    # # cmap = mpl.colors.LinearSegmentedColormap.from_list(
+    # # 'Custom cmap', cmaplist, cmap.N)
 
     
-    fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
-    df = groups_disagg[("lowmod", 0)][0]["AvgSA"][0.02]
-    # plot_disaggregation_3d(ax, df, "Mag", "Dist", "Eps", colour_map, dx=0.5, dy=20)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection="3d")
+    # df = groups_disagg[("lowmod", 0)][0]["AvgSA"][0.02]
+    # # plot_disaggregation_3d(ax, df, "Mag", "Dist", "Eps", colour_map, dx=0.5, dy=20)
 
-    elev = 30
-    azim = 60
-    catx = "Mag"
-    caty = "Dist"
-    catz = "Eps"
-    dx = 0.1
-    dy = 10
-    width_sf = 1.0
-
-    agg_df = df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
-    agg_df["bar_top"] = agg_df.groupby([catx, caty])['P(m|X>x)'].cumsum()
-    agg_df["bar_bot"] = agg_df["bar_top"] - agg_df['P(m|X>x)']
-
-    # x_range = df[catx].max() - df[catx].min()
-    # y_range = df[caty].max() - df[caty].min()
-    # ax.set_box_aspect((x_range, y_range, (x_range + y_range) / 4))
-
-    # 2. Plot each Epsilon bin as a layer
-    catz_vals = sorted(agg_df[catz].unique())
-    for ii, catz_val in enumerate(catz_vals):
-        
-        subset = agg_df[agg_df[catz] == catz_val]
-        # Draw the 3D bars for this Eps slice
-        ax.bar3d(subset[catx]-dx/2, subset[caty]-dy/2, subset["bar_bot"], 
-                 dx * width_sf, dy * width_sf, subset["P(m|X>x)"], 
-                 color=cmap(ii), label=f'{catz}: {catz_val}', shade=False,
-                 edgecolor="k", linewidth=0.25, alpha=0.8)
-        ax.view_init(elev=elev, azim=azim, roll=0)
-    plt.show()
-
-    # ## PyVista
+    # elev = 30
+    # azim = 60
     # catx = "Mag"
     # caty = "Dist"
     # catz = "Eps"
@@ -244,97 +224,126 @@ if __name__ == "__main__":
     # dy = 10
     # width_sf = 1.0
 
-    # poe_df = groups_disagg[("lowmod", 0)][0]["AvgSA"][0.02]
-    # df = poe_df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
-    # df["bar_top"] = df.groupby([catx, caty])['P(m|X>x)'].cumsum()
-    # df["bar_bot"] = df["bar_top"] - df['P(m|X>x)']
+    # agg_df = df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
+    # agg_df["bar_top"] = agg_df.groupby([catx, caty])['P(m|X>x)'].cumsum()
+    # agg_df["bar_bot"] = agg_df["bar_top"] - agg_df['P(m|X>x)']
 
-    # # Define a colormap for Epsilon
-    # catz_vals = np.sort(df[catz].unique())
-    # colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+    # # x_range = df[catx].max() - df[catx].min()
+    # # y_range = df[caty].max() - df[caty].min()
+    # # ax.set_box_aspect((x_range, y_range, (x_range + y_range) / 4))
 
-    # # Axes and ranges
-    # x_min, x_max = 4.0, 10.0
-    # y_min, y_max = 0, 500
-    # z_min, z_max = 0, df["bar_top"].max()
+    # # 2. Plot each Epsilon bin as a layer
+    # catz_vals = sorted(agg_df[catz].unique())
+    # for ii, catz_val in enumerate(catz_vals):
+        
+    #     subset = agg_df[agg_df[catz] == catz_val]
+    #     # Draw the 3D bars for this Eps slice
+    #     ax.bar3d(subset[catx]-dx/2, subset[caty]-dy/2, subset["bar_bot"], 
+    #              dx * width_sf, dy * width_sf, subset["P(m|X>x)"], 
+    #              color=cmap(ii), label=f'{catz}: {catz_val}', shade=False,
+    #              edgecolor="k", linewidth=0.25, alpha=0.8)
+    #     ax.view_init(elev=elev, azim=azim, roll=0)
+    # plt.show()
 
-    # # 2. Initialize Plotter
-    # plotter = pv.Plotter()
+    # # ## PyVista
+    # # catx = "Mag"
+    # # caty = "Dist"
+    # # catz = "Eps"
+    # # dx = 0.1
+    # # dy = 10
+    # # width_sf = 1.0
+
+    # # poe_df = groups_disagg[("lowmod", 0)][0]["AvgSA"][0.02]
+    # # df = poe_df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
+    # # df["bar_top"] = df.groupby([catx, caty])['P(m|X>x)'].cumsum()
+    # # df["bar_bot"] = df["bar_top"] - df['P(m|X>x)']
+
+    # # # Define a colormap for Epsilon
+    # # catz_vals = np.sort(df[catz].unique())
+    # # colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+
+    # # # Axes and ranges
+    # # x_min, x_max = 4.0, 10.0
+    # # y_min, y_max = 0, 500
+    # # z_min, z_max = 0, df["bar_top"].max()
+
+    # # # 2. Initialize Plotter
+    # # plotter = pv.Plotter()
     
-    # # We want 1 unit of Magnitude to look like 'scale' units of Distance
-    # # If dy=10 and dx=0.1, we need x_scale to be 100 to make the base square
-    # desired_x_size = dy  # We want the x-width to visually match the y-length
-    # x_scale_factor = desired_x_size / dx 
+    # # # We want 1 unit of Magnitude to look like 'scale' units of Distance
+    # # # If dy=10 and dx=0.1, we need x_scale to be 100 to make the base square
+    # # desired_x_size = dy  # We want the x-width to visually match the y-length
+    # # x_scale_factor = desired_x_size / dx 
 
-    # # For Z, we want the max bar height to be visually significant (e.g., 1/4 of Y range)
-    # z_scale_factor = (y_max / 4) / df["bar_top"].max()
+    # # # For Z, we want the max bar height to be visually significant (e.g., 1/4 of Y range)
+    # # z_scale_factor = (y_max / 4) / df["bar_top"].max()
 
-    # # 3. Create Meshes
-    # for i, catz_val in enumerate(catz_vals):
-    #     subset = df[df[catz] == catz_val]
+    # # # 3. Create Meshes
+    # # for i, catz_val in enumerate(catz_vals):
+    # #     subset = df[df[catz] == catz_val]
         
-    #     # We can combine all bars of the same Epsilon into one mesh 
-    #     # for better performance
-    #     eps_meshes = []
-    #     for _, row in subset.iterrows():
-    #         # Create a box at the specific location
-    #         # PyVista Box bounds: (xmin, xmax, ymin, ymax, zmin, zmax)
-    #         box = pv.Box(bounds=(
-    #             row[catx] - dx/2, row[catx] + dx/2,
-    #             row[caty] - dy/2, row[caty] + dy/2,
-    #             row["bar_bot"], row["bar_top"]
-    #         ))
-    #         eps_meshes.append(box)
+    # #     # We can combine all bars of the same Epsilon into one mesh 
+    # #     # for better performance
+    # #     eps_meshes = []
+    # #     for _, row in subset.iterrows():
+    # #         # Create a box at the specific location
+    # #         # PyVista Box bounds: (xmin, xmax, ymin, ymax, zmin, zmax)
+    # #         box = pv.Box(bounds=(
+    # #             row[catx] - dx/2, row[catx] + dx/2,
+    # #             row[caty] - dy/2, row[caty] + dy/2,
+    # #             row["bar_bot"], row["bar_top"]
+    # #         ))
+    # #         eps_meshes.append(box)
         
-    #     # Merge all boxes for this Epsilon into a single multiblock or polydata
-    #     combined = pv.merge(eps_meshes)
+    # #     # Merge all boxes for this Epsilon into a single multiblock or polydata
+    # #     combined = pv.merge(eps_meshes)
         
-    #     # Add to plotter
-    #     actor = plotter.add_mesh(
-    #         combined, 
-    #         color=colors[i % len(colors)], 
-    #         label=f"{catz} {catz_val}",
-    #         smooth_shading=False,
-    #         show_edges=True,  # This gives you the clean black outlines
-    #         edge_color='black'
-    #     )
+    # #     # Add to plotter
+    # #     actor = plotter.add_mesh(
+    # #         combined, 
+    # #         color=colors[i % len(colors)], 
+    # #         label=f"{catz} {catz_val}",
+    # #         smooth_shading=False,
+    # #         show_edges=True,  # This gives you the clean black outlines
+    # #         edge_color='black'
+    # #     )
 
-    #     # APPLY THE SCALE TO THE ACTOR
-    #     # This stretches the Magnitude and Probability visually
-    #     actor.scale = [x_scale_factor, 1.0, z_scale_factor]
+    # #     # APPLY THE SCALE TO THE ACTOR
+    # #     # This stretches the Magnitude and Probability visually
+    # #     actor.scale = [x_scale_factor, 1.0, z_scale_factor]
     
 
-    # # # Create manual tick arrays in "Engineering Units"
-    # # x_ticks_data = np.arange(x_min, x_max + 0.5, 0.5)
-    # # y_ticks_data = np.arange(y_min, y_max + 50, 50)
+    # # # # Create manual tick arrays in "Engineering Units"
+    # # # x_ticks_data = np.arange(x_min, x_max + 0.5, 0.5)
+    # # # y_ticks_data = np.arange(y_min, y_max + 50, 50)
 
-    # # 4. Final Formatting
-    # # This defines the visual box where the grid lives
-    # scaled_bounds = (
-    #         x_min * x_scale, x_max * x_scale,
-    #         y_min, y_max,
-    #         z_min * z_scale, z_max * z_scale
-    #     )
+    # # # 4. Final Formatting
+    # # # This defines the visual box where the grid lives
+    # # scaled_bounds = (
+    # #         x_min * x_scale, x_max * x_scale,
+    # #         y_min, y_max,
+    # #         z_min * z_scale, z_max * z_scale
+    # #     )
 
-    # grid_actor = plotter.show_grid(
-    #     bounds=scaled_bounds,
-    #     xtitle="Magnitude (Mw)",
-    #     ytitle="Distance (km)",
-    #     ztitle="Contribution",
-    #     # Pass scaled world positions for tick placement
-    #     # xticks=x_ticks_data * x_scale,
-    #     # yticks=y_ticks_data * y_scale,
-    #     # Pass strings for the actual labels shown
-    #     # xticklabels=[f"{v:.1f}" for v in x_ticks_data],
-    #     # yticklabels=[f"{int(v)}" for v in y_ticks_data],
-    #     color='black',
-    #     location='outer',
-    #     padding=0.05
-    # )
+    # # grid_actor = plotter.show_grid(
+    # #     bounds=scaled_bounds,
+    # #     xtitle="Magnitude (Mw)",
+    # #     ytitle="Distance (km)",
+    # #     ztitle="Contribution",
+    # #     # Pass scaled world positions for tick placement
+    # #     # xticks=x_ticks_data * x_scale,
+    # #     # yticks=y_ticks_data * y_scale,
+    # #     # Pass strings for the actual labels shown
+    # #     # xticklabels=[f"{v:.1f}" for v in x_ticks_data],
+    # #     # yticklabels=[f"{int(v)}" for v in y_ticks_data],
+    # #     color='black',
+    # #     location='outer',
+    # #     padding=0.05
+    # # )
 
-    # plotter.add_legend(bcolor='white')
-    # plotter.set_background("white")
-    # plotter.show()
+    # # plotter.add_legend(bcolor='white')
+    # # plotter.set_background("white")
+    # # plotter.show()
 
 
-    pass
+    # pass

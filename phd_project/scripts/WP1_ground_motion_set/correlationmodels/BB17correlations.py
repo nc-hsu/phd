@@ -42,7 +42,7 @@ def extract_text_before_brackets(text):
 
 def bb17_empirical_correlation_model():
     # load the baker and bradley 2017 correlation model
-    bb17 = pd.read_csv(cfg["data"]["rho_models"] / "BB17/rhoDataPD_corrected.csv", sep=",",
+    bb17 = pd.read_csv(cfg["raw_data"]["rho_models"] / "BB17/rhoDataPD_corrected.csv", sep=",",
                     index_col=0)
     labels = [("rotD50",
             extract_text_before_brackets(c),
