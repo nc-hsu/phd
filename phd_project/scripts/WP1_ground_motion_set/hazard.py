@@ -68,7 +68,7 @@ def get_mask(keys: list, targets: list, df: pd.DataFrame):
 
 
 def group_disagg_data(groups: list[tuple], metadata, dstore,
-                      disagg_type, traditional):
+                      disagg_type, traditional, occurence=False):
     """
     Groups the dissagregation data stored in an openquake datastore according to
     groups and metadata.
@@ -77,7 +77,7 @@ def group_disagg_data(groups: list[tuple], metadata, dstore,
     disaggregation results.
     """
 
-    disagg_data = get_disagg_from_datastore(dstore, disagg_type, traditional)
+    disagg_data = get_disagg_from_datastore(dstore, disagg_type, traditional, occurence)
 
     grouped_data = {}
     for s, r in groups:
@@ -175,29 +175,29 @@ def get_disagg_stats_from_groups(groups_disagg, site_metadata, hmaps,
 #         # Update bottom for the next Eps layer
 #         bottom += dz 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from openquake.commonlib.datastore import read
-    from phd_project.scripts.oqhelpers import get_bins
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+#     from openquake.commonlib.datastore import read
+#     from phd_project.scripts.oqhelpers import get_bins
     
     
-    # load the site model and the sites
-    sel_sites = pd.read_csv(cfg["results"]["selected_sites_csv"])
-    site_model = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
-    site_metadata = pd.concat([sel_sites, site_model], axis=1).T.drop_duplicates().T
-    site_metadata.columns
+#     # load the site model and the sites
+#     sel_sites = pd.read_csv(cfg["results"]["selected_sites_csv"])
+#     site_model = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
+#     site_metadata = pd.concat([sel_sites, site_model], axis=1).T.drop_duplicates().T
+#     site_metadata.columns
 
-    groups = list(site_metadata.groupby(["seismicity", "region"]).size().index)
+#     groups = list(site_metadata.groupby(["seismicity", "region"]).size().index)
 
-    calc_id = 16
-    dstore = read(calc_id)
-    disagg_type = 'TRT_Mag_Dist_Eps'
-    bins = get_bins(dstore, disagg_type)
-    groups_disagg = group_disagg_data(groups, site_metadata, dstore, 
-                                  disagg_type, traditional=True)
-    hmaps = dstore["hmaps-stats"]
-    disagg_stats = get_disagg_stats_from_groups(groups_disagg, site_metadata,
-                                                hmaps, geodf=False)
+#     calc_id = 16
+#     dstore = read(calc_id)
+#     disagg_type = 'TRT_Mag_Dist_Eps'
+#     bins = get_bins(dstore, disagg_type)
+#     groups_disagg = group_disagg_data(groups, site_metadata, dstore, 
+#                                   disagg_type, traditional=True)
+#     hmaps = dstore["hmaps-stats"]
+#     disagg_stats = get_disagg_stats_from_groups(groups_disagg, site_metadata,
+#                                                 hmaps, geodf=False)
     
     # # Matplotlib
     # # Plot a disaggregation plot 1x2.

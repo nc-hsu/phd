@@ -4,9 +4,20 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import ast
 
-def get_hcurve_from_dstore(dstore, site, im , stat):
-    # TODO
-    ...
+def get_hcurve_from_dstore(dstore, site_idx, imt , stat, investigation_time,
+                           mafe:bool=True):
+    hc_metadata = get_hc_metadata(dstore)
+    imt_idx = hc_metadata["imt"].index(imt)
+    stat_idx = hc_metadata["stat"].index(stat)
+    y_data = np.array(dstore["hcurves-stats"][site_idx, stat_idx, imt_idx, :])
+    if mafe:
+        y_data = -np.log(1-y_data) / investigation_time
+
+    x_data = np.array(get_imtls(dstore)[imt]).reshape(-1, 1)
+    y_data = y_data.reshape(-1, 1)
+    hc = np.hstack([x_data, y_data])
+    return hc
+
 
 def get_hc_metadata(dstore):
     hc_metadata = json.loads(dstore["hcurves-stats"].attrs["json"])
@@ -71,7 +82,9 @@ def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
                 df = _disagg_array_to_df(disagg_data[disagg_slice], 
                                          disagg_type, disagg_bins)
                 if occurence:
-                    df =  _get_occurence_disagg(df)
+                    imtl = get_imtl_from_hmap(dstore, site_i, imt_i, poe_i, 0)
+                    df =  _get_occurence_disagg(df, dstore, site_i, imt, imtl,
+                                                investigation_time)
 
                 if traditional and not occurence:
                     df = _get_traditional_disagg(df, investigation_time)
@@ -174,17 +187,21 @@ def _get_traditional_disagg(df, investigation_time):
     return df
 
 
-def _get_occurence_disagg(df, investigation_time, imtl, delta=0.001):
+def _get_occurence_disagg(
+        df, dstore, site_idx, imt, imtl, investigation_time, delta=0.001):
     # calculate the disaggregation results based on occurence, P(m|X=x)
 
     # first do the traditional disaggregation
     df = _get_traditional_disagg(df, investigation_time)
-    delta_im = delta * imtl
-    lambda_im1 = ... # lambda_im
-    lambda_im2 = ... # lambda_(im + delta_im)
+    hc = get_hcurve_from_dstore(
+        dstore, site_idx, imt, "mean", investigation_time, mafe=True)
+    delta_imtl = delta * imtl
+    lambda_im1 = np.interp(imtl, hc[:,0], hc[:,1])              # lambda_im
+    lambda_im2 = np.interp(imtl+delta_imtl, hc[:,0], hc[:,1])   # lambda_(im + delta_im)
     delta_lambda = lambda_im1 - lambda_im2
     df["P(m|X=x)"] = (df["P(m|X>x)"] * lambda_im1 - df["P(m|X>x)"] * lambda_im2) / delta_lambda
 
+    return df
 
 def get_imtl_from_hmap(dstore, site_idx, imt_idx, poe_idx, stat_idx=0):
     # only works if the poe has a hmap. Interpolation not supported
