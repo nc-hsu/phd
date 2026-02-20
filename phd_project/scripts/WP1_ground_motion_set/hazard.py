@@ -103,17 +103,17 @@ def get_disagg_stats_from_groups(groups_disagg, site_metadata, hmaps,
                                  stat_idx=0, geodf:bool=False):
     all_stats = []
     for (s, r), vi in groups_disagg.items():
-        for site_idx, (site_id, vj) in enumerate(vi.items()):
+        for site_id, vj in vi.items():
             for imt_idx, (imt, vk) in enumerate(vj.items()):
                 for poe_idx, (poe, vl) in enumerate(vk.items()):
                     stats = {"site_id": site_id,
-                             "lat": site_metadata.loc[site_idx, "lat"],
-                             "lon": site_metadata.loc[site_idx, "lon"],
+                             "lat": site_metadata.loc[site_id, "lat"],
+                             "lon": site_metadata.loc[site_id, "lon"],
                              "seismicity": s,
                              "region": r,
                              "imt": imt,
                              "poe": poe,
-                             "imtl": hmaps[site_idx, stat_idx, imt_idx, poe_idx]
+                             "imtl": hmaps[site_id, stat_idx, imt_idx, poe_idx]
                     } 
                     all_stats.append(stats | _get_disagg_stats(vl))
 
@@ -124,8 +124,33 @@ def get_disagg_stats_from_groups(groups_disagg, site_metadata, hmaps,
     return df
 
 
+if __name__ == "__main__":
 
 
+    import pickle
+    from openquake.commonlib.datastore import read
+    from phd_project.config.config import load_config
+    from phd_project.scripts.oqhelpers import (
+    get_bins,
+    )
+    cfg = load_config()
+
+    calc_id = 16
+    dstore = read(calc_id)
+    disagg_type = 'TRT_Mag_Dist_Eps'
+
+    # load the site model and the sites
+    sel_sites = pd.read_csv(cfg["results"]["selected_sites_csv"])
+    site_model = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
+    site_metadata = pd.concat([sel_sites, site_model], axis=1).T.drop_duplicates().T
+    site_metadata.columns
+    groups = list(site_metadata.groupby(["seismicity", "region"]).size().index)
+    groups_disagg = group_disagg_data(groups, site_metadata, dstore, 
+                                  disagg_type, traditional=True, occurence=True)
+    hmaps = dstore["hmaps-stats"]
+    disagg_stats = get_disagg_stats_from_groups(groups_disagg, site_metadata,
+                                                hmaps, geodf=False)
+    ...
 
 
 
