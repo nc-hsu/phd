@@ -134,6 +134,7 @@ def get_disagg_stats_from_groups(groups_disagg, site_metadata, hmaps,
 
 
 
+
 # def plot_disaggregation_3d(ax, df, catx, caty, catz, colour_map, dx, dy):
 #     agg_df = df.groupby([catx, caty, catz])['P(m|X>x)'].sum().reset_index()
 
