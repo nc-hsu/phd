@@ -14,7 +14,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "KothaEtAl2020ESHM20"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_asc"
                 </uncertaintyModel>
                 <uncertaintyWeight>1.0</uncertaintyWeight>
@@ -29,7 +29,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "KothaEtAl2020ESHM20"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_asc"
                 </uncertaintyModel>
                 <uncertaintyWeight>1.0</uncertaintyWeight>
@@ -44,7 +44,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "BCHydroESHM20SInter"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_sinter"
                     faba_taper_model = "SFunc"
                     a = -100.00
@@ -62,7 +62,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "BCHydroESHM20SSlab"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_sslab"
                     faba_taper_model = "SFunc"
                     a = -100.00
@@ -80,7 +80,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "BCHydroESHM20SSlab"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_vrancea"
                     faba_taper_model = "SFunc"
                     a = -100.00
@@ -98,7 +98,7 @@ xmlns:gml="http://www.opengis.net/gml"
                 <uncertaintyModel>
                     [GenericGmpeAvgSA]
                     gmpe_name = "KothaEtAl2020ESHM20"
-                    avg_periods = [0.025, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
+                    avg_periods = [0.0, 0.67, 1.33, 2.00, 2.67, 3.33, 4.00, 4.67, 5.33, 6.00]
                     corr_func = "clemett_asc"
                 </uncertaintyModel>
                 <uncertaintyWeight>1.0</uncertaintyWeight>
