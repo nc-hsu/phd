@@ -8,6 +8,8 @@ raw_data:
   root: "data_raw"
   gm_flatfiles: "data_raw/gm_flatfiles"
   esm_flatfile: data_raw/gm_flatfiles/ESM_flatfile_SA.csv
+  kiknet_flatfile_meta: data_raw/gm_flatfiles/2025-001_Loviknes-et-al_1997_2024_kik_Oct24META.csv
+  kiknet_flatfile_sa: data_raw/gm_flatfiles/2025-001_Loviknes-et-al_1997_2024_kik_Oct24META.csv
   eshm20_attenuation_regions: data_raw/eshm20_attenuation_regions
   eshm20_hmaps: "data_raw/eshm20_hazard_maps"
   eu_shapefile: "data_raw/eu_shapefile"
@@ -18,6 +20,9 @@ proc_data:
   site_selection: "data_processed/01_site_selection"
   site_hazard_disaggregation: "data_processed/03_site_hazard_disaggregation"
   corr_model: "data_processed/02_im_correlation_model"
+  gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
+  gm_database: "data_processed/04_gm_database_for_selection/esm_records.csv"
+  gcim_dists_AvgSA_03: "data_processed/05_gcim_distributions/gcim_dist_AvgSA_03.pickle"
 
 results:
   root: "results"
