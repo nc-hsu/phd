@@ -4,6 +4,7 @@ Script for generating test tables for the Indirect AvgSA GMPES in OpenQuake
 
 import numpy as np
 import pandas as pd
+from pickagm.avgSA import indirect_AvgSA_GMPE
 from openquake.hazardlib.imt import SA, PGA
 from openquake.hazardlib.gsim.kotha_2020 import KothaEtAl2020ESHM20
 from phd_project.config.config import load_config
@@ -83,6 +84,16 @@ testtable_avgSA_stddev["AvgSA"] = avgSA_sigma
 testtable_avgSA_mean.to_csv(folder / "generic_gmpe_avgsa_clemettasc_mean.csv")
 testtable_avgSA_stddev.to_csv(folder / "generic_gmpe_avgsa_clemettasc_stddev.csv")
 
+# test my own implementation of AvgSA GMM
+avgSA_gmm = indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(), rho_total=rhos_ts1, avg_periods=ts1)
+
+mean_t = np.zeros((1, len(site_rup_ctxs)))
+sigma_t = np.zeros_like(mean)
+tau_t = np.zeros_like(mean)
+phi_t = np.zeros_like(mean)
+avgSA_gmm.compute(site_rup_ctxs, None, mean_t, sigma_t, tau_t, phi_t)
+
+##########################################################################################
 ## Case 2: ts2 -> SA and PGA
 imts = [SA(t) if t != 0 else PGA() for t in ts2]
 mean = np.zeros((len(imts), len(site_rup_ctxs)))
@@ -107,6 +118,17 @@ testtable_avgSA_stddev["AvgSA"] = avgSA_sigma
 
 testtable_avgSA_mean.to_csv(folder / "generic_gmpe_avgsa_clemettasc_w_pga_mean.csv")
 testtable_avgSA_stddev.to_csv(folder / "generic_gmpe_avgsa_clemettasc_w_pga_stddev.csv")
+
+# test my own implementation of AvgSA GMM
+avgSA_gmm = indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(), rho_total=rhos_ts2, avg_periods=ts2)
+
+mean_t = np.zeros((1, len(site_rup_ctxs)))
+sigma_t = np.zeros_like(mean)
+tau_t = np.zeros_like(mean)
+phi_t = np.zeros_like(mean)
+avgSA_gmm.compute(site_rup_ctxs, None, mean_t, sigma_t, tau_t, phi_t)
+
+...
 
 if __name__ == "__main__":
     ...
