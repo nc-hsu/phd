@@ -14,6 +14,7 @@ import pickagm.eqdbases as eqdb
 import pickagm.dfops as dfops
 from pickagm.avgSA import compute_ln_AvgSA
 
+from openquake.hazardlib.imt import IMT
 from phd_project.config.config import load_config
 
 
@@ -33,7 +34,10 @@ def load_esm_flatfile(file_path) -> pd.DataFrame:
 def dataset_is_subset_of_esm(database: dict, esm: pd.DataFrame):
 
     df_B = _convert_dict_to_df(database)
-    keys = ["event_id", "network_code", "station_code"]
+    df_B = df_B.astype(str)
+    esm["sensor_depth_m"] = esm["sensor_depth_m"].astype(np.float64)
+    df_B["sensor_depth_m"] = df_B["sensor_depth_m"].astype(np.float64)
+    keys = ["event_id", "network_code", "station_code", "sensor_depth_m"]
 
     # perform a "merge" based on the the three columns of "keys".
     # Left join from B to A. All the rows in B are retained.
@@ -45,23 +49,47 @@ def dataset_is_subset_of_esm(database: dict, esm: pd.DataFrame):
     return (check_merge["_merge"] == "both").all()
 
 
+def rows_not_in_esm(database: dict, esm: pd.DataFrame):
+
+    df_B = _convert_dict_to_df(database)
+    df_B = df_B.astype(str)
+    esm["sensor_depth_m"] = esm["sensor_depth_m"].astype(np.float64)
+    df_B["sensor_depth_m"] = df_B["sensor_depth_m"].astype(np.float64)
+    keys = ["event_id", "network_code", "station_code", "sensor_depth_m"]
+
+    # perform a "merge" based on the the three columns of "keys".
+    # Left join from B to A. All the rows in B are retained.
+    # If the indicator is "both" for all rows then the same rows appear in
+    # both DataFrames.
+    check_merge = df_B[keys].merge(
+        esm[keys], on=keys, how="left", indicator=True)
+    
+    idxs = check_merge[check_merge["_merge"] == "both"].index
+    return idxs
+
+
 def _convert_dict_to_df(database: dict):
     event_id = [r["event"]["id"] for r in database["records"]]
     network_code = [r["site"]["network_code"] for r in database["records"]]
     station_code = [r["site"]["code"] for r in database["records"]]
+    sensor_depth = [r["site"]["sensor_depth"] for r in database["records"]]
 
     df = pd.DataFrame.from_dict({"event_id": event_id,
                                  "network_code": network_code,
-                                 "station_code": station_code},
+                                 "station_code": station_code,
+                                 "sensor_depth_m": sensor_depth},
                                  orient="columns")
     return df
 
 
 def extract_flatfile_for_dataset(database: dict, esm: pd.DataFrame):
     df_B = _convert_dict_to_df(database)
-    keys = ["event_id", "network_code", "station_code"]
+    df_B = df_B.astype(str)
+    esm["sensor_depth_m"] = esm["sensor_depth_m"].astype(np.float64)
+    df_B["sensor_depth_m"] = df_B["sensor_depth_m"].astype(np.float64)
+    keys = ["event_id", "network_code", "station_code", "sensor_depth_m"]
 
-    # perform a "merge" based on the the three columns of "keys".
+    # perform a "merge" based on the the four columns of "keys".
     # inner join from A to B. All the rows from A are retained that are
     # also in B.
     new_df = esm.merge(
@@ -170,15 +198,6 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     new_cols = cols_before + cols_to_move + cols_after
     esm_db_mod = esm_db_mod[new_cols]
 
-    # remove rows where any of the added metadata is missing values
-    esm_db_mod = esm_db_mod[esm_db_mod["mag"].notna() 
-                    & esm_db_mod["rhypo"].notna() 
-                    & esm_db_mod["hypo_depth"].notna() 
-                    & esm_db_mod["rhypo"].notna() 
-                    & esm_db_mod["vs30"].notna() 
-                    & esm_db_mod["vs30measured"].notna()
-                    & esm_db_mod["z1pt0"].notna()
-                    ]
     return esm_db_mod
 
 
@@ -227,7 +246,8 @@ def add_AvgSA_columns(
         
         sa_com_df = sa_com_df.apply(pd.to_numeric) # ensure numeric data
         sa_com_df = sa_com_df.dropna(axis=0)
-        interped_SA_values = dfops.interpolate_for_sa(sa_com_df, ts)
+        interped_SA_values = dfops.interpolate_for_sa(sa_com_df, ts, 
+                                                      pga_to_small_T=True)
         
         # calculate the AvgSA
         sa_arr = interped_SA_values.to_numpy()
@@ -238,6 +258,92 @@ def add_AvgSA_columns(
         flatfile_df.loc[sa_com_df.index, column_name] = AvgSA
 
     return flatfile_df
+
+
+def add_AvgSA_columns2(
+        im_df: pd.DataFrame, 
+        tags: list[str], 
+        periods: list[np.ndarray]):
+    
+    sa_df = im_df[[c for c in im_df.columns if c.startswith("SA(")]]
+
+    if any(np.concatenate(periods) <= 0.01): # consider all periods
+        pga_series = im_df["PGA"]
+        sa_df.insert(loc=0, column=f"SA(0.0)", value=pga_series)
+   
+    sa_df = sa_df.apply(pd.to_numeric) # ensure numeric data
+    sa_df = sa_df.dropna(axis=0)   # remove rows with nan
+    
+    for tag, ts in zip(tags, periods):
+        interped_SA_values = dfops.interpolate_for_sa(sa_df, ts, 
+                                                      pga_to_small_T=True)
+    
+        # calculate the AvgSA
+        sa_arr = interped_SA_values.to_numpy()
+        AvgSA = np.exp(compute_ln_AvgSA(np.log(sa_arr)))
+    
+        # assign the avgSA values back to the original flatfile
+        im_df.loc[sa_df.index, tag] = AvgSA.copy()
+
+    return im_df
+
+
+def interpolate_SA_values(im_df: pd.DataFrame, periods):
+    
+    
+    sa_df = im_df[[c for c in im_df.columns if c.startswith("SA(")]]
+
+    if any(periods < 0.01): # consider all periods
+        sa_df.insert(loc=0, column=f"SA(0.0)", value=im_df["PGA"])
+   
+    sa_df = sa_df.apply(pd.to_numeric) # ensure numeric data
+    valid_sa_df = sa_df.dropna(axis=0)   # remove rows with nan
+
+    interped_SA_values = dfops.interpolate_for_sa(valid_sa_df, periods, pga_to_small_T=True)
+    result = pd.DataFrame(
+            index=im_df.index, 
+            columns=interped_SA_values.columns, 
+            dtype=float
+        )
+        
+    # 6. Map interpolated data back to the matching indices
+    result.loc[valid_sa_df.index, :] = interped_SA_values
+    
+    return result
+
+
+
+def filter_gm_database_on_imts(im_df, imts: list[IMT]):
+    """ returns a dataframes with columns corresponding to the imts given.
+    Values of SA are interpolated where possible.
+    Assumes only the im columns are given and there is only a single level index
+    consisting of the im strings.
+    No error is raised if an imt is not in im_df."""
+
+    # get the non-SA ims
+    non_sa_ims = [im.string for im in imts 
+                 if (not im.string.startswith("SA(")) and
+                 (im.string in im_df.columns)]
+    non_sa_df = im_df[non_sa_ims]
+    
+    # interpolate for desired SA ims
+    sa_df = im_df[[c for c in im_df.columns if c.startswith("SA(")]]
+    desired_periods = np.array([im.period for im in imts if im.name == "SA"])
+
+    if any(desired_periods <= 0.01): # consider all periods
+        pga_series = im_df["PGA"]
+        sa_df.insert(loc=0, column=f"SA(0.0)", value=pga_series)
+   
+    sa_df = sa_df.apply(pd.to_numeric) # ensure numeric data
+    sa_df = sa_df.dropna(axis=0)   # remove rows with nan
+    
+    interped_SA_df = dfops.interpolate_for_sa(
+        sa_df, desired_periods, pga_to_small_T=True)
+    
+    # combine everything together
+    new_im_df = pd.concat([non_sa_df, interped_SA_df], axis=1)
+
+    return new_im_df
 
 
 def extract_SA_data(flatfile_df: pd.DataFrame, idx_im_data: int):
@@ -292,7 +398,59 @@ def set_new_rake(df, new_rake_angle):
     return df
 
 
+def label_record_trts_esm(esm_df, col_idx=None):
+    
+    non_asc_data_folder = cfg["raw_data"]["root"] / "eshm20_subduction_vrancea_datasets"
+    non_asc_data_files = [
+        "hellenic_inslab_db.json", 
+        "hellenic_interface_db.json", 
+        "vrancea_db.json"
+        ]
+    
+    tags = ["Subduction Inslab", "Subduction Interface", "Non-Subduction Deep"]
 
+    esm_df.loc[:, "sensor_depth_m"] = esm_df["sensor_depth_m"].astype(np.float64)
+    if col_idx is None:
+        esm_df = esm_df.assign(trt="Shallow Default") 
+    else:
+        esm_df.insert(col_idx, "trt", "Shallow Default")
+    
+    df_A = esm_df.reset_index() 
+    
+    for f, tag in zip(non_asc_data_files, tags):
+        with open(non_asc_data_folder / f, "r") as file:
+            db = json.load(file)
+            df_B = _convert_dict_to_df(db)
+            df_B = df_B.astype(str)
+            df_B["sensor_depth_m"] = df_B["sensor_depth_m"].astype(np.float64)
+            keys = ["event_id", "network_code", "station_code", "sensor_depth_m"]
+
+            # Merge using only the stable identifier columns
+            matched = df_A.merge(df_B[keys], on=keys, how='inner')
+            indices = matched['index'].tolist() # Extract the list of indices
+
+            # update the appropriate rows in the trt column
+            esm_df.loc[indices, "trt"] = tag
+    return esm_df
+
+def scale_cols(df: pd.DataFrame, conversion_map: dict) -> pd.DataFrame:
+    """multiples each colum by a value according to conversion map, which
+    maps the name of each column to a scale factor"""
+    for tag, sf in conversion_map.items():
+        mask = df.columns.str.startswith(tag)
+        df.loc[:, mask] *= sf
+    return df
+
+
+def get_SA_periods_from_headers(df: pd.DataFrame):
+    # Parse Periods from column headers
+    pattern = re.compile(r"SA\(([\d.]+)\)")
+    cols = [c for c in df.columns if pattern.search(c)]
+    periods = np.array([float(pattern.search(c).group(1)) for c in cols])
+    return periods
+
+if __name__ == "__main__":
+    ...
     
 
 

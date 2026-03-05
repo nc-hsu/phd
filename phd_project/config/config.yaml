@@ -19,8 +19,9 @@ proc_data:
   site_hazard: "data_processed/03_site_hazard"
   corr_model: "data_processed/02_im_correlation_model"
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
-  gm_database: "data_processed/04_gm_database_for_selection/esm_records.csv"
-  gcim_dists_AvgSA_03: "data_processed/05_gcim_distributions/gcim_dist_AvgSA_03.pickle"
+  gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
+  gcim_dists: "data_processed/05_gcim_distributions"
+  gm_selection: "data_processed/06_gm_selection"
 
 results:
   root: "results"
