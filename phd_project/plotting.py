@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
 def custom_log_formatter(x, pos):
     """
     Formats the tick label:
@@ -18,3 +22,22 @@ def custom_log_formatter(x, pos):
     else:
         # Use integer format for values >= 1
         return f"{int(round(x))}"
+    
+
+def plot_im_ecdf_vs_target(
+        ax, im_ecdf: np.ndarray, ks_bounds: np.ndarray,
+        style={
+            "lb": {"ls": "--", "color":"0.8"},
+            "cdf": {"ls": "-", "color":"0.8"},
+            "ub": {"ls": "--", "color":"0.8"},
+            "ecdf": {"ls": "-", "color":"b"},
+        }):
+    
+    ax.plot(ks_bounds[:,0], ks_bounds[:,1], **style["lb"])
+    ax.plot(ks_bounds[:,0], ks_bounds[:,2], **style["cdf"])
+    ax.plot(ks_bounds[:,0], ks_bounds[:,3], **style["ub"])
+    ax.plot(im_ecdf[:,0], im_ecdf[:,1], **style["ecdf"])
+
+    ax.set_xlim(0, 1.1*max(im_ecdf[:,0]))
+    ax.set_ylim(0, 1)
+    return ax
