@@ -2,7 +2,7 @@ import re
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from openquake.hazardlib.imt import SA, PGA, RSD595
+from openquake.hazardlib.imt import SA, PGA, RSD595, IA
 
 import pickagm.eqdbases as eqdb
 import pickagm.dfops as dfops
@@ -11,7 +11,7 @@ cfg = load_config()
 
 # RESIDUALS_FOLDER = cfg["raw_data"]["residuals"]
 # FLATFILE_FOLDER = cfg["data"]["gm_flatfiles"]
-START_IDX_IM_DATA = 84  # after this index is im data. before it is metadata (applies for)
+START_IDX_IM_DATA = 91  # after this index is im data. before it is metadata (applies for)
 
 def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: Path):
     """_summary_
@@ -27,6 +27,7 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
     # load the database and organise it
     gmm_PGA_SA = gmms["gmm_PGA_SA"]
     gmm_RSD595 = gmms["gmm_RSD595"]
+    gmm_IA = gmms["gmm_IA"]
     gmm_AvgSA = gmms["gmm_AvgSA"]
 
     print(f"Calculating residuals:\n"
@@ -34,9 +35,10 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
             f"    Output file: {residuals_fp.name}\n"
             f"    GMM PGA/SA:  {gmm_PGA_SA}\n"
             f"    GMM RSD595:  {gmm_RSD595}\n"
+            f"    GMM IA    :  {gmm_IA}\n"
             f"    GMM AvgSA :  {gmm_AvgSA}\n")
 
-    ims = {"pga": "PGA", "T90": "RSD595", "SA":"SA", 
+    desired_ims = {"pga": "PGA", "T90": "RSD595", "SA":"SA", "ia": "IA",
             "AvgSA([0, 3])":"AvgSA([0, 3])", "AvgSA[0, 6]":"AvgSA([0, 6])"}
     
     n_periods = 10
@@ -44,16 +46,18 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
                      "AvgSA([0, 6])": 6.0}
 
     df = load_flatfile(flatfile_fp)
-    im_df, metadata = organise_database_for_residual_calculations(df, ims)
+    im_df, metadata = organise_database_for_residual_calculations(df, desired_ims)
     ctxs = create_site_rup_ctx(metadata)
 
     idx = pd.IndexSlice
 
     # calculate the residuals for PGA and SA between 0.02s and 8s
+    # because these are the bounds of the SA GMMs
     periods = im_df.loc[:, idx["rotD50", "SA", :]].columns.get_level_values(2)
     periods = [t for t in periods if 0.02 <= t <= 8]
 
-    obs = np.log(im_df.loc[:, idx["rotD50", ["PGA", "SA"], ["None"] + periods]])
+    # oberserved values from database
+    obs: pd.DataFrame = np.log(im_df.loc[:, idx["rotD50", ["PGA", "SA"], ["None"] + periods]])
 
     imts = [PGA()] + [SA(t) for t in periods if 0.02 <= t <= 8]
 
@@ -63,6 +67,7 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
     phi = np.zeros((len(imts), len(ctxs)))
     gmm_PGA_SA.compute(ctxs, imts, pred, sig, tau, phi)
 
+    # predicted values from gmms
     pred = pd.DataFrame(pred.T, index=obs.index, columns=obs.columns)
 
     # calculate the residuals for RSD595 and append to the dataframes
@@ -74,6 +79,16 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
 
     obs[("GM", "RSD595", "None")] = np.log(im_df.loc[:, idx["GM", "RSD595", "None"]])
     pred[("GM", "RSD595", "None")] = pred_rsd595[0,:]
+
+    # calculate the residuals for Arias Intensity and append to the dataframes
+    pred_ia = np.zeros((1, len(ctxs)))
+    sig_ia = np.zeros((1, len(ctxs)))
+    tau_ia = np.zeros((1, len(ctxs)))
+    phi_ia = np.zeros((1, len(ctxs)))
+    gmm_IA.compute(ctxs, [IA()], pred_ia, sig_ia, tau_ia, phi_ia)
+
+    obs[("GM", "IA", "None")] = np.log(im_df.loc[:, idx["GM", "IA", "None"]])
+    pred[("GM", "IA", "None")] = pred_ia[0,:]
 
     # calculate the residuals for AvgSA([0, 3]) and AvgSA([0, 6]) and append to dataframes
     AvgSA_cols = [c for c in im_df if "AvgSA" in c[1]]
@@ -88,7 +103,6 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
         pred[AvgSA_col] = pred_AvgSA[0,:]
 
     obs = obs.reindex(sorted(obs.columns), axis=1)
-
     pred = pred.reindex(sorted(pred.columns), axis=1)
 
     # calculate all the residuals
@@ -99,12 +113,13 @@ def calculate_residuals(flatfile_fp: Path, gmms: dict[str, dict], residuals_fp: 
     residuals["event_id"] = metadata["event_id"]
     residuals["station_code"] = metadata["station_code"]
     residuals["max_usable_T"] = metadata["max_usable_T"].round(4)
-    periods = np.array([0, 0] + periods)  # 0 for PGA and RSD595
+    periods = np.array([0, 0, 0] + periods)  # 0 for PGA, RSD595, AI
     new_labels += ["event_id", "station_code", "max_usable_T"]
     residuals.columns = new_labels
 
     # save the dataframes as csv files for R processing
     residuals.to_csv(residuals_fp, index=True, sep=",")
+    return residuals
 
 
 def load_flatfile(flatfile_fp: Path):
@@ -122,7 +137,7 @@ def load_flatfile(flatfile_fp: Path):
     return df
 
 
-def organise_database_for_residual_calculations(df: pd.DataFrame, ims:dict[str, str]):
+def organise_database_for_residual_calculations(df: pd.DataFrame, desired_ims:dict[str, str]):
     idx = pd.IndexSlice
 
     df = eqdb.rename_sa_columns_esm(df)
@@ -161,8 +176,8 @@ def organise_database_for_residual_calculations(df: pd.DataFrame, ims:dict[str, 
     im_df.columns = pd.MultiIndex.from_tuples(
         new_labels, names=["component", "im", "period"])
 
-    # remove the ims that aren't needed
-    im_df = im_df.loc[:, idx[["GM", "rotD50"], list(ims.values()), :]]
+    # retain only the desired ims and components
+    im_df = im_df.loc[:, idx[["GM", "rotD50"], list(desired_ims.values()), :]]
     im_df = im_df.drop(columns=("rotD50", "RSD595", "None"))
 
     # sort columns
@@ -178,14 +193,15 @@ def organise_database_for_residual_calculations(df: pd.DataFrame, ims:dict[str, 
         columns_to_scale = im_df.loc[:, idx[:, im, :]].columns
         im_df.loc[:, columns_to_scale] = im_df.loc[:, columns_to_scale] * sf
 
-    # accelerations are now in [g]
+    # accelerations are now in [g], arias intensity in m/s
     return im_df, metadata
 
 
 def create_site_rup_ctx(metadata: pd.DataFrame):
     # create the rupture contexts for calculating the predicted ims
-    ctx_columns = ["mag", "rhypo", "hypo_depth", "xvf", "vs30", "vs30measured"
-                , "rake", "rrup", "z1pt0", "region", "rjb"]
+    ctx_columns = ["mag", "rhypo", "hypo_depth", "xvf", "vs30", "vs30measured",
+                   "rake", "rrup", "z1pt0", "region", "rjb", "lat", "lon", 
+                   "hypo_lat", "hypo_lon", "ztor"]
     site_rup_ctxs = np.recarray(
         len(metadata), dtype=[
         ("mag", "f4"),
@@ -198,7 +214,12 @@ def create_site_rup_ctx(metadata: pd.DataFrame):
         ("rrup", "f4"),
         ("z1pt0", "f4"),
         ("region", "f4"),
-        ("rjb", "f4")
+        ("rjb", "f4"),
+        ("lat", "f4"),
+        ("lon", "f4"),
+        ("hypo_lat", "f4"),
+        ("hypo_lon", "f4"),
+        ("ztor", "f4")
     ])
 
     for col in ctx_columns:
