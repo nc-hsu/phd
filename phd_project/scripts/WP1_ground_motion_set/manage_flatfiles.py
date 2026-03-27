@@ -104,7 +104,8 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     
     Most of the data is provided / can be calculated from data already in the flatfiles
     with the exception of the rake angle of the ruptures. The given rake angle 
-    provided as an input is is applied to all records.
+    provided as an input is is applied to all records that have an oblique or undefined
+    fault type.
     rake_angle = 90 "reverse fault"  
     rake_angle = 0 "strike slip fault"
     rake_angle = -90 "normal fault" 
@@ -113,7 +114,7 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     approximated for each recording using  the neareast site from the ESHM20 site
     model
     """
-    n_ctx_columns_added = 12
+    n_ctx_columns_added = 19
     
     ####### Some precalculations and data conversions
     # add some metadata columns to the esm_db
@@ -130,6 +131,12 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     except ValueError:
         esm_db_mod["hypo_dist"] = hypo_dist
 
+    # convert some other columns to numeric
+    esm_db_mod["es_dip"] = pd.to_numeric(esm_db_mod["es_dip"])
+    esm_db_mod["es_width"] = pd.to_numeric(esm_db_mod["es_width"])
+    esm_db_mod["es_z_top"] = pd.to_numeric(esm_db_mod["es_z_top"])
+    esm_db_mod["es_rake"] = pd.to_numeric(esm_db_mod["es_rake"])
+    
     # calculate the geometric mean of the 5%-95% significant duration (T90)
     esm_db_mod["U_T90"] = pd.to_numeric(esm_db_mod["U_T90"])
     esm_db_mod["V_T90"] = pd.to_numeric(esm_db_mod["V_T90"])
@@ -140,6 +147,17 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
         esm_db_mod.insert(loc=idx+1, column="GM_T90", value=gm_T90)
     except ValueError:
         esm_db_mod["GM_T90"] = gm_T90
+
+    # calculate the geometric mean of the Arias Intensity
+    esm_db_mod["U_ia"] = pd.to_numeric(esm_db_mod["U_ia"])
+    esm_db_mod["V_ia"] = pd.to_numeric(esm_db_mod["V_ia"])
+    gm_ia = (esm_db_mod["U_ia"] * esm_db_mod["V_ia"]) ** (1 / 2)
+
+    idx = np.where(esm_db_mod.columns == "W_ia")[0][0]
+    try:
+        esm_db_mod.insert(loc=idx+1, column="GM_ia", value=gm_ia)
+    except ValueError:
+        esm_db_mod["GM_ia"] = gm_ia
 
     # some data conversions:
     esm_db_mod["EMEC_Mw"] = pd.to_numeric(esm_db["EMEC_Mw"])
@@ -169,13 +187,26 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     # add a column indicating the maximum usable period based on the highpass filter
     # frequency of the record
     esm_db_mod["max_usable_T"] = 0.8 / esm_db_mod[["U_hp", "V_hp"]].apply(pd.to_numeric).min(axis=1)
+
     # add columns needed for the openquake context array
     # magnitude "mag": where possible used the EMEC_Mw, otherwise fall back on the
     # default Mw
     esm_db_mod["mag"] = esm_db_mod["EMEC_Mw"].combine_first(esm_db_mod["Mw"])
+    esm_db_mod["mag"] = pd.to_numeric(esm_db_mod["mag"])
+
     esm_db_mod["hypo_depth"] = esm_db_mod["ev_depth_km"]
-    # rake: where possible use the "es_rake" otherwise set to 90 (reverse faulting)
-    esm_db_mod["rake"] = esm_db_mod["es_rake"].fillna(rake_angle)
+    # rake: where possible use the "es_rake" otherwise base it on the fm_type_code
+    esm_db_mod["rake"] = esm_db_mod["es_rake"].combine_first(
+        _estimate_rake_angle(esm_db_mod["fm_type_code"], rake_angle))
+    
+    esm_db_mod["fault_dip"] = esm_db_mod["es_dip"].combine_first(
+        pd.Series(_estimate_dip_angle(esm_db_mod["rake"]), index=esm_db_mod["es_dip"].index))
+
+    esm_db_mod["rup_width"] = esm_db_mod["es_width"].combine_first(
+        pd.Series(_estimate_fault_width(esm_db_mod["rake"].values, esm_db_mod["mag"].values), index=esm_db_mod["es_width"].index))
+    
+    esm_db_mod["ztor"] = esm_db_mod["es_z_top"].combine_first(
+        pd.Series(_estimate_ztor(esm_db_mod["hypo_depth"], esm_db_mod["rup_width"], esm_db_mod["fault_dip"]), index=esm_db_mod["es_z_top"].index))
 
     esm_db_mod["rhypo"] = esm_db_mod["hypo_dist"]
     # distance from rupture plane "rrup": where possible use rup_dist, otherwise
@@ -189,6 +220,12 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     esm_db_mod["vs30measured"] = esm_db_mod["vs30_m_sec"].notna()
     esm_db_mod["z1pt0"] = z1pt0_values
     esm_db_mod["region"] = region_values
+    # station location
+    esm_db_mod["lat"] = pd.to_numeric(esm_db_mod["st_latitude"])
+    esm_db_mod["lon"] = pd.to_numeric(esm_db_mod["st_longitude"])
+    # hypocentre location
+    esm_db_mod["hypo_lat"] = pd.to_numeric(esm_db_mod["ev_latitude"])
+    esm_db_mod["hypo_lon"] = pd.to_numeric(esm_db_mod["ev_latitude"])
 
     # reorder the dataframe columns for easier viewing
     cols = esm_db_mod.columns.tolist()
@@ -201,6 +238,58 @@ def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
     return esm_db_mod
 
 
+def _estimate_dip_angle(rake_values: np.ndarray) -> np.ndarray:
+    # based on Kaklamanos et al. 2011
+    # Define faulting conditions based on rake
+    conds = [
+        (rake_values >= -135) & (rake_values <= -45), # Normal
+        (rake_values >= 45) & (rake_values <= 135)    # Reverse
+    ]
+    
+    # Define the corresponding output values
+    choices = [50, 40]
+    
+    # Default corresponds to Strike-Slip
+    return np.select(conds, choices, default=90)
+    
+
+def _estimate_fault_width(rake_values: np.ndarray, mag: np.ndarray) -> np.ndarray:
+    # based on Kaklamanos et al. 2011
+    # Define faulting conditions based on rake
+    conds = [
+        (rake_values >= -135) & (rake_values <= -45), # Normal
+        (rake_values >= 45) & (rake_values <= 135)    # Reverse
+    ]
+
+    # fault width estimates for each regime
+    choices = [
+        10**(-1.14 + 0.35 * mag),
+        10**(-1.61 + 0.41 * mag)
+    ]
+
+    # Default corresponds to Strike-Slip
+    return np.select(conds, choices, default=10**(-0.76 + 0.27 * mag))
+
+
+def _estimate_ztor(
+        hypo_depth: np.ndarray, rup_width: np.ndarray, fault_dip: np.ndarray) -> np.ndarray:
+    # based on Kaklamanos et al. 2011
+    return np.maximum((hypo_depth - 0.6 * rup_width * np.sin(fault_dip)), 0)
+    
+
+def _estimate_rake_angle(fm_type_codes: pd.Series, fill_rake):
+    rake_map = {
+        "NF": -90,
+        "TF": 90,
+        "SS": 0,
+        "O": fill_rake,
+        "U": fill_rake
+    }
+
+    estimated_rakes = fm_type_codes.map(rake_map)
+    return estimated_rakes
+
+
 def drop_records_with_missing_metadata(df):
     df = df[df["mag"].notna() 
         & df["rhypo"].notna() 
@@ -209,6 +298,8 @@ def drop_records_with_missing_metadata(df):
         & df["vs30"].notna() 
         & df["vs30measured"].notna()
         & df["z1pt0"].notna()
+        & df["rrup"].notna()
+        & df["ztor"].notna()
         ]
     return df
     
@@ -392,9 +483,10 @@ def print_summary(df_flatfile):
         df_flatfile["EMEC_Mw"].min(), df_flatfile["EMEC_Mw"].max())
 
 
-def set_new_rake(df, new_rake_angle):
+def set_new_rake(df: pd.DataFrame, new_rake_angle: float):
     # sets a new rake angle for all records where one is not already specified
-    df["rake"] = df["es_rake"].fillna(new_rake_angle)
+    df["rake"] = df["es_rake"].combine_first(
+        _estimate_rake_angle(df["fm_type_code"], new_rake_angle))
     return df
 
 
