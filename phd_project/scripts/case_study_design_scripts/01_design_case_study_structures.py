@@ -101,9 +101,6 @@ for S_alpha_RP in S_alpha_RPs:
                 break
             else:
                 raise e
-                # with open(log_filepath, "a") as file:
-                #     file.write(f"FAILED:: {name} -- some other error")
-                #     print(f"FAILED:: {name} -- some other error")
 
         with open(log_filepath, "a") as file:
             if scs:

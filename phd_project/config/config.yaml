@@ -12,7 +12,7 @@ raw_data:
   eshm20_hmaps: "data_raw/eshm20_hazard_maps"
   eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
-  esm_download_manifest: "data_raw/gm_records/esm_hdf5_files/download_manifest.csv"
+  esm_failed_downloads: "data_raw/gm_records/esm_hdf5_files/download_manifest.csv"
   
 proc_data:
   root: "data_processed"
@@ -49,6 +49,7 @@ scripts:
 
 models:
   case_study: "casestudy_structures"
+  casestudy_designs_ec8_gen2: "casestudy_structures/concentrically_braced_frames/ec8_gen2"
   examples: "calculation_examples"
 
 notebooks:
