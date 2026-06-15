@@ -617,9 +617,7 @@ def determine_q_design(model, lc_tags, gammas, psis, verification_tag, T_1,
         model.add_design_parameter("equivalent_base_shear", equivalent_base_shear)
         model.add_design_parameter("elastic_baseshear_gravity_frame", base_shear)
     
-    # if the brace utilisation is less than 1.5 then q = 1.5 is used because 
-    # we allow low levels of energy dissipation 
-    return max(min(q, q_max), 1), equivalent_base_shear # value between 1.5 and q
+    return max(min(q, q_max), 1), equivalent_base_shear # value between 1 and q
 
 
 def verify_load_combinations(model, lcs, seismic_index, GQ_characteristic_floor_loads,
