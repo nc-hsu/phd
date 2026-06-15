@@ -12,7 +12,7 @@ raw_data:
   eshm20_hmaps: "data_raw/eshm20_hazard_maps"
   eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
-  esm_failed_downloads: "data_raw/gm_records/esm_hdf5_files/download_manifest.csv"
+  esm_download_manifest: "data_raw/gm_records/esm_hdf5_download_manifest.csv"
   
 proc_data:
   root: "data_processed"
@@ -23,6 +23,11 @@ proc_data:
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
   gcim_dists: "data_processed/05_gcim_distributions"
   gm_selection: "data_processed/06_gm_selection"
+  dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
+  sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
+  sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
+  sdof_optimisation: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/optimisation_results" 
+  approx_sdof_systems: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/approx_sdof_systems" 
 
 results:
   root: "results"
@@ -46,11 +51,42 @@ hazard_models:
 scripts: 
   root: "phd_project/scripts"
   residual_partitioning: "phd_project/scripts/WP1_ground_motion_set/residual_partitioning"
+  wp1pt4pt1_batch_run: "phd_project/scripts/WP1_ground_motion_set/batch_run_analysis_scripts/wp1pt4pt1"
 
 models:
   case_study: "casestudy_structures"
   casestudy_designs_ec8_gen2: "casestudy_structures/concentrically_braced_frames/ec8_gen2"
   examples: "calculation_examples"
+
+templates:
+  root: "phd_project/scripts/templates"
+  structural_model: "phd_project/scripts/templates/template_nlcbf_structural_model.py"
+  run_pushover: "phd_project/scripts/templates/template_run_pushover.py"
+  config_pushover: "phd_project/scripts/templates/template_config_pushover.py"
+  run_cyclic_pushover: "phd_project/scripts/templates/template_run_cyclic_pushover.py"
+  config_cyclic_pushover: "phd_project/scripts/templates/template_config_cyclic_pushover.py"
+  run_modal: "phd_project/scripts/templates/template_run_modal.py"
+  config_modal: "phd_project/scripts/templates/template_config_modal.py"
+  run_nltha_ud: "phd_project/scripts/templates/template_run_nltha_w_updating_damping.py"
+  config_nltha: "phd_project/scripts/templates/template_config_nltha.py"
+  batch_run: "phd_project/scripts/templates/template_run_batch_scripts.py"
+  group_sdof_optimisation: "phd_project/scripts/templates/template_run_group_sdof_optimisation.py"
+  config_im_SA: "phd_project/scripts/templates/template_config_im_SA.py"
+  ida_process_recorder_roof_drift: "phd_project/scripts/templates/template_ida_process_recorder_roof_drift.py"
+  ida_process_recorder_x_displacement: "phd_project/scripts/templates/template_ida_process_recorder_x_displacement.py"
+  nltha_injection_update_damping: "phd_project/scripts/templates/template_nltha_injection_func_update_damping.py"
+  run_ida_htf_single_record: "phd_project/scripts/templates/template_run_ida_htf_single_record.py"
+  config_ida_htf: "phd_project/scripts/templates/template_config_ida_htf.py"
+  run_ida_htf_multiple_records: "phd_project/scripts/templates/template_run_ida_htf_multiple_records.py"
+  model_cbf_sdof: "phd_project/scripts/templates/template_model_cbf_sdof.py"
+
+analysis_data:
+  root: "E:"
+  dc2_sdof_fitting: "E:/03_wp1pt4pt1_dc2_sdof_fitting"
+
+
+
+
 
 notebooks:
   root: "notebooks"
