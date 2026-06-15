@@ -1,0 +1,84 @@
+from datetime import datetime
+from pathlib import Path
+
+from standes.parallel import run_records_in_subprocesses
+from standes.analysis.ida import collate_ida_results, process_ida_results
+from standes.utils import import_from_path
+
+
+## launcher / coordinator: run an IDA for a SINGLE building, parallelised across
+## ground motion records (one CPU core per record). Every record is driven by the
+## SAME config file (config_data) -- only the record tag differs -- so there is no
+## need for a separate config file per record.
+##
+## After all per-record subprocesses finish, the per-record results are collated
+## into ida_results.pickle / record_logs.json and (optionally) post-processed into
+## fragility curves, exactly as the serial run_ida_htf_multiple_records.py does.
+def run(config_data: str | Path,
+        max_workers: int | None = None,
+        use_semaphore: bool = False,
+        worker_script: str | Path | None = None):
+
+    config_path = Path(config_data)
+    if not (config_path.exists() and config_path.is_file()):
+        raise ValueError(f"Invalid path for config_data: {config_path}")
+
+    # load the config to read output folder, record tags and post-processing opts
+    config: dict = import_from_path(config_path).config
+
+    output_folder: Path = config["result_dst"]
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    # the worker that each subprocess runs (sibling script by default)
+    if worker_script is None:
+        worker_script = Path(__file__).parent / "run_ida_htf_per_record.py"
+
+    # record tags come straight from the existing config -- no per-record config
+    record_tags = list(config["gm_json_files"].keys())
+
+    # optionally use the shared, machine-global semaphore so this can coexist
+    # with a multi-building batch; otherwise cap with a local max_workers count
+    semaphore_module = None
+    if use_semaphore:
+        import importlib
+        try:
+            semaphore_module = importlib.import_module("process_semaphore.process_semaphore")
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "use_semaphore=True but 'process_semaphore' is not importable. "
+                "Add the folder containing the process_semaphore package to "
+                "PYTHONPATH, or run with use_semaphore=False (max_workers).") from exc
+
+    print(f"Launch Time: {datetime.now()}")
+    start_time = datetime.now()
+
+    # fire one subprocess per record and wait for them all
+    run_records_in_subprocesses(
+        worker_script=worker_script,
+        config_path=config_path,
+        record_tags=record_tags,
+        max_workers=max_workers,
+        semaphore_module=semaphore_module)
+
+    elapsed_time = datetime.now() - start_time
+    print(f"All records complete. Time elapsed: {elapsed_time}")
+
+    ## COLLATE per-record results -> ida_results.pickle + record_logs.json
+    ida_results, _ = collate_ida_results(output_folder)
+
+    ## POST PROCESSING
+    if config["post_process"]:
+        process_ida_results(
+            ida_results.values(),
+            output_folder,
+            edp_idxs=config["edp_idxs"],
+            edp_tags=config["edp_tags"],
+            ida_fractiles=config["ida_fractiles"],
+            collapse_fragility=config["calculate_collapse_fragility"],
+            record_ids=ida_results.keys())
+
+
+if __name__ == "__main__":
+    # example usage
+    config_path = Path(__file__).parent / "config_ida_htf.py"
+    run(config_path)
