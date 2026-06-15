@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import openseespy.opensees as ops
 
-from standes.analysis.pushover import pushover_analysis
+from standes.analysis.pushover import cyclic_pushover_analysis, multi_cycle_ramp
 from standes.utils import import_from_path
 
 ## model to run a nonlinear static pushover analysis:
@@ -30,10 +30,9 @@ def run(config_data: str|Path|dict):
     recorders, ls_recorders = config["model_init"]()
 
     # actually starting the structural analysis stuff
-    # Determine the maximum displacement and the step size:
-    U_max = config["U_max"]
-    dU = config["dU"]
-
+    # Determine the displacement path:
+    displacements = config["displacements"]
+    
     if config["displacement_type"] == "drift":
         coord = ops.nodeCoord(config["ctrl_node"])
         if len(coord) == 2:
@@ -42,23 +41,21 @@ def run(config_data: str|Path|dict):
             height = coord[2]
 
         # convert the drifts to displacements
-        U_max = height * U_max / 100
-        dU = height * dU / 100
+        displacements = height * displacements / 100  
 
-    elif config["displacement_type"] != "disp":
-        raise ValueError("Invalid displacement type: either 'drift', or 'disp'")
+    analysis_parameters = config["analysis_parameters"](
+        config["ctrl_node"], 
+        displacements, 
+        config["excitation_dof"],
+        dU_max = config["dU"])
 
-    analysis_parameters = config["analysis_parameters"](config["ctrl_node"], U_max, dU, 
-                                                        config["excitation_dof"])
-    
     # create loading
     # create new load pattern
     ops.timeSeries("Linear", config["tseries_tag"]) 
     ops.pattern("Plain", config["pattern_tag"], config["tseries_tag"])
     _ = config["load_pattern"](config["excitation_dof"], 1)
 
-    lf, disps = pushover_analysis(analysis_parameters, recorders, ls_recorders, 
-                                    config["allow_negative_load_factor"])
+    lf, disps = cyclic_pushover_analysis(analysis_parameters, recorders, ls_recorders)
 
     po_curve = np.column_stack([disps, lf])
 
@@ -75,4 +72,4 @@ def run(config_data: str|Path|dict):
     np.savetxt(output_folder / f"po_curve.csv", po_curve, delimiter=",")
 
 if __name__ == "__main__":
-    run(Path(__file__).parent / "config_pushover.py")
+    run(Path(__file__).parent / "config_cyclic_pushover.py")

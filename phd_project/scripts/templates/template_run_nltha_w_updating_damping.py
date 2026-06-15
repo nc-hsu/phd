@@ -1,5 +1,6 @@
 import json
 import pickle
+import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 import openseespy.opensees as ops
@@ -28,6 +29,9 @@ def run(config_data: str|Path|dict):
     else:
         config = config_data
 
+    damping_config = config["damping_config"]
+    damping_model = config["damping_model"]
+
     #print some stuff to screen
     print(f"NLTHA --> Record: {config['gm_json_file'][:-4]} :: Scale Factor: {config['scale_factor']}")
 
@@ -35,8 +39,11 @@ def run(config_data: str|Path|dict):
     # load the record
     gm = load_ground_motion_from_json(config["gm_json_src"] / config["gm_json_file"])
 
-    # create the model
+    # create the model -> does gravity analysis and sets damping etc.
     recorders, collapse_recorders = config["model_init"]()
+
+    # node masses
+    node_masses = {n: ops.nodeMass(n, 1) for n in ops.getNodeTags() if ops.nodeMass(n, 1) != 0}
 
     # create loading
     # create new excitation pattern
@@ -50,8 +57,6 @@ def run(config_data: str|Path|dict):
                 "-accel", config["tseries_tag"],
                 "-factor", config["scale_factor"])    # scale for im level
 
-    set_analysis_objects(config["analysis_parameters"])  # intialises the analysis in OpenSees
-
     # determine the maximum record time
     if config["max_record_time"] is None:
         max_time = gm[0][-1]
@@ -60,16 +65,22 @@ def run(config_data: str|Path|dict):
 
     # record initial state at t=0
     time = [ops.getTime()]
-    update_recorders(recorders)      
-
+    update_recorders(recorders)     
+    
+    # run the time history analysis
+    set_analysis_objects(config["analysis_parameters"])  # intialises the analysis in OpenSees
     with tqdm(total=max_time, desc="Performing NLTHA") as pbar:
         while time[-1] < max_time:
-
+            
+            # actually do an analysis step
             collapsed = do_analysis_step(config["analysis_parameters"], recorders, 
                                             collapse_recorders)
             if collapsed: break
             time.append(ops.getTime())
             pbar.update(time[-1] - time[-2])
+
+            # update damping
+            damping_model(damping_config)
 
     ls_collapse = limit_state_collapse(collapse_recorders)        
 
@@ -88,9 +99,9 @@ def run(config_data: str|Path|dict):
 
     results = {
         "collapsed": collapsed,
-        "ls_collapse": ls_collapse
+        "ls_collapse": ls_collapse,
+        "nodal_masses": node_masses
         }
 
     with open(output_folder / "collapse.json", "w") as file:
         json.dump(results, file)
-

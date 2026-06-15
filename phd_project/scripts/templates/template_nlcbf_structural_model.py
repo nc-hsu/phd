@@ -25,7 +25,7 @@ ops_model_config: dict = {
     "gravity_analysis": True,
     "print_output": True,
     "mass_dofs": [1,3],
-    "z_mass_reduction": 1e-4,
+    "z_mass_reduction": 1e-4,           # used to reduce the vertical mass so that the horizontal modeshapes all have the longest periods
     "leaning_column_transf": "Corotational",
     "gravity_ts_pat_tag": 1,
     "brace_material": "Fatigue",
@@ -68,18 +68,18 @@ ops_model_config: dict = {
     "bcj_theta_ult": 0.15
 }
 
-ops_model_config_no_G = ops_model_config
+ops_model_config_no_G = ops_model_config.copy()
 ops_model_config_no_G["gravity_analysis"] = False
 
 recorder_config = {
     "drift_limit": 0.2,
-    "incl_remove_recorders": False
+    "incl_remove_recorders": True,
 }
 
 damping_config = {  # dependent on the damping model that is being used
     "n_modes": 1,
     "damping_ratio": 0.05,
-    "fullgen": False
+    "fullgen": False,
 }
   
 

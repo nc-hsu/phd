@@ -3,27 +3,29 @@ import subprocess
 import time
 from pathlib import Path
 from datetime import datetime
+from tqdm import tqdm
+from phd_project.process_semaphore.process_semaphore import (
+    acquire_slot, release_slot, get_current_running, get_max_concurrent)
 
-MAX_CONCURRENT = 40
 running_processes = []  # List of dicts: {proc, script, config, start_time}
 
 # Paths to your scripts and the configurations
 scripts_and_configs = [
     {
-        "script": Path(r"E:\01_model_verification_analyses\damping_model\3s_cbf_dc2_41_rayleigh_initial\run_snapback.py"),
+        "script": Path(r"E:\02_wp1pt4pt1_po_analyses_for_sdof_fitting\3s_cbf_dc2_41\run_pushover.py"),
         "config": [
-            Path(r"E:\01_model_verification_analyses\damping_model\3s_cbf_dc2_41_rayleigh_initial\config_snapback.py")
+            Path(r"E:\02_wp1pt4pt1_po_analyses_for_sdof_fitting\3s_cbf_dc2_41\config_pushover.py"),
         ]
-    }
+    },
 ]
 
+
 def launch_script(script_path: Path, config_path: Path):
+    SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
 
-    # Unique window title based on script and config
     window_title = f"{script_path.parts[-2]}/{script_path.name} [{config_path.name}]"
 
-    # Inline Python code to run: import the script and call run(config_path)
     py_code = (
         f"import importlib.util; "
         f"path = r'''{script_path}'''; "
@@ -33,71 +35,71 @@ def launch_script(script_path: Path, config_path: Path):
         f"mod.run(r'''{config_path}''')"
     )
 
-    # PowerShell command with title, run, and pause on error
     ps_command = (
         f"$host.UI.RawUI.WindowTitle = '{window_title}'; "
         f"& '{venv_python}' -c \"{py_code}\"; "
         f"if ($LASTEXITCODE -ne 0) {{ pause }}"
     )
 
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = SW_SHOWMINNOACTIVE 
+
     proc = subprocess.Popen(
-        ["powershell.exe", "-Command", ps_command],
-        creationflags=subprocess.CREATE_NEW_CONSOLE
+        ["pwsh", "-NoLogo", "-NoProfile", "-Command", ps_command],
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        startupinfo=startupinfo
     )
 
     return proc, window_title
 
 
-def check_running_processes():
+def check_for_finished(pbar):
+    """Checks for finished processes, releases slots, and updates tqdm."""
     global running_processes
     still_running = []
-
     for entry in running_processes:
-        proc = entry["proc"]
-        if proc.poll() is None:
-            still_running.append(entry)
+        if entry["proc"].poll() is not None:
+            elapsed = datetime.now() - entry["start_time"]
+            pbar.write(f"✅ Finished: {entry['display_name']} in {elapsed.total_seconds():.1f}s")
+            release_slot(entry["proc"].pid)
+            pbar.update(1)
         else:
-            end_time = datetime.now()
-            elapsed = end_time - entry["start_time"]
-            print(f"✅ Finished: {entry["display_name"]}] "
-                  f"in {elapsed.total_seconds():.1f}s")
-    
+            still_running.append(entry)
     running_processes = still_running
 
-
 def main():
+    total_scripts = sum(len(entry["config"]) for entry in scripts_and_configs)
+    pbar = tqdm(total=total_scripts, desc="Batch Progress", unit="script")
+
     for entry in scripts_and_configs:
-        script = entry["script"]
-        config_paths = entry["config"]
-
-        if not script.exists():
-            print(f"❌ Script not found: {script}")
-            continue
-
+        script, config_paths = entry["script"], entry["config"]
+        
         for cfg_path in config_paths:
-            if not cfg_path.exists():
-                print(f"⚠️ Config not found: {cfg_path}")
-                continue
+            # ACTIVE WAITING: Check for finished jobs while waiting for a slot
+            while True:
+                check_for_finished(pbar) # This ensures the bar moves during the launch phase
+                if len(get_current_running()) < get_max_concurrent():
+                    break
+                time.sleep(0.1)
 
-            # Wait if at concurrency limit
-            while len(running_processes) >= MAX_CONCURRENT:
-                check_running_processes()
-                time.sleep(0.5)
-
-            # Launch script
             proc, display_name = launch_script(script, cfg_path)
-            start_time = datetime.now()
-            print(f"▶️ Launched: {display_name} at {start_time.strftime('%H:%M:%S')}")
+            acquire_slot(proc.pid)
+            
+            pbar.write(f"▶️ Launched: {display_name}")
             running_processes.append({
                 "proc": proc,
                 "display_name": display_name,
-                "start_time": start_time
+                "start_time": datetime.now()
             })
 
-    # Wait for all to finish
+    # FINAL WAIT: For the last remaining batch
     while running_processes:
-        check_running_processes()
-        time.sleep(0.5)
+        check_for_finished(pbar)
+        time.sleep(0.1)
+    
+    pbar.close()
+
 
 if __name__ == "__main__":
     main()
