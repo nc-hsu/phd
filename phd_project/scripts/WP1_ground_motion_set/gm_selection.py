@@ -1,12 +1,18 @@
+import pickle
+from pathlib import Path
+
+from sympy import im
 from openquake.hazardlib.imt import IMT, AvgSA
 import numpy as np
 from pickagm.typing import TRT 
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-
+from typing import Callable
+from collections import Counter
 from openquake.hazardlib.gsim.base import registry
 from openquake.hazardlib.imt import SA, RSD595, AvgSA, PGA
+from tqdm.autonotebook import tqdm
 
 from pickagm.avgSA import indirect_AvgSA_GMPE
 import pickagm.eqdbases as eqdb
@@ -19,15 +25,22 @@ from pickagm.distributions import (
     gcim_simulation, 
     ensemble_ks_test, 
     ensemble_r_score,
-    ensemble_ks_bounds
+    ensemble_ks_bounds,
+    ensemble_ecdfs,
+    ensemble_quantiles
     )
 from pickagm.selection import (
     preselection, 
     scale_records_in_db,
     filter_on_sf,
+    filter_on_m,
+    filter_on_d,
+    filter_on_vs30,
+    filter_by_usable_T,
     calculate_sse_scores,
     pick_records,
-    set_weights
+    set_weights,
+    valid_selection
     )
 
 from pickagm.corrmodels import (
@@ -52,22 +65,27 @@ type_map = {
 class ESHM20SiteRupCtxBuilder:
     
     def __init__(self, site_params: dict[str, float|bool],
-                 depths: dict[TRT, float], assumed_rake: float):
+                 depths: dict[TRT, float], assumed_rake: float, 
+                 average_ztor: dict[TRT, float]):
         
         self.site_params = site_params
         self.depths = depths
         self.assumed_rake = assumed_rake
+        self.average_ztor = average_ztor
         
 
     def ctx(self, rup_params: dict) -> np.recarray:
 
         site_rup_params = self.site_params | rup_params | {
-             "hypo_depth": self.depths[rup_params["trt"]], # TODO:: check if needs to be done better
-             "rake": self.assumed_rake, # TODO:: check if needs to be done better  
+             "hypo_depth": self.depths[rup_params["trt"]],
+             "rake": self.assumed_rake,
+             "ztor": self.average_ztor[rup_params["trt"]],
+             "hypo_lat": self.site_params["lat"] + 0.1, # dummy -> same as lat + 0.1°
+             "hypo_lon": self.site_params["lon"] + 0.1, # dummy -> same as lon + 0.1°
         }
     
         site_rup_params["rrup"] = np.sqrt(site_rup_params["rjb"]**2 + 
-                                          site_rup_params["hypo_depth"]**2)
+                                          site_rup_params["hypo_depth"]**2) # TODO:: Document this assumption
         site_rup_params["rhypo"] = np.sqrt(site_rup_params["rjb"]**2 + 
                                            site_rup_params["hypo_depth"]**2) # TODO:: Document this assumption
 
@@ -120,36 +138,42 @@ def create_gmm_map(gmm_logic_tree_fp):
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Craton"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Craton"),
             "RSD595": registry["BahrampouriEtAldm2021Asc"](),
+            "IA": registry["BahrampouriEtAl2021Asc"](),
             },
         "Non-Subduction Deep": {
             "AvgSA": AvgSA_gmm_from_logic_tree(GMM_AvgSA_LT, "Non-Subduction Deep"),
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Non-Subduction Deep"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Non-Subduction Deep"),
-            "RSD595": registry["BahrampouriEtAldm2021SSlab"]()
+            "RSD595": registry["BahrampouriEtAldm2021SSlab"](),
+            "IA": registry["BahrampouriEtAl2021SSlab"]()
             },
         "Shallow Default": {
             "AvgSA": AvgSA_gmm_from_logic_tree(GMM_AvgSA_LT, "Shallow Default"),
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Shallow Default"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Shallow Default"),
-            "RSD595": registry["BahrampouriEtAldm2021Asc"]()
+            "RSD595": registry["BahrampouriEtAldm2021Asc"](),
+            "IA": registry["BahrampouriEtAl2021Asc"]()
             },
         "Subduction Inslab": {
             "AvgSA": AvgSA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Inslab"),
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Inslab"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Inslab"),
-            "RSD595": registry["BahrampouriEtAldm2021SSlab"]()
+            "RSD595": registry["BahrampouriEtAldm2021SSlab"](),
+            "IA": registry["BahrampouriEtAl2021SSlab"]()
             },
         "Subduction Interface": {
             "AvgSA": AvgSA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Interface"),
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Interface"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Subduction Interface"),
-            "RSD595": registry["BahrampouriEtAldm2021SInter"]()
+            "RSD595": registry["BahrampouriEtAldm2021SInter"](),
+            "IA": registry["BahrampouriEtAl2021SInter"]()
             },
         "Volcanic": {
             "AvgSA": AvgSA_gmm_from_logic_tree(GMM_AvgSA_LT, "Volcanic"),
             "PGA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Volcanic"),
             "SA": SA_PGA_gmm_from_logic_tree(GMM_AvgSA_LT, "Volcanic"),
-            "RSD595": registry["BahrampouriEtAldm2021Asc"]()
+            "RSD595": registry["BahrampouriEtAldm2021Asc"](),
+            "IA": registry["BahrampouriEtAl2021Asc"]()
             }
     }
     return gmm_map
@@ -208,9 +232,36 @@ def select_ensembles(
     rup_rng = np.random.default_rng(rng_seed)
     sim_rng = np.random.default_rng(rng_seed)
 
-    df = preselection(df, magnitude_bounds, distance_bounds, vs30_bounds, usable_T)
+    # selection stats
+    filter_stats = {
+        "m_bounds": magnitude_bounds,
+        "d_bounds": distance_bounds,
+        "vs30_bounds": vs30_bounds,
+        "sf_bounds": sf_bounds,
+        "usable_T_bound": usable_T,
+        "N_recs": len(df),       # total number of records
+    }
+    
+    df = filter_on_m(df, magnitude_bounds)
+    filter_stats["N_recs|m"] = len(df)
+    filter_stats["% N_recs|m"] = filter_stats["N_recs|m"] / filter_stats["N_recs"]
+
+    df = filter_on_d(df, distance_bounds)
+    filter_stats["N_recs|m,d"] = len(df)
+    filter_stats["% N_recs|m,d"] = filter_stats["N_recs|m,d"] / filter_stats["N_recs"]
+    
+    df = filter_on_vs30(df, vs30_bounds)
+    filter_stats["N_recs|m,d,v"] = len(df)
+    filter_stats["% N_recs|m,d,v"] = filter_stats["N_recs|m,d,v"] / filter_stats["N_recs"]
+    
+    df = filter_by_usable_T(df, usable_T)
+    filter_stats["N_recs|m,d,v,t"] = len(df)
+    filter_stats["% N_recs|m,d,v,t"] = filter_stats["N_recs|m,d,v,t"] / filter_stats["N_recs"]
+    
     df = scale_records_in_db(df, conditioning_imt, conditioning_iml)
     df = filter_on_sf(df, sf_bounds)
+    filter_stats["N_recs|m,d,v,t,sf"] = len(df)
+    filter_stats["% N_recs|m,d,v,t,sf"] = filter_stats["N_recs|m,d,v,t,sf"] / filter_stats["N_recs"]
 
     weights = set_weights(imt_weights, len(selection_imts))
 
@@ -233,74 +284,70 @@ def select_ensembles(
         df_sel = pick_records(df, sse_scores, max_records_from_one_event,
                               sim_trts, ok_trt_matches)
 
+        # check if the ensemble is full and there are no empty rows.
+        
+        has_empty_rows = df_sel.isnull().all(axis=1).any()
+        if has_empty_rows:
+            # empty rows indicate that there were not enough records in the filtered database
+            # to allow a full ensemble to be selected.
+            continue # skip this ensemble attempt
+
         # do KS-tests to assess the fit of the data
         ks_passed, ks_results, failed_ims = ensemble_ks_test(
-            df_sel["ims_scaled"], target_gcim_cdfs, p_value)
-        # calculate the R-Score
+            df_sel["ims_scaled"], target_gcim_cdfs, p_value)       
         rscore = ensemble_r_score(ks_results, weights)
+        ks_bounds = ensemble_ks_bounds(target_gcim_cdfs, n_samples, p_value)
+        ecdfs = ensemble_ecdfs(df_sel["ims_scaled"])
+        quantiles = ensemble_quantiles(df_sel["ims_scaled"])
 
         ensemble_data = {
             "sims": sims,
-            "mu_cond": mu,
-            "sig_cond": sig,
+            "mu_cond_sims": mu,
+            "sig_cond_sims": sig,
             "ctxs": ctxs,
             "eps": eps,
             "recs": df_sel,
             "ks_passed": ks_passed,
             "ks_results": ks_results,
             "ks_failed_ims": failed_ims,
-            "R-score": rscore}
+            "ks_bounds": ks_bounds,
+            "R-score": rscore,
+            "ecdfs": ecdfs,
+            "quantiles": quantiles,
+            "cond_imt": conditioning_imt.string,
+            "cond_iml": conditioning_iml,
+            "filter_stats": filter_stats}
         
         gcim_ensembles.append(ensemble_data)
 
+    # if and empty list is returned it means that no suitable ensembles could
+    # be found. Generally this is because of a lack or records in the filtered
+    # ground motion database.
+
     return gcim_ensembles
 
-
-def get_best_ensemble(gcim_ensembles: list[dict], must_pass_ks=True):
     
-    if must_pass_ks:
-        passing_es = [ii for ii, e in enumerate(gcim_ensembles) if e["ks_passed"]]
-        if passing_es == []:
-            return None, None
-        best_idx = passing_es[0]
-        best_e = gcim_ensembles[best_idx]
-    
-    for ii, e in enumerate(gcim_ensembles[1:]):
-        if must_pass_ks:
-            if e["R-score"] < best_e["R-score"] and e["ks_passed"]:
-                best_e = e
-                best_idx = ii+1
-        else:
-            if e["R-score"] < best_e["R-score"]:
-                best_e = e
-                best_idx = ii+1
-
-    return best_e, best_idx
-
-    
-def get_record_ensembles_for_sites(
-        grouped_disagg_data: dict, 
+def get_ground_motion_ensembles_for_sites(
+        site_poe_disaggs: dict, 
         disagg_stats: pd.DataFrame,
-        grouped_gcim_dists: dict,
+        gcim_dists: dict,
         ground_motion_database: pd.DataFrame,
-        selection_ctx: dict,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
         rng_seed: int,
-        only_sites:list[int]=[],
-        only_poes: list[int]=[] 
+        only: list[tuple[int, float]]=[]
         ) -> dict:
     """ 
-    grouped_disagg_data is a nested dictionary with the following levels
-    - (seismicity: str, region: int)    -> tuple
-        - site_id: int
-            - poe: float                -> exceedence probability of the disaggregations
+    site_poe_disaggs is a dictionary with the following levels
+    - (site_id: int, poe: float)    -> tuple
+       -> pd.DataFrame: exceedence probability of the disaggregations
 
     disagg_stats is pd.DataFrame containing with columns:
     - ["site_id", "seismicity", "region", "imt", "poe"]
     
-    grouped_gcim_dists is a nested dictionary with the following levels
-    - (seismicity: str, region: int)    -> tuple
-        - site_id: int
-            - poe: float                -> exceedence probability of the disaggregations
+    gcim_dists is a dictionary with the following levels
+    - (site_id: int, poe: float)    -> tuple
+        -> dict: statistics and distributions of the GCIMs
     
     selection_ctx is a dictionary with the following required keys:
     n_ensembles         : int           :
@@ -326,358 +373,305 @@ def get_record_ensembles_for_sites(
     ctx_builder         :                 context builder that builds the site_rup_ctx used by the openquake GMMs
     ctx_builder_params  : list[str]     : list of keys in this dict that should be passed to ctx_builder after site_params e.g. ["average_depths", "assumed_rake"]      
 
-    returns a nested dictionary with the following levels:
-    - (seismicity: str, region: int)    -> tuple
-        - site_id: int
-            - poe: float                -> exceedence probability of the disaggregations
-                - selection_results     
+    returns a dictionary with tuple keys:
+    - (site_id: int, poe: float)
+ 
     """
 
-    imt = selection_ctx["disagg_imt"]
-    
+    imt_strings = [imt.string for imt in basic_selection_ctx["selection_imts"]]
+    assert all(item in ground_motion_database["ims"].columns 
+           for item in imt_strings) , "Not all selection imts are available in the ground motion database"
+    imt = basic_selection_ctx["disagg_imt"]
+
     selections = {}
-    print("Selecting Record Ensembles...")
-    for (s, r), group_disaggs in grouped_disagg_data.items():
-        print(f"  Region {r} - {s} seismicity")
+
+    if only != []:
+        keys = only
+    else:
+        keys = list(site_poe_disaggs.keys())
+    
+    ii_loop = tqdm(range(len(keys)), desc="Selecting GM Ensembles")
+    for ii in ii_loop:
+        site, poe = keys[ii]
+       
+        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
+        poe_disagg = site_poe_disaggs[(site, poe)]
+
+        site_params = site_model.loc[site,:].to_dict()
+        site_selection_ctx = deepcopy(basic_selection_ctx)
+        site_selection_ctx["site_params"] = site_params
+
+        gcim_cdfs = gcim_dists[(site, poe)]["cdfs"]
+        iml = get_imtl_from_disaggstats(
+            disagg_stats, site, imt, poe)
         
-        selections_site = {}
-        for site_id, site_dissags in group_disaggs.items():
-            if site_id not in only_sites and only_sites != []:
-                continue
-
-            print(f"    site id: {site_id}")
-            
-            site_params = selection_ctx["sites"].loc[site_id,:].to_dict()
-            
-            selections_poe = {}
-            for poe, poe_disagg in site_dissags[imt].items():
-                if poe not in only_poes and only_poes != []:
-                    continue
-
-                print(f"        poe: {poe}")
-                gcim_cdfs = grouped_gcim_dists[(s,r)][site_id][poe]["cdfs"]
-                iml = get_imtl_from_disaggstats(
-                    disagg_stats, site_id, s, r, imt, poe)
-                
-                selections_poe[poe] = get_record_ensembles_for_single_distribution(
-                    poe_disagg, iml, selection_ctx, ground_motion_database, 
-                    site_params, gcim_cdfs, rng_seed
-                    )
-                
-            selections_site[site_id] = selections_poe
-        selections[(s, r)] = selections_site
-    
-    return selections
-
-
-def get_record_ensembles_for_site_and_poe(
-        site_id: int,
-        poe: float,
-        grouped_disagg_data: dict, 
-        disagg_stats: pd.DataFrame,
-        grouped_gcim_dists: dict,
-        ground_motion_database: pd.DataFrame,
-        selection_ctx: dict,
-        rng_seed: int 
-    ):
-
-    imt = selection_ctx["disagg_imt"]
-    
-    unique_sites = disagg_stats["site_id"].unique()
-    unique_poes = disagg_stats["poe"].unique()
-
-    if not poe in unique_poes:
-        raise ValueError(f"poe {poe} is not in the disagg_stats data")
-    
-    if not site_id in unique_sites:
-        raise ValueError(f"site_id {site_id} is not in the disagg_stats data")
-
-    print(f"Selecting Record Ensembles for Site {site_id}, poe: {poe}")
-
-
-    idx = disagg_stats[(disagg_stats["site_id"] == site_id) &
-                       (disagg_stats["poe"] == poe)].index[0]
-    s = disagg_stats.loc[idx, "seismicity"]
-    r = disagg_stats.loc[idx, "region"]
-
-    site_params = selection_ctx["sites"].loc[site_id,:].to_dict()
-    poe_disagg = grouped_disagg_data[(s, r)][site_id][imt][poe]
-
-    gcim_cdfs = grouped_gcim_dists[(s,r)][site_id][poe]["cdfs"]
-    
-    iml = get_imtl_from_disaggstats(
-        disagg_stats, site_id, s, r, imt, poe)
-    
-    selection = get_record_ensembles_for_single_distribution(
-        poe_disagg, iml, selection_ctx, ground_motion_database, 
-        site_params, gcim_cdfs, rng_seed
-        )
-                
-    return selection
-
-
-def get_record_ensembles_for_single_site(
-        site_id: int,
-        grouped_disagg_data: dict, 
-        disagg_stats: pd.DataFrame,
-        site_gcim_dists: dict,
-        ground_motion_database: pd.DataFrame,
-        selection_ctx: dict,
-        rng_seed: int
-    ):
-
-    imt = selection_ctx["disagg_imt"]
-    
-    unique_sites = disagg_stats["site_id"].unique()
-    if not site_id in unique_sites:
-        raise ValueError(f"site_id {site_id} is not in the disagg_stats data")
-
-    print(f"Calculating Record Ensembles for Site {site_id}")
-
-    idxs = disagg_stats[(disagg_stats["site_id"] == site_id)].index
-
-    # initialise the context builder
-    site_params = selection_ctx["sites"].loc[site_id,:].to_dict()
-    
-    selections = {}
-    for idx in idxs:
-        s = disagg_stats.loc[idx, "seismicity"]
-        r = disagg_stats.loc[idx, "region"]
-        poe = disagg_stats.loc[idx, "poe"]
-        imtl = disagg_stats.loc[idx, "imtl"]
-
-        print(f"poe:  {poe}")
-        # get the disagg distribution
-        poe_disagg = grouped_disagg_data[(s, r)][site_id][imt][poe]
-
-        gcim_cdfs = site_gcim_dists[poe]["cdfs"]
-        
-        selection = get_record_ensembles_for_single_distribution(
-            poe_disagg, imtl, selection_ctx, ground_motion_database, 
-            site_params, gcim_cdfs, rng_seed
+        selections[(site, poe)] = get_record_ensembles_for_single_poe_distribution(
+            poe_disagg, iml, site_selection_ctx, ground_motion_database, 
+            gcim_cdfs, rng_seed
             )
 
-        selections[poe] = selection    
-
     return selections
 
 
+def optimise_ground_motion_ensembles_for_sites(
+        preliminary_ensembles: dict,
+        site_poe_disaggs: dict[tuple[int, float], pd.DataFrame],
+        disagg_stats: pd.DataFrame,
+        gcim_dists: dict[tuple[int, float], dict],
+        ground_motion_database: pd.DataFrame,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
+        only: list[tuple[int, float]]=[],
+        shuffle:bool = False,
+        rng_seed: float = 1.0, 
+        descr: str = "Optimising GM Ensembles",
+        penalty_constant: float = 10
+        ):
 
-def get_record_ensembles_for_single_distribution(
-        disagg_dst, conditioning_iml, selection_ctx, ground_motion_database, 
-        site_params, gcim_cdfs, rng_seed):
+    obj_func = weighted_ks_statistic_and_L2norm_penalty
+
+    optimised_ensembles = {}
+    scores = {}
+
+    if only != []:
+        keys = only
+    else:
+        keys = list(preliminary_ensembles.keys())
+
+    ii_loop = tqdm(range(len(keys)), desc=f"{descr}")
+    for ii in ii_loop:
+        site, poe = keys[ii]
+        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
+        pr_ensemble = preliminary_ensembles[(site, poe)]
+    
+        # if there is no preliminary ensemble it can't be optimised
+        if pr_ensemble is None:
+            optimised_ensembles[(site, poe)] = None
+            continue
+
+        cond_iml = disagg_stats[(disagg_stats["site_id"] == site) &
+                                (disagg_stats["poe"] == poe)].values[0]
+        disagg_dist = site_poe_disaggs[(site, poe)]
+        target_cdfs = gcim_dists[(site, poe)]["cdfs"]
+        ks_bounds = ensemble_ks_bounds(
+            target_cdfs, 
+            basic_selection_ctx["n_samples"],
+            basic_selection_ctx["p_value"])
+        
+        site_params = site_model.loc[site,:].to_dict()
+        site_selection_ctx = basic_selection_ctx.copy()
+        site_selection_ctx["site_params"] = site_params
+        
+        im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
+
+        obj_func_kwargs = {
+            "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]]) 
+                                    for k, ksb in ks_bounds.items() if k in im_strings],
+            "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]]) 
+                                    for k, ksb in ks_bounds.items() if k in im_strings],
+            "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]]) 
+                                    for k, ksb in ks_bounds.items() if k in im_strings],
+            "n_recs": basic_selection_ctx["n_samples"],
+            "im_weights": basic_selection_ctx["imt_weights"],
+            "penalty_constant": penalty_constant
+        }
+
+        # do the optimisation
+        cond_iml = disagg_stats[(disagg_stats["site_id"] == site) &
+                                (disagg_stats["poe"] == poe)]["imtl"].iloc[0]
+        
+        new_recs, score = greedy_optimise_ensemble(
+            pr_ensemble, cond_iml, disagg_dist, ground_motion_database, 
+            site_selection_ctx, obj_func, obj_func_kwargs, is_nested=True,
+            shuffle=shuffle, rng_seed=rng_seed)
+
+        new_ensemble = assemble_ensemble_dict(
+            new_recs, target_cdfs, site_selection_ctx, 
+            basic_selection_ctx["conditioning_imt"].string, cond_iml)
+        
+        optimised_ensembles[(site, poe)] = new_ensemble
+        scores[(site, poe)] = score
+    
+    return optimised_ensembles, scores
+
+
+def optimise_ground_motion_ensembles_for_sites_with_shuffles(
+        n_shuffles: int,
+        rng_seeds: list[int],
+        preliminary_ensembles: dict,
+        site_poe_disaggs: dict[tuple[int, float], pd.DataFrame],
+        disagg_stats: pd.DataFrame,
+        gcim_dists: dict[tuple[int, float], dict],
+        ground_motion_database: pd.DataFrame,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
+        only: list[tuple[int, float]]=[],
+    ):
+    
+    assert len(rng_seeds) >= n_shuffles, "The number of seeds must be >= the number of shuffles"
+
+    ensembles = []
+    scores = []
+    for ii, rng_seed in enumerate(rng_seeds):
+        es, ss = optimise_ground_motion_ensembles_for_sites(
+            preliminary_ensembles, site_poe_disaggs, disagg_stats,
+            gcim_dists, ground_motion_database, basic_selection_ctx, site_model, only, 
+            shuffle=True, rng_seed=rng_seed, descr=f"Shuffle {ii+1} - Optimising Ensemble")
+        ensembles.append(es)
+        scores.append(ss)
+
+    score_tuples = {
+        key: tuple(d[key] for d in scores) 
+        for key in scores[0].keys()
+        }
+
+    best_ensembles = {}
+    best_scores = {}
+    for site_poe, scores in score_tuples.items():
+        best_score = min(scores)
+        idx = scores.index(best_score)
+        best_ensemble = ensembles[idx][site_poe]
+        best_ensembles[site_poe] = best_ensemble
+        best_scores[site_poe] = best_score
+
+    return best_ensembles, best_scores
+
+
+def _initialise_ctx_builder(site_selection_ctx):
+    # initialise the context builder
+    ctx_builder = site_selection_ctx["ctx_builder"](
+        site_selection_ctx["site_params"], 
+        *[site_selection_ctx[p] for p in site_selection_ctx["ctx_builder_params"]])
+    return ctx_builder
+
+
+def get_record_ensembles_for_single_poe_distribution(
+        disagg_dst, conditioning_iml, site_selection_ctx, ground_motion_database, 
+        gcim_cdfs, rng_seed):
     
     # initialise the context builder
-    ctx_builder = selection_ctx["ctx_builder"](
-        site_params, *[selection_ctx[p] for p in selection_ctx["ctx_builder_params"]])
+    ctx_builder = _initialise_ctx_builder(site_selection_ctx)
 
     # get m_bounds, dbounds, vs30bounds
     m_bounds = get_m_bounds(
-        disagg_dst, selection_ctx["occurence"], 
-        selection_ctx["m_bound_model"])
+        disagg_dst, site_selection_ctx["occurence"], 
+        site_selection_ctx["m_bound_model"])
     
     d_bounds = get_d_bounds(
-        disagg_dst, selection_ctx["occurence"], 
-        selection_ctx["d_bound_model"])
+        disagg_dst, site_selection_ctx["occurence"], 
+        site_selection_ctx["d_bound_model"])
 
     vs30_bounds = get_vs30_bounds(
-        site_params["vs30"], 
-        selection_ctx["vs30_bound_model"])
+        site_selection_ctx["site_params"]["vs30"], 
+        site_selection_ctx["vs30_bound_model"])
 
     # select the ensembles                
     poe_ensembles = select_ensembles(
         disagg_dst,
         gcim_cdfs,
         ground_motion_database,
-        selection_ctx["n_ensembles"],
-        selection_ctx["n_samples"], 
-        selection_ctx["conditioning_imt"],
+        site_selection_ctx["n_ensembles"],
+        site_selection_ctx["n_samples"], 
+        site_selection_ctx["conditioning_imt"],
         conditioning_iml,
-        selection_ctx["selection_imts"], 
-        selection_ctx["imt_weights"],
-        selection_ctx["gmm_map"],
-        selection_ctx["corr_map"],
+        site_selection_ctx["selection_imts"], 
+        site_selection_ctx["imt_weights"],
+        site_selection_ctx["gmm_map"],
+        site_selection_ctx["corr_map"],
         ctx_builder,
         m_bounds, 
         d_bounds, 
         vs30_bounds,
-        selection_ctx["sf_bounds"],
-        selection_ctx["usable_T"],
-        selection_ctx["max_n_recs"],
-        selection_ctx["p_value"],
-        selection_ctx["ok_trt_matches"],
+        site_selection_ctx["sf_bounds"],
+        site_selection_ctx["usable_T"],
+        site_selection_ctx["max_n_recs"],
+        site_selection_ctx["p_value"],
+        site_selection_ctx["ok_trt_matches"],
         rng_seed)
     
-    # check that some pass, otherwise log a failed flag
-    # get the best ensemble
-    best_ensemble, idx = get_best_ensemble(poe_ensembles, must_pass_ks=True)
-    ensemble_found = True if best_ensemble is not None else False
-    
-    # calculate the ks bounds for the distribution
-    ks_bounds = ensemble_ks_bounds(
-        gcim_cdfs, selection_ctx["n_samples"], selection_ctx["p_value"])
-    
-    # save the results
-    selection = {
-        "ensemble_found": ensemble_found,
-        "best_ensemble": best_ensemble, 
-        "best_ensemble_idx": idx,
-        "all_ensembles": poe_ensembles, 
-        "ks_bounds": ks_bounds,
-        "m_bounds": m_bounds,
-        "d_bounds": d_bounds,
-        "vs30_bounds": vs30_bounds
-    }
-
-    return selection
+    return poe_ensembles
 
 
-def calculate_site_gcim_distributions_for_all_sites(
-        grouped_disagg_data: dict, disagg_stats: pd.DataFrame, 
-        conditioning_imt:IMT, selection_imts: list[IMT],
-        sites: pd.DataFrame, gmm_map: dict, corr_map: dict,
-        average_depths: dict, assumed_rake: float, occurence: bool, 
+def calculate_gcim_distributions_for_sites(
+        site_poe_disaggs: dict, disagg_stats: pd.DataFrame, 
+        site_model: pd.DataFrame, basic_selection_ctx: dict, 
         percentiles: list[int]) -> dict:
     """ 
-    disagg_data is a nested dictionary with the following levels
-    - (seismicity: str, region: int)    -> tuple
-        - site_id: int
-            - conditioning_imt: string
-            - poe: float                -> exceedence probability of the disaggregations
+    site_poe_disaggs is a dictionary with tuple keys (site_id: int, poe: float)
+        -> exceedence probability of the disaggregations
 
     disagg_stats is pd.DataFrame containing with columns:
     - ["site_id", "seismicity", "region", "imt", "poe"]
     
-    returns a nested dictionary with the following levels:
-    - (seismicity: str, region: int)    -> tuple
-        - site_id: int
-            - poe: float                -> exceedence probability of the disaggregations"""
+    basic_selection_ctx is a dictionary with the following required keys:
+    conditioning_imt    : IMT           
+                        : the imt that the disaggregation is conditioned on. 
+                        : this is needed to extract the correct imtl from the 
+                        : disagg_stats and to calculate the gcim distributions
     
+    selection_imts      : list[IMT]     
+                        : the imts for which the gcim distributions should be 
+                        : calculated.
+    
+    gmm_map             : dict[str, dict[str, GMM]] 
+                        : map of gmm objects for each tectonic region and imt. 
+                        : the keys should be the same as the trt types in the 
+                        : disagg_stats and the imts in selection_imts
+    
+    corr_map            : dict[str, pd.DataFrame] 
+                        : map of correlation matrices for each tectonic region. 
+                        : the keys should be the same as the trt types in the 
+                        : disagg_stats and the columns and index should be the 
+                        : same as the imts in selection_imts
+    ctx_builder         :                 
+                        : context builder that builds the site_rup_ctx used by 
+                        : the openquake GMMs. this is needed to calculate the 
+                        : gcim distributions
+    
+    ctx_builder_params  : list[str]     
+                        : list of keys in this dict that should be passed to 
+                        : ctx_builder after site_params 
+                        : e.g. ["average_depths", "assumed_rake", "average_ztor"]
+    
+    occurence           : bool          
+                        : true if the dissagregation was done for "P(m|X=x)"
+    
+    returns a dictionary with the tuple keys:
+    - (site_id: int, poe: float) 
+        -> dict: GCIM distribution statistics and distributions"""
+    
+    bsc = basic_selection_ctx 
+
     gcim_dists = {}
-    print("Calculating GCIM Distributions...")
-    for (s, r), group_disaggs in grouped_disagg_data.items():
-        print(f"  Region {r} - {s} seismicity")
-        gcim_site = {}
-        for site_id, site_dissags in group_disaggs.items():
-            print(f"    site id: {site_id}")
-            # initialise the context builder
-            site_params = sites.loc[site_id,:].to_dict()
-            ctx_builder = ESHM20SiteRupCtxBuilder(site_params, average_depths, assumed_rake)
-            gcim_poe = {}
-            for poe, poe_dissag in site_dissags[conditioning_imt.name].items():
-                imtl = get_imtl_from_disaggstats(
-                    disagg_stats, site_id, s, r, conditioning_imt.name, poe)
-                gcim_stats, gcim_pdfs, gcim_cdfs = gcim_distributions(
-                    poe_dissag, imtl, gmm_map, selection_imts, 
-                    conditioning_imt, corr_map, ctx_builder, occurence, percentiles)
-                
-                gcim_poe[poe] = {"stats": gcim_stats, "pdfs": gcim_pdfs, "cdfs": gcim_cdfs}
-            gcim_site[site_id] = gcim_poe
-        gcim_dists[(s, r)] = gcim_site
+    keys = list(site_poe_disaggs.keys())
+
+    ii_loop = tqdm(range(len(keys)), desc="Calculating GCIM Distributions")
+    for ii in ii_loop:
+        site, poe = keys[ii]
+        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
+        
+        # initialise the context builder
+        site_params = site_model.loc[site,:].to_dict()
+        site_selection_ctx = deepcopy(basic_selection_ctx)
+        site_selection_ctx["site_params"] = site_params
+        ctx_builder = _initialise_ctx_builder(site_selection_ctx)
+        
+        poe_disagg = site_poe_disaggs[(site, poe)]
+
+        imtl = get_imtl_from_disaggstats(
+            disagg_stats, site, bsc["conditioning_imt"].name, poe)
+            
+        gcim_stats, gcim_pdfs, gcim_cdfs = gcim_distributions(
+            poe_disagg, imtl, bsc["gmm_map"], bsc["selection_imts"], 
+            bsc["conditioning_imt"], bsc["corr_map"], ctx_builder, 
+            bsc["occurence"], percentiles)
+            
+        gcim_dists[(site, poe)] = {
+            "stats": gcim_stats, 
+            "pdfs": gcim_pdfs, 
+            "cdfs": gcim_cdfs}
 
     return gcim_dists
-
-
-def get_gcim_distributions_for_single_site_and_poe(
-        site_id: int,
-        poe: float,
-        grouped_disagg_data: dict, 
-        disagg_stats: pd.DataFrame,
-        selection_ctx: dict,
-        percentiles: list=[0.16, 0.5, 0.84]
-    ):
-
-    imt = selection_ctx["disagg_imt"]
-    
-    unique_sites = disagg_stats["site_id"].unique()
-    unique_poes = disagg_stats["poe"].unique()
-
-    if not poe in unique_poes:
-        raise ValueError(f"poe {poe} is not in the disagg_stats data")
-    
-    if not site_id in unique_sites:
-        raise ValueError(f"site_id {site_id} is not in the disagg_stats data")
-
-    print(f"Calculating GCIM distributions for Site {site_id}, poe: {poe}")
-
-    idx = disagg_stats[(disagg_stats["site_id"] == site_id) &
-                            (disagg_stats["poe"] == poe)].index[0]
-    s = disagg_stats.loc[idx, "seismicity"]
-    r = disagg_stats.loc[idx, "region"]
-
-    # initialise the context builder
-    site_params = selection_ctx["sites"].loc[site_id,:].to_dict()
-    ctx_builder = selection_ctx["ctx_builder"](
-        site_params, *[selection_ctx[p] for p in selection_ctx["ctx_builder_params"]])
-    
-    # get the disagg distribution
-    poe_disagg = grouped_disagg_data[(s, r)][site_id][imt][poe]
-
-    conditioning_imt = selection_ctx["conditioning_imt"]
-    selection_imts = selection_ctx["selection_imts"]
-
-    imtl = get_imtl_from_disaggstats(
-        disagg_stats, site_id, s, r, conditioning_imt.name, poe)
-    
-    gmm_map = selection_ctx["gmm_map"]
-    corr_map = selection_ctx["corr_map"]
-    occurence = selection_ctx["occurence"]
-    gcim_stats, gcim_pdfs, gcim_cdfs = gcim_distributions(
-        poe_disagg, imtl, gmm_map, selection_imts, 
-        conditioning_imt, corr_map, ctx_builder, occurence, percentiles)
-    
-    gcim_out = {"stats": gcim_stats, "pdfs": gcim_pdfs, "cdfs": gcim_cdfs}
-                
-    return gcim_out
-
-
-def get_gcim_distributions_for_single_site(
-        site_id: int,
-        grouped_disagg_data: dict, 
-        disagg_stats: pd.DataFrame,
-        selection_ctx: dict,
-        percentiles: list=[0.16, 0.5, 0.84]
-    ):
-
-    imt = selection_ctx["disagg_imt"]
-    
-    unique_sites = disagg_stats["site_id"].unique()
-    if not site_id in unique_sites:
-        raise ValueError(f"site_id {site_id} is not in the disagg_stats data")
-
-    print(f"Calculating GCIM distributions for Site {site_id}")
-
-    idxs = disagg_stats[(disagg_stats["site_id"] == site_id)].index
-
-    # initialise the context builder
-    site_params = selection_ctx["sites"].loc[site_id,:].to_dict()
-    ctx_builder = selection_ctx["ctx_builder"](
-        site_params, *[selection_ctx[p] for p in selection_ctx["ctx_builder_params"]])
-    
-    conditioning_imt = selection_ctx["conditioning_imt"]
-    selection_imts = selection_ctx["selection_imts"]
-    gmm_map = selection_ctx["gmm_map"]
-    corr_map = selection_ctx["corr_map"]
-    occurence = selection_ctx["occurence"]
-
-    gcim_out = {}
-    for idx in idxs:
-        s = disagg_stats.loc[idx, "seismicity"]
-        r = disagg_stats.loc[idx, "region"]
-        poe = disagg_stats.loc[idx, "poe"]
-        imtl = disagg_stats.loc[idx, "imtl"]
-
-        # get the disagg distribution
-        poe_disagg = grouped_disagg_data[(s, r)][site_id][imt][poe]
-
-        gcim_stats, gcim_pdfs, gcim_cdfs = gcim_distributions(
-            poe_disagg, imtl, gmm_map, selection_imts, 
-            conditioning_imt, corr_map, ctx_builder, occurence, percentiles)
-        
-        gcim_out[poe] = {"stats": gcim_stats, "pdfs": gcim_pdfs, "cdfs": gcim_cdfs}
-                
-    return gcim_out
-
 
 
 def get_m_bounds(disagg_dst: pd.DataFrame, occurence: bool, model="tarbali_and_bradley_2016") -> tuple:
@@ -701,27 +695,48 @@ def get_vs30_bounds(site_vs30, model="tarbali_and_bradley_2016") -> tuple:
         return vs30_bounds_tarbali_and_bradley_2016(site_vs30)
 
 
+def get_disagg_percentiles(disagg_dist, param_key, prob_key, targets=[0.01, 0.1, 0.9, 0.99]):
+    srs = disagg_dist.groupby(param_key)[prob_key].sum()
+    srs = srs.sort_index()
+    # Calculate the cumulative probability
+    cdf = srs.cumsum()
+    # Normalize CDF if the sum isn't exactly 1.0 due to rounding
+    cdf = cdf / srs.sum()
+    # Interpolate distances at target cumulative probabilities
+    results = np.round(np.interp(targets, cdf, srs.index.to_numpy()), 3)
+    
+    return dict(zip(targets, results))
+
+
 def m_bounds_tarbali_and_bradley_2016(
         disagg_dst: pd.DataFrame, occurence: bool,) -> tuple[float, float]:
+    
+    param_key = "Mag"
     if occurence:
-        mask = disagg_dst["P(m|X=x)"] != 0
-        df = disagg_dst.loc[mask, "Mag"]
-        lower = min(df.quantile(0.01), df.quantile(0.1) - 0.5)
-        upper = max(df.quantile(0.99), df.quantile(0.9) - 0.5)
+        prob_key = "P(m|X=x)"
     else:
         raise NotImplementedError
+    
+    pctiles = get_disagg_percentiles(disagg_dst, param_key, prob_key)
+    lower = min(pctiles[0.01], pctiles[0.1] - 0.5)
+    upper = max(pctiles[0.99], pctiles[0.90] + 0.5)
+
     return (lower, upper)
 
 
 def d_bounds_tarbali_and_bradley_2016(
         disagg_dst: pd.DataFrame, occurence: bool,) -> tuple[float, float]:
+    
+    param_key = "Dist"
     if occurence:
-        mask = disagg_dst["P(m|X=x)"] != 0
-        df = disagg_dst.loc[mask, "Dist"]
-        lower = min(df.quantile(0.01), 0.5 * df.quantile(0.1))
-        upper = max(df.quantile(0.99), 1.5 * df.quantile(0.90))
+        prob_key = "P(m|X=x)"
     else:
         raise NotImplementedError
+    
+    pctiles = get_disagg_percentiles(disagg_dst, param_key, prob_key)
+    lower = min(pctiles[0.01], 0.5 * pctiles[0.1])
+    upper = max(pctiles[0.99], 1.5 * pctiles[0.90])
+
     return (lower, upper)
 
 
@@ -730,170 +745,1104 @@ def vs30_bounds_tarbali_and_bradley_2016(
     return (0.5 * site_vs30, 1.5 * site_vs30)
 
 
-def get_imtl_from_disaggstats(disagg_stats, site_id, seismicity, region, imt, poe):
+def get_imtl_from_disaggstats(disagg_stats, site_id, imt, poe):
     imtl = disagg_stats[(disagg_stats["site_id"] == site_id) &
-                        (disagg_stats["seismicity"] == seismicity) &
-                        (disagg_stats["region"] == region) &
                         (disagg_stats["imt"] == imt) &
                         (disagg_stats["poe"] == poe)]["imtl"].values[0]
     return imtl
 
 
+def adjust_ensemble_distributions(
+        disagg_dist: pd.DataFrame, 
+        target_gcim_cdfs: dict, ensemble: dict, selection_ctx: dict,
+        gm_db: pd.DataFrame):
+    # takes an ensemble failing the ks-test and trys to tweak the selected
+    # records so that the distribution passes.
+    # it is not an optimisation algorithm.
+    # It will stop when the all the distributions are passing the KS-test
+    # or when ... 
+
+    # the ensemble dict must have the following keys as a minimum:
+    # ...
+
+    # the selection_ctx must have the following keys as a minimum:
+    # ...
+
+    recs = ensemble["recs"]
+    current_recs = recs.copy()
+    current_ks_results = ensemble["ks_results"]
+    current_rscore = ensemble["R-score"]
+    current_ecdfs = ensemble["ecdfs"]
+    
+    # calculate KS-bounds incase the number of samples or p-value has changed
+    # in the seleection context
+    ks_bounds = ensemble_ks_bounds(target_gcim_cdfs, selection_ctx["n_samples"],
+                                   selection_ctx["p_value"])
+    
+    # initialise the context builder
+    site_params = selection_ctx["site_params"]
+
+    # get m_bounds, dbounds, vs30bounds
+    m_bounds = get_m_bounds(
+        disagg_dist, selection_ctx["occurence"], 
+        selection_ctx["m_bound_model"])
+    
+    d_bounds = get_d_bounds(
+        disagg_dist, selection_ctx["occurence"], 
+        selection_ctx["d_bound_model"])
+
+    vs30_bounds = get_vs30_bounds(
+        site_params["vs30"], 
+        selection_ctx["vs30_bound_model"])
+    
+    # get the filtered gm_database
+    gm_db = preselection(gm_db, m_bounds, d_bounds, vs30_bounds, selection_ctx["usable_T"])
+    gm_db = scale_records_in_db(gm_db, selection_ctx["conditioning_imt"], ensemble["cond_iml"])
+    gm_db = filter_on_sf(gm_db, selection_ctx["sf_bounds"])
+
+    # get the failing ims and order from lowest to highest p-value
+    failing_ims = ensemble["ks_failed_ims"]
+
+    # set some flags
+    passing = ensemble["ks_passed"]
+    hail_mary_ims = []
+    updated_at_least_once = False
+    update_failed = False
+    failed_point = None
+
+    while (not passing) and (not update_failed):
+        updated = False
+        im = failing_ims[0]
+        
+        # calculate determine the imls exceeding the ks bounds
+        lower_exceedances = ks_lower_bound_exceedances(
+            current_ecdfs[im], ks_bounds[im][:, [0,1]])
+        
+        upper_exceedances = ks_upper_bound_exceedances(
+            current_ecdfs[im], ks_bounds[im][:, [0,3]])
+
+        # calculate the sign of the ecdf relative to the cdf
+        im_signs = _assign_signs_from_cdf_array(
+            current_ecdfs[im], ks_bounds[im][:, [0,2]])
+        
+        if lower_exceedances != []:
+            # select the iml to improve
+            iml, diff = lower_exceedances[0]
+            target_iml = iml + diff
+
+            # find the records that can be replaced:
+            # must have an iml higher than the iml we want to improve
+            # and lie on the same side of the cdf, here 1 (right-hand side)
+            ok_replacement_ims = [i for i, sign in im_signs if sign == 1 and i > target_iml]
+            ok_replacement_recs = current_recs[current_recs[("ims_scaled", im)].isin(ok_replacement_ims)]\
+                .copy()\
+                .sort_values(("ims_scaled", im), axis=0, ascending=True)
+            
+            # get a mask for the imls
+            # < used because we want to move an upper part of the ecdf down to 
+            # the lower end
+            gm_db_iml_mask = gm_db[("ims_scaled", im)] < target_iml
+            
+        elif upper_exceedances != []:
+            # select the iml to improve
+            iml, diff = upper_exceedances[0]
+            target_iml = iml + diff
+
+            # find the records that can be replaced:
+            # must have an iml lower than the iml we want to improve
+            # and lie on the same side of the cdf, here -1 (left-hand side)
+            ok_replacement_ims = [i for i, sign in im_signs if sign == -1 and i < target_iml]
+            ok_replacement_recs = current_recs[current_recs[("ims_scaled", im)].isin(ok_replacement_ims)]\
+                .copy()\
+                .sort_values(("ims_scaled", im), ascending=False)
+            
+            # get a mask for the imls
+            # > used because we want to move an lower part of the cdf up to the
+            # upper end
+            gm_db_iml_mask = gm_db[("ims_scaled", im)] > target_iml
+            
+        else:
+            # if we get here then neither the upper or lower ks bounds have been
+            # exceeded. But the last round throught the while loop should have 
+            # yielded no failing ims and passing == True. 
+            # Technically we should never get here...
+            raise NotImplementedError()
+
+        # print(im, iml, diff)
+
+        # do the loops
+        for _, rec_to_replace in ok_replacement_recs.iterrows():
+            rec_trt = rec_to_replace[("metadata", "trt")]
+
+            # filter the gm_database by trt and iml:
+            filtered_gm_db = gm_db[(gm_db[("metadata", "trt")] == rec_trt) &
+                                    gm_db_iml_mask]
+        
+            # get a new record and try the fit. returns none if no improvement was possible
+            res = _loop_to_improve_im_and_rscore(
+                rec_to_replace, current_recs, current_rscore, filtered_gm_db,
+                selection_ctx, target_gcim_cdfs)
+        
+            if res is not None:
+                # record found that improves r-score
+                (passing, current_recs, current_rscore, current_ecdfs, 
+                current_ks_results, failing_ims, updated) = res
+
+                # the ecdf has changed. we need to break out
+                break
+        
+        if updated:
+            # go back to start of the while loop and check for new exceedance
+            # points
+            updated_at_least_once = True
+            continue
+
+        # if we get here we weren't able to improve the rscore by replacing
+        # any of the records that are allowed to be replaced.
+        # Now we try allowing records to be selected that don't improve the 
+        # R-Score but don't allow any new IMs to fail either 
+        # (a bit of a looser requirement)
+        for _, rec_to_replace in ok_replacement_recs.iterrows():
+            rec_trt = rec_to_replace[("metadata", "trt")]
+
+            # filter the gm_database by trt and iml:
+            filtered_gm_db = gm_db[(gm_db[("metadata", "trt")] == rec_trt) &
+                                    gm_db_iml_mask]
+
+            res = _loop_to_improve_im_without_others_failing(
+                rec_to_replace, current_recs, failing_ims, filtered_gm_db,
+                selection_ctx, target_gcim_cdfs)
+
+            if res is not None:
+                # record found that improves im distribution without causing others
+                # to fail
+                (passing, current_recs, current_rscore, current_ecdfs, 
+                current_ks_results, failing_ims, updated) = res
+                # the ecdf has changed. we need to break out
+                break
+
+        if updated:
+            # go back to start of the while loop and check for new exceedance
+            # points
+            updated_at_least_once = True
+            continue
+
+        # if we get here we weren't able to improve the im without causing
+        # others to fail. 
+        failed_point = (im, iml, diff) # the im iml combination that can't be made to work
+        update_failed = True
+    
+    if not updated_at_least_once:
+        return ensemble["ks_passed"], ensemble, failed_point
+    
+    # update new ensemble  
+    new_ensemble = deepcopy(ensemble)
+    new_ensemble["recs"] = current_recs
+    new_ensemble["ks_passed"] = passing
+    new_ensemble["ks_results"] = current_ks_results
+    new_ensemble["ks_failed_ims"] = failing_ims
+    new_ensemble["R-score"] = current_rscore
+    new_ensemble["ecdfs"] = current_ecdfs
+    quantiles = ensemble_quantiles(current_recs["ims_scaled"])
+    new_ensemble["quantiles"] = quantiles
+    new_ensemble["ks_bounds"] = ks_bounds
+
+    return passing, new_ensemble, failed_point
+
+
+def _loop_to_improve_im_and_rscore(
+        rec_to_replace: pd.Series, current_recs: pd.DataFrame, 
+        current_rscore: float, gm_db: pd.DataFrame, 
+        selection_ctx: dict, target_gcim_cdfs: dict):
+    
+    for ii in range(len(gm_db)):
+        new_rec = gm_db.iloc[ii, :] # the new record to try
+
+        if not valid_selection(new_rec, current_recs, selection_ctx["max_n_recs"]):
+            continue
+
+        test_out = _test_new_record(
+            rec_to_replace, new_rec, current_recs, selection_ctx, target_gcim_cdfs) 
+        
+        passing = test_out[1]
+
+        # check that the R-score has improved:
+        if test_out[4] >= current_rscore:
+            continue # no improvement
+
+        # update the failing_ims and recs
+        new_recs = test_out[0]
+        new_rscore = test_out[4]
+        new_ecdfs = ensemble_ecdfs(new_recs["ims_scaled"])
+        new_ks_results = test_out[2]
+        failing_ims = test_out[3]
+        updated = True
+        return (passing, new_recs, new_rscore, new_ecdfs, 
+                new_ks_results, failing_ims, updated)
+    
+    return None
+
+
+def _loop_to_improve_im_without_others_failing(
+        rec_to_replace: pd.Series, 
+        current_recs: pd.DataFrame, 
+        failing_ims: list[str],
+        gm_db: pd.DataFrame, 
+        selection_ctx: dict, 
+        target_gcim_cdfs: dict):
+    
+    for ii in range(len(gm_db)):
+        new_rec = gm_db.iloc[ii, :] # the new record to try
+
+        if not valid_selection(new_rec, current_recs, selection_ctx["max_n_recs"]):
+            continue
+
+        test_out = _test_new_record(
+            rec_to_replace, new_rec, current_recs, selection_ctx, target_gcim_cdfs) 
+        
+        passing = test_out[1]
+
+        if _no_new_failing_ims(test_out[3], failing_ims) != []:
+                # some new im failed and we dismiss this record
+                continue
+
+        # update the failing_ims and recs
+        new_recs = test_out[0]
+        new_rscore = test_out[4]
+        new_ecdfs = ensemble_ecdfs(new_recs["ims_scaled"])
+        new_ks_results = test_out[2]
+        failing_ims = test_out[3]
+        updated = True
+        return (passing, new_recs, new_rscore, new_ecdfs, 
+                new_ks_results, failing_ims, updated)
+    
+    return None
+
+
+def _test_new_record(
+        rec_to_replace: pd.Series, 
+        new_rec: pd.Series, 
+        new_recs: pd.DataFrame,
+        selection_ctx: dict, 
+        target_gcim_cdfs: dict):
+    
+    # temporarily replace the record 
+    idx_pos = new_recs.index.get_loc(rec_to_replace.name)
+    temp_recs = pd.concat([new_recs.iloc[:idx_pos], 
+                            new_rec.to_frame().T, 
+                            new_recs.iloc[idx_pos + 1:]])
+    temp_recs = temp_recs.astype(new_recs.dtypes)
+
+    # recompute the KS tests for all IMs 
+    passing, temp_ks_results, temp_failed_ims = ensemble_ks_test(
+    temp_recs["ims_scaled"], target_gcim_cdfs, selection_ctx["p_value"])
+
+    # calculate the R-Score
+    temp_rscore = ensemble_r_score(
+        temp_ks_results, selection_ctx["imt_weights"])
+    
+    return temp_recs, passing, temp_ks_results, temp_failed_ims, temp_rscore 
+
+
+def _no_new_failing_ims(list_a, list_b):
+    """Returns elements in A that are not in B."""
+    # Convert B to a set for O(1) lookup performance
+    set_b = set(list_b)
+    
+    # Use a list comprehension to filter A
+    return [item for item in list_a if item not in set_b]
+
+
+def _assign_signs_from_cdf_array(ecdf, cdf):
+    """
+    Assigns -1 or 1 to ECDF x-values based on position relative to 
+    a theoretical CDF provided as an array.
+    """
+    # 1. Filter ECDF for the 'leading edge' (min y for each unique x)
+    # Sort by x ascending, then y ascending
+    ecdf_sorted = ecdf[np.lexsort((ecdf[:, 1], 
+                                   ecdf[:, 0]))]
+    _, indices = np.unique(ecdf_sorted[:, 0], return_index=True)
+    ecdf_filtered = ecdf_sorted[indices]
+    
+    x_ecdf = ecdf_filtered[:, 0]
+    y_ecdf = ecdf_filtered[:, 1]
+    
+    # 2. Extract CDF array columns
+    x_cdf = cdf[:, 0]
+    y_cdf = cdf[:, 1]
+    
+    # 3. Interpolate the theoretical x for the given ecdf y-values
+    # Note: np.interp(x_eval, x_data, y_data) 
+    # To get x as a function of y, we swap the data columns:
+    x_theoretical_at_y = np.interp(y_ecdf, y_cdf, x_cdf)
+    
+    # 4. Assign signs
+    # x_ecdf > x_theory means the observation is larger than expected (Right)
+    # Using np.where(condition, if_true, if_false)
+    signs = np.where(x_ecdf >= x_theoretical_at_y, 1, -1)
+    
+    # Create list of tuples (x_value, sign)
+    return list(zip(x_ecdf, signs))
+
+
+def ks_lower_bound_exceedances(ecdf: np.ndarray, ks_bound: np.ndarray):
+    # Identify each unique x and select the pair with the minimum y value. 
+    # This ensures we are comparing the "leading edge" of each step against the 
+    # Kolmogorov-Smirnov (KS) lower bound.
+    
+    # Sort by x then y to ensure the first occurrence is the minimum y
+    ecdf_sorted = ecdf[np.lexsort((ecdf[:, 1], ecdf[:, 0]))]
+
+    # Identify unique x-values and keep only the first occurrence (min y)
+    _, indices = np.unique(ecdf_sorted[:, 0], return_index=True)
+    ecdf_filtered = ecdf_sorted[indices]
+    
+    # ECDF: col 0 is x, col 1 is y
+    x_ecdf = ecdf_filtered[:, 0]
+    y_ecdf = ecdf_filtered[:, 1]
+
+    # KS Bound: col 0 is x, col 1 is y
+    x_ks = ks_bound[:, 0]
+    y_ks = ks_bound[:, 1]
+
+    # Interpolate KS x-values for each y-value present in the ECDF
+    x_ks_interped = np.interp(y_ecdf, y_ks, x_ks)
+
+    # if the last y_ks = 1 then we have an upper bound case. We need to fix
+    # the interpolation otherwise it jumps to the last value with y = 1.0
+    if np.round(y_ks[-1], 6) == 1:
+        x_max = x_ks[np.where(np.round(y_ks, 6) == 1)[0][0]]
+        x_ks_interped[-1] = x_max
+
+    diffs = x_ks_interped - x_ecdf
+    exceedances = [(x, d) for x, d in zip(x_ecdf, diffs) if d < 0]
+
+    return exceedances
+
+
+def ks_upper_bound_exceedances(ecdf: np.ndarray, ks_bound: np.ndarray):
+    """
+    Finds points where ECDF x-values exceed the KS upper bound.
+    Exceedance occurs when x_ecdf < x_ks (ECDF is to the left of the bound).
+    Diff is calculated as x_ks - x_ecdf.
+    """
+    # Sort by x ascending, then y descending to grab max y per x
+    ecdf_sorted = ecdf[np.lexsort((-ecdf[:, 1], ecdf[:, 0]))]
+
+    # Identify unique x-values and keep the first occurrence (max y)
+    _, indices = np.unique(ecdf_sorted[:, 0], return_index=True)
+    ecdf_filtered = ecdf_sorted[indices]
+    
+    x_ecdf = ecdf_filtered[:, 0]
+    y_ecdf = ecdf_filtered[:, 1]
+
+    # KS Bound: col 0 is x, col 1 is y
+    x_ks = ks_bound[:, 0]
+    y_ks = ks_bound[:, 1]
+
+    # Interpolate KS x-values for the ECDF y-levels
+    x_ks_interped = np.interp(y_ecdf, y_ks, x_ks)
+
+    # Handle the boundary case where y reaches 1.0
+    if np.round(y_ks[-1], 6) == 1.0:
+        # Find the very first x-value where the KS bound hits 1.0
+        idx_first_one = np.where(np.round(y_ks, 6) == 1.0)[0][0]
+        x_max_ks = x_ks[idx_first_one]
+        
+        # Apply this x_max to all interpolated points where ECDF is at 1.0
+        mask_one = np.round(y_ecdf, 6) == 1.0
+        x_ks_interped[mask_one] = x_max_ks
+
+    # In an upper bound context, a positive value means x_ecdf < x_ks
+    diffs = x_ks_interped - x_ecdf
+    
+    # Return (x_ecdf, x_ks, diff) for exceedances (where diff > 0)
+    exceedances = [(xe, d) for xe, d in zip(x_ecdf, diffs) if d > 0]
+
+    return exceedances
+
+
+def greedy_optimise_ensemble(
+        ensemble: dict,
+        iml: float,
+        disagg_dist: pd.DataFrame, 
+        gm_database: pd.DataFrame,
+        selection_ctx: dict,
+        objective_function: Callable,
+        obj_func_kwargs: list,
+        is_nested:bool=False, 
+        shuffle:bool=False,
+        rng_seed:int=1):
+    
+    cond_imt = selection_ctx["conditioning_imt"].string
+           
+    # get m_bounds, dbounds, vs30bounds
+    m_bounds = get_m_bounds(
+        disagg_dist, selection_ctx["occurence"], 
+        selection_ctx["m_bound_model"])
+    
+    d_bounds = get_d_bounds(
+        disagg_dist, selection_ctx["occurence"], 
+        selection_ctx["d_bound_model"])
+
+    site_params = selection_ctx["site_params"]
+    vs30_bounds = get_vs30_bounds(
+        site_params["vs30"], 
+        selection_ctx["vs30_bound_model"])
+    
+    # get the filtered gm_database
+    filtered_gm_db = preselection(gm_database, m_bounds, d_bounds, vs30_bounds, selection_ctx["usable_T"])
+    filtered_gm_db = scale_records_in_db(filtered_gm_db, selection_ctx["conditioning_imt"], iml)
+    filtered_gm_db = filter_on_sf(filtered_gm_db, selection_ctx["sf_bounds"])
+    
+    if shuffle:
+        gm_db = filtered_gm_db.sample(frac=1, random_state=rng_seed)
+    else:
+        gm_db = filtered_gm_db
+
+    rec_event_map = gm_db[("metadata", "event_id")].to_dict()
+    rec_event_station_map = {
+        idx: (row[("metadata", "event_id")], row[("metadata", "station_code")]) 
+        for idx, row in gm_db.iterrows()
+    }
+
+    # presort the gm database by trt. Also track the index so I know what 
+    # record was selected
+    gm_db_trt_groups = {}
+    for trt, group in gm_db.groupby(("metadata", "trt")):
+        gm_db_trt_groups[trt] = {
+            "ims": np.log(group["ims_scaled"].drop(columns=cond_imt).to_numpy()),
+            "indices": group.index.values # Store the original index
+        }
+
+    # set up the database and some other stuff
+    original_ensemble_indices = ensemble["recs"].index.tolist()
+
+    current_ims = np.log(ensemble["recs"]["ims_scaled"].drop(columns=cond_imt).to_numpy().copy())
+    current_score = objective_function(current_ims, **obj_func_kwargs)
+    current_ensemble_indices = original_ensemble_indices.copy()
+
+    # counter to track the number of records selection from each event
+    current_event_counts = Counter([rec_event_map[idx] for idx in current_ensemble_indices])
+    
+    # counter to track the number of records selection from each event
+    current_events_and_stations = [
+        (row[("metadata", "event_id")], row[("metadata", "station_code")]) 
+        for _, row in ensemble["recs"].iterrows()
+        ]
+    
+    # for each record in ensemble
+    ii_loop = tqdm(range(len(ensemble["recs"])), desc="Optimizing Ensemble Slots",
+                   leave=not is_nested)
+    for ii in ii_loop:
+        # get database of gms filtered by sf and trt etc
+        rec_trt = ensemble["recs"].iloc[ii][("metadata", "trt")]
+        
+        # get the event ID of the record to replace
+        old_event_id = rec_event_map[current_ensemble_indices[ii]]
+
+        if rec_trt not in gm_db_trt_groups:
+            raise KeyError
+
+        gm_pool_ims = gm_db_trt_groups[rec_trt]["ims"]
+        gm_pool_indices = gm_db_trt_groups[rec_trt]["indices"]
+        
+        # current best ims for this slot
+        best_ims_for_ii = current_ims[ii, :].copy()
+
+        for jj, gm_idx in enumerate(gm_pool_indices):
+            
+            # skip record if a record with that event and station is already
+            # in the ensemble
+            if rec_event_station_map[gm_idx] in current_events_and_stations:
+                continue
+            
+            # skip record if adding it exceeds the max count of records
+            # from a single event
+            new_event_id = rec_event_map[gm_idx]
+            if new_event_id != old_event_id:
+                if current_event_counts[new_event_id] >= selection_ctx["max_n_recs"]:
+                    continue
+             
+            # update current ims with the new record
+            current_ims[ii, :] = gm_pool_ims[jj, :]
+            
+            test_score = objective_function(current_ims, **obj_func_kwargs)
+
+            if test_score < current_score:
+                current_score = test_score
+
+                # update the event counter
+                current_event_counts[old_event_id] -= 1
+                current_event_counts[new_event_id] += 1
+
+                # update the event and station tracker              
+                current_events_and_stations[ii] = rec_event_station_map[gm_idx]
+
+                # Update our tracker with the index from gm_db
+                current_ensemble_indices[ii] = gm_pool_indices[jj]
+                best_ims_for_ii = gm_pool_ims[jj, :].copy()
+                old_event_id = new_event_id
+                ii_loop.set_postfix(score=f"{current_score:.4f}")
+            else:
+                # Replace the row with the current best IM values if no improvement
+                current_ims[ii, :] = best_ims_for_ii
+
+    
+    # reconstruct the dataframe
+    final_recs = gm_db.loc[current_ensemble_indices]
+    
+    return final_recs, current_score
+
+
+def sse_point_stats(rec_ims, stat_types, target_stats, im_weights, stat_weights):
+    """
+    rec_ims and target_stats should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (M, N) matrix of linear-space IM values (e.g., Sa in g)
+    stat_types: (X,) list of metrics to use to calculate ["mean", "sigma", quantiles as floats between 0-1]
+    target_stats: (N, X) matrix of stats for the target distributions function
+    im_weights: (N,) vector
+    stat_weights: (X,) vector of weights corresponding to the stats in stat_types
+    """   
+    
+    assert len(stat_types) == len(stat_weights), "stats and weights must have the same length"
+    
+    # Calculate sample stats in log-space
+    stats = []
+    for s in stat_types:
+        if s == "mean":
+            stats.append(np.mean(rec_ims, axis=0))
+        elif s == "sigma":
+            stats.append(np.std(rec_ims, ddof=1, axis=0)) # sample standard deviation
+        elif isinstance(s, float):
+            stats.append(np.quantile(rec_ims, s, axis=0))
+   
+    sample_stats = np.column_stack(stats)
+    
+    # Weighted SSE
+    # (N, 4) matrix of squared errors
+    sq_err = (target_stats - sample_stats)**2
+    
+    # normalise weights
+    im_weights = np.array(im_weights) / sum(im_weights) 
+    stat_weights = np.array(stat_weights) / sum(stat_weights)
+
+    # Weighted sum across stats, then across IMs
+    weighted_im_err = np.sum(sq_err * stat_weights, axis=1)
+    total_sse = np.sum(weighted_im_err * im_weights)
+    
+    return total_sse
+
+
+def weighted_ks_statistic(
+        rec_ims, target_cdfs_list, im_weights, n_recs):
+    """
+    rec_ims and target_cdfs should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (n_recs, n_imts) numpy array
+    target_cdfs_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    im_weights: (n_imts,) numpy array
+    """
+    # sort all IMTs at once along the record axis (axis 0)
+    sorted_ims = np.sort(rec_ims, axis=0)
+    
+    # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
+    steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
+    steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
+    
+    total_weighted_ks = 0.0
+    
+    for i in range(len(target_cdfs_list)):
+        xp = target_cdfs_list[i][:,0]
+        fp = target_cdfs_list[i][:,1]
+        
+        # interpolate to get the values of the target that match the x values of
+        # the cdf. This calculates F(xi) for the whole column at once
+        # assumes linear interpolation.
+        f_xi = np.interp(sorted_ims[:, i], xp, fp, left=0, right=1).reshape(-1, 1)
+        
+        # Calculate D+ and D- (the two possible maximum distances)
+        d_plus = np.max(np.abs(steps_up - f_xi))
+        d_minus = np.max(np.abs(steps_down - f_xi))
+        
+        ks_stat = max(d_plus, d_minus)
+        total_weighted_ks += im_weights[i] * ks_stat
+        
+    return total_weighted_ks
+
+
+def total_ks_statistic(
+        rec_ims, target_cdfs_list, n_recs):
+    """
+    rec_ims and target_cdfs should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (n_recs, n_imts) numpy array
+    target_cdfs_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    im_weights: (n_imts,) numpy array
+    """
+    # sort all IMTs at once along the record axis (axis 0)
+    sorted_ims = np.sort(rec_ims, axis=0)
+    
+    # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
+    steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
+    steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
+    
+    total_ks = 0.0
+    
+    for i in range(len(target_cdfs_list)):
+        xp = target_cdfs_list[i][:,0]
+        fp = target_cdfs_list[i][:,1]
+        
+        # interpolate to get the values of the target that match the x values of
+        # the cdf. This calculates F(xi) for the whole column at once
+        # assumes linear interpolation.
+        f_xi = np.interp(sorted_ims[:, i], xp, fp, left=0, right=1).reshape(-1, 1)
+        
+        # Calculate D+ and D- (the two possible maximum distances)
+        d_plus = np.max(np.abs(steps_up - f_xi))
+        d_minus = np.max(np.abs(steps_down - f_xi))
+        
+        ks_stat = max(d_plus, d_minus)
+        total_ks += ks_stat
+        
+    return total_ks
+
+
+def weighted_ks_statistic_and_failing_im_penalty(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list, 
+        im_weights, n_recs, penalty_constant):
+    """
+    rec_ims and target_cdfs should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (n_recs, n_imts) numpy array
+    target_cdfs_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    im_weights: (n_imts,) numpy array
+    """
+    # sort all IMTs at once along the record axis (axis 0)
+    sorted_ims = np.sort(rec_ims, axis=0)
+    
+    # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
+    steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
+    steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
+    
+    total_weighted_ks = 0.0
+    
+    failed_im_count = 0
+    for i in range(len(target_cdfs_list)):
+        xp = target_cdfs_list[i][:,0]
+        fp = target_cdfs_list[i][:,1]
+        fp_upper = upper_ks_bounds_list[i][:,1]
+        fp_lower = lower_ks_bounds_list[i][:,1]
+        
+        # interpolate to get the values of the target that match the x values of
+        # the cdf. This calculates F(xi) for the whole column at once
+        # assumes linear interpolation.
+        f_xi = np.interp(sorted_ims[:, i], xp, fp, left=0, right=1).reshape(-1, 1)
+        f_upper_xi = np.interp(sorted_ims[:, i], xp, fp_upper).reshape(-1, 1)
+        f_lower_xi = np.interp(sorted_ims[:, i], xp, fp_lower).reshape(-1, 1)
+        
+        # is im failing?
+        is_failing = (np.any(steps_up > f_upper_xi) or 
+                      np.any(steps_down < f_lower_xi))
+        
+        if is_failing:
+            failed_im_count += 1
+        # Calculate D+ and D- (the two possible maximum distances)
+        d_plus = np.max(np.abs(steps_up - f_xi))
+        d_minus = np.max(np.abs(steps_down - f_xi))
+        
+        ks_stat = max(d_plus, d_minus)
+
+        total_weighted_ks += im_weights[i] * ks_stat
+
+    objective_value = (failed_im_count * penalty_constant) + total_weighted_ks
+        
+    return objective_value
+
+
+def total_ks_statistic_and_failing_im_penalty(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list, 
+        n_recs, penalty_constant):
+    """
+    rec_ims and target_cdfs should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (n_recs, n_imts) numpy array
+    target_cdfs_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    """
+    # sort all IMTs at once along the record axis (axis 0)
+    sorted_ims = np.sort(rec_ims, axis=0)
+    
+    # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
+    steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
+    steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
+    
+    total_ks = 0.0
+    
+    failed_im_count = 0
+    for i in range(len(target_cdfs_list)):
+        xp = target_cdfs_list[i][:,0]
+        fp = target_cdfs_list[i][:,1]
+        fp_upper = upper_ks_bounds_list[i][:,1]
+        fp_lower = lower_ks_bounds_list[i][:,1]
+        
+        # interpolate to get the values of the target that match the x values of
+        # the cdf. This calculates F(xi) for the whole column at once
+        # assumes linear interpolation.
+        f_xi = np.interp(sorted_ims[:, i], xp, fp, left=0, right=1).reshape(-1, 1)
+        f_upper_xi = np.interp(sorted_ims[:, i], xp, fp_upper).reshape(-1, 1)
+        f_lower_xi = np.interp(sorted_ims[:, i], xp, fp_lower).reshape(-1, 1)
+        
+        # is im failing?
+        is_failing = (np.any(steps_up > f_upper_xi) or 
+                      np.any(steps_down < f_lower_xi))
+        
+        if is_failing:
+            failed_im_count += 1
+        # Calculate D+ and D- (the two possible maximum distances)
+        d_plus = np.max(np.abs(steps_up - f_xi))
+        d_minus = np.max(np.abs(steps_down - f_xi))
+        
+        ks_stat = max(d_plus, d_minus)
+
+        total_ks += ks_stat
+
+    objective_value = (failed_im_count * penalty_constant) + total_ks
+        
+    return objective_value
+
+
+def weighted_ks_statistic_and_L2norm_penalty(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list, 
+        im_weights, n_recs, penalty_constant):
+    """
+    This objective function scores an ensemble based on the sum weighted KS-statistics
+    of each IM. A penalty based the sum of the squared distances between the ecdf
+    and the ks bounds is used to prioritise swaps that reduce the number of failing
+    ims. There is no penalty for IMs that are inside the ks bounds
+    
+    rec_ims and target_cdfs should be provided in log units if accurate results
+    are desired.
+
+    rec_ims: (n_recs, n_imts) numpy array
+    target_cdfs_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    upper_ks_bounds_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    lower_ks_bounds_list: A list of 2D numpy arrays for each IMT. [xp_values, fp_values]
+    im_weights: (n_imts,) numpy array,
+    n_recs: int,
+    penalty_constant: float
+    """
+    # sort all IMTs at once along the record axis (axis 0)
+    sorted_ims = np.sort(rec_ims, axis=0)
+    
+    # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
+    steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
+    steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
+    
+    total_weighted_ks = 0.0
+    total_violation = 0.0
+    
+    for i in range(len(target_cdfs_list)):
+
+        if im_weights[i] == 0:
+            continue # skip if this im is not weighted
+
+        xp = target_cdfs_list[i][:,0]
+        fp = target_cdfs_list[i][:,1]
+        fp_upper = upper_ks_bounds_list[i][:,1]
+        fp_lower = lower_ks_bounds_list[i][:,1]
+        
+        # interpolate to get the values of the target that match the x values of
+        # the cdf. This calculates F(xi) for the whole column at once
+        # assumes linear interpolation.
+        f_xi = np.interp(sorted_ims[:, i], xp, fp, left=0, right=1).reshape(-1, 1)
+        f_upper_xi = np.interp(sorted_ims[:, i], xp, fp_upper).reshape(-1, 1)
+        f_lower_xi = np.interp(sorted_ims[:, i], xp, fp_lower).reshape(-1, 1)
+        
+        # Calculate KS-statistics D+ and D- (the two possible maximum distances)
+        d_plus = np.max(np.abs(steps_up - f_xi))
+        d_minus = np.max(np.abs(steps_down - f_xi))
+        ks_stat = max(d_plus, d_minus)
+
+        upper_violation = np.sum(np.maximum(0, steps_up - f_upper_xi) ** 2)
+        lower_violation = np.sum(np.maximum(0, f_lower_xi - steps_down) ** 2)
+        
+        total_violation += (upper_violation + lower_violation)
+        total_weighted_ks += im_weights[i] * ks_stat
+
+    objective_value = (total_violation * penalty_constant) + total_weighted_ks
+        
+    return objective_value
+
+
+def get_best_ensemble_in_list(
+        ensembles: list[dict],
+        conditioning_imt: str, 
+        obj_func: Callable, 
+        obj_func_kwargs: dict) -> dict:
+    # assumes the im values are in linear scale and converts the ensemble
+    # ims to log units.
+
+    current_ensemble = ensembles[0]
+    rec_ims = current_ensemble["recs"]["ims_scaled"].drop(columns=conditioning_imt).to_numpy()
+    current_score = obj_func(np.log(rec_ims), **obj_func_kwargs)
+
+    for e in ensembles[1:]:
+        rec_ims = e["recs"]["ims_scaled"].drop(columns=conditioning_imt).to_numpy()
+        score = obj_func(np.log(rec_ims), **obj_func_kwargs)
+        if score < current_score:
+            current_score = score
+            current_ensemble = e
+
+    return current_ensemble
+
+
+def assemble_ensemble_dict(new_recs, target_gcim_cdfs, site_selection_ctx,
+                    cond_imt, cond_iml):
+    # do a ks test
+    ks_passed, ks_results, failed_ims = ensemble_ks_test(
+        new_recs["ims_scaled"], target_gcim_cdfs, site_selection_ctx["p_value"])       
+    ks_bounds = ensemble_ks_bounds(target_gcim_cdfs, site_selection_ctx["n_samples"], site_selection_ctx["p_value"])
+    ecdfs = ensemble_ecdfs(new_recs["ims_scaled"])
+    quantiles = ensemble_quantiles(new_recs["ims_scaled"], qs=[0.05, 0.16, 0.33, 0.5, 0.67, 0.84, 0.9])
+    mu_lnIM_recs = pd.Series(np.exp(np.mean(np.log(new_recs["ims_scaled"]), axis=0)), index=new_recs["ims_scaled"].columns)
+    sig_lnIM_recs = pd.Series(np.std(np.log(new_recs["ims_scaled"]), axis=0, ddof=1), index=new_recs["ims_scaled"].columns)
+
+    # create the ensemble dict
+    new_ensemble = {}
+    new_ensemble["recs"] = new_recs
+    new_ensemble["ks_passed"] = ks_passed
+    new_ensemble["ks_results"] = ks_results
+    new_ensemble["ks_failed_ims"] = failed_ims
+    new_ensemble["ks_bounds"] = ks_bounds
+    new_ensemble["ecdfs"] = ecdfs
+    new_ensemble["quantiles"] = quantiles
+    new_ensemble["mu_lnIM_recs"] = mu_lnIM_recs
+    new_ensemble["sig_lnIM_recs"] = sig_lnIM_recs
+    new_ensemble["cond_imt"] = cond_imt
+    new_ensemble["cond_iml"] = cond_iml
+
+    return new_ensemble
+
+
+def preliminary_record_selection(
+        site_poe_disaggs: dict,
+        disagg_stats: dict,
+        gcim_dists: dict,
+        gm_db: pd.DataFrame,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
+        rng_seed: int,
+        preliminary_selection_fp: Path|None,
+        only_select: list[tuple]=[],
+        load_rs_if_exists: bool=False,
+        penalty_constant: float=10):
+    
+    """
+    performs the preliminary record selection step of the workflow. 
+    This involves selecting a set of candidate ensembles for each site and poe, 
+    then selecting the best ensemble for each site and poe based on the 
+    weighted KS statistic and a penalty for failing IMs. The results are 
+    saved to a file if preliminary_selection_fp is provided. 
+    If load_rs_if_exists is True, the function will attempt to load the 
+    preliminary selection from the file before performing the calculations.
+    """
+
+    if load_rs_if_exists: # load the preliminary record selection instead of calculating 
+        no_file = False
+        if preliminary_selection_fp.is_file():
+            with open(preliminary_selection_fp, "rb") as file:
+                preliminary_ensembles = pickle.load(file)
+                candidate_ensembles = None
+            print("Existing record selection data loaded...")
+        else:
+            no_file = True
+            print("No existing record selection data found...")
+            
+    if (not load_rs_if_exists) or no_file or preliminary_selection_fp is None:
+
+        # select multiple candidtate ensembles for all sites
+        candidate_ensembles = get_ground_motion_ensembles_for_sites(
+            site_poe_disaggs, disagg_stats, gcim_dists, 
+            gm_db, basic_selection_ctx, site_model, rng_seed, only_select)
+        
+        # get the best of the candidate ensembles for each site and poe
+        obj_func = total_ks_statistic_and_failing_im_penalty
+
+        preliminary_ensembles = {}
+
+        for (site, poe), ensembles in candidate_ensembles.items():
+
+            if ensembles == []:
+                # no ensemble was found
+                preliminary_ensembles[(site, poe)] = None
+                continue
+
+            target_cdfs = gcim_dists[(site, poe)]["cdfs"]
+            ks_bounds = ensemble_ks_bounds(
+                target_cdfs, 
+                basic_selection_ctx["n_samples"],
+                basic_selection_ctx["p_value"])
+            
+            im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
+
+            obj_func_kwargs = {
+                "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]]) 
+                                    for k, ksb in ks_bounds.items() if k in im_strings],
+                "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]]) 
+                                        for k, ksb in ks_bounds.items() if k in im_strings],
+                "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]]) 
+                                        for k, ksb in ks_bounds.items() if k in im_strings],
+                "n_recs": basic_selection_ctx["n_samples"],
+                "penalty_constant": penalty_constant
+            }
+
+            e = get_best_ensemble_in_list(
+                ensembles, basic_selection_ctx["conditioning_imt"].string, 
+                obj_func, obj_func_kwargs)
+            preliminary_ensembles[(site, poe)] = e
+
+        # Save the results
+        if preliminary_selection_fp is not None:
+            with open(preliminary_selection_fp, "wb") as file:
+                pickle.dump(preliminary_ensembles, file)
+
+    # Check if all the sites and poes found a set of suitable ground motions
+    prelim_ensembles_not_passing = []
+    no_preliminary_ensembles = []
+    for (site, poe), ensemble in preliminary_ensembles.items():
+        
+        if ensemble is None:
+            prelim_ensembles_not_passing.append((site, poe))
+            no_preliminary_ensembles.append((site, poe))
+        
+        elif not ensemble["ks_passed"]:
+            prelim_ensembles_not_passing.append((site, poe))
+
+    if len(prelim_ensembles_not_passing) == 0:
+        print(f"OK! - Preliminary ensembles pass for all combinations of site and poe")
+    else:
+        print(f"Sub-Optimal! - Preliminary ensembles do not pass for {len(prelim_ensembles_not_passing)} combinations of site and poe")
+
+    if no_preliminary_ensembles:
+        print(f"No preliminary ensembles found for {len(no_preliminary_ensembles)} combinations of site and poe")
+
+    return preliminary_ensembles, prelim_ensembles_not_passing, no_preliminary_ensembles, candidate_ensembles
+
+
+def optimise_record_selection(
+        site_poe_disaggs: dict,
+        disagg_stats: dict,
+        gcim_dists: dict,
+        gm_db: pd.DataFrame,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
+        preliminary_ensembles: int,
+        optimised_selection_fp: Path|None,
+        only_optimise: list[tuple]=[],
+        shuffle: bool=False,
+        rng_seed: int=1,
+        description: str="",
+        load_rs_if_exists: bool=False,
+        penalty_constant: float=10):
+
+    if load_rs_if_exists: 
+        no_file = False
+        if optimised_selection_fp.is_file():
+            with open(optimised_selection_fp, "rb") as file:
+                optimised_ensembles = pickle.load(file)
+            print("Existing optimised ensembles loaded...")
+        else:
+            no_file = True
+            print("No existing optimised ensembles found...")
+
+    if (not load_rs_if_exists) or no_file:
+        # do the ensemble optimisation and save the results
+        optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites(
+            preliminary_ensembles, site_poe_disaggs, disagg_stats,
+            gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise, 
+            penalty_constant=penalty_constant, shuffle=shuffle, 
+            rng_seed=rng_seed, descr=description)
+
+        # Save the results
+        with open(optimised_selection_fp, "wb") as file:
+            pickle.dump(optimised_ensembles, file)
+
+    # Check if all the sites and poes found a set of suitable ground motions
+    optim_ensembles_not_passing = []
+    for (site, poe), ensemble in optimised_ensembles.items():
+
+        if ensemble is None:
+            optim_ensembles_not_passing.append((site, poe))
+
+        elif not ensemble["ks_passed"]:
+            optim_ensembles_not_passing.append((site, poe))
+
+    if len(optim_ensembles_not_passing) == 0:
+        print(f"OK! - Optimised ensembles pass for all combinations of site and poe")
+    else:
+        print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and poe")
+
+    return optimised_ensembles, optim_ensembles_not_passing
 
 
 if __name__ == "__main__":
-    import os
     import pickle
     import numpy as np
     import pandas as pd
-    import scipy.stats as stats
+    import matplotlib.pyplot as plt
 
-    from openquake.hazardlib.imt import PGA, SA, RSD595, AvgSA, IMT
+    from pickagm.distributions import ensemble_ks_bounds
 
     from phd_project.config.config import load_config 
     from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
-        ESHM20SiteRupCtxBuilder,
-        create_gmm_map,
-        create_corr_model_map,
-        calculate_site_gcim_distributions_for_all_sites,
-        get_record_ensembles_for_site_and_poe
+        calculate_gcim_distributions_for_sites,
+        get_ground_motion_ensembles_for_sites,
+        get_best_ensemble_in_list,
+        total_ks_statistic_and_failing_im_penalty,
+        optimise_ground_motion_ensembles_for_sites,
+        optimise_ground_motion_ensembles_for_sites_with_shuffles,
+        preliminary_record_selection
     )
-    import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
+
+    from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
+        setup_AvgSA03_gcim_gm_selection,
+        )
 
     cfg = load_config()
 
-    # Load the disaggregation data
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_data_60sites.pickle"
-    with open(fp, "rb") as f:
-        disagg_data_AvgSA_03 = pickle.load(f)
+        # file paths:
+    gcim_dist_fp = cfg["proc_data"]["gcim_dists"] / f"gcim_dist_AvgSA_03.pickle"
+    # optimised_selection_rd1_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_06_optimised_selection_rd01.pickle"
+    # optimised_selection_rd2_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_06_optimised_selection_rd02.pickle"
+    # optimised_selection_rd3_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_06_optimised_selection_rd03.pickle"
+    # optimised_selection_rd4_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_06_optimised_selection_rd04.pickle"
 
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_stats_60sites.pickle"
-    with open(fp, "rb") as f:
-        disagg_stats_AvgSA_03 = pickle.load(f)
+    # other stuff:
+    rng_seed = 1
 
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_06_disagg_data_60sites.pickle"
-    with open(fp, "rb") as f:
-        disagg_data_AvgSA_06 = pickle.load(f)
-
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_06_disagg_stats_60sites.pickle"
-    with open(fp, "rb") as f:
-        disagg_stats_AvgSA_06 = pickle.load(f)
-
-    # load the site file
-    sites = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
-
-    # load the flatfiles
-    flatfile_folder = cfg["proc_data"]["corr_model"] / "reverse" / "flatfiles"
-    flatfiles = {}
-    for f in [f for f in os.listdir(flatfile_folder) if f.endswith(".csv")]:
-        tag = f.split("_")[0]
-        flatfiles[tag] = pd.read_csv(flatfile_folder / f, delimiter=";", index_col=0, low_memory=False)
-
-    flatfiles["volcanic"] = pd.read_csv(cfg["raw_data"]["gm_flatfiles"] / "volcanic_lanzanoluzi_flatfile.csv", 
-                                        delimiter=";", index_col=0)
-
-    # load the preprocessed gm database
-    gm_database = pd.read_csv(cfg["proc_data"]["gm_database"], sep=",", low_memory=False, header=[0, 1])
-
-    # create the average depth map for each TRT #TODO:: if this needs to be more specific
-    average_depths = {
-        "Craton": flatfiles["asc"]["ev_depth_km"].mean(),
-        "Non-Subduction Deep": flatfiles["vran"]["ev_depth_km"].mean(),
-        "Shallow Default": flatfiles["asc"]["ev_depth_km"].mean(),
-        "Subduction Inslab": flatfiles["sinter"]["ev_depth_km"].mean(),
-        "Subduction Interface": flatfiles["sinter"]["ev_depth_km"].mean(),
-        "Volcanic": flatfiles["volcanic"]["ev_depth_km"].mean(),
-    }
-
-    # the map of what sim trts are allowed to match with what record trts
-    OK_TRT_MATCHES = {
-        "Craton": ["Shallow Default"],
-        "Non-Subduction Deep": ["Non-Subduction Deep", "Subduction Inslab", "Subduction"],
-        "Shallow Default": ["Shallow Default"],
-        "Subduction Inslab": ["Non-Subduction Deep", "Subduction Inslab", "Subduction"],
-        "Subduction Interface": ["Subduction Interface"],
-        "Volcanic": ["Shallow Default"],
-    }
-
-    occurence = True    # the record selection should be performed based on occurence
-
-    # set some parameters for the selection
-    t_lower = 0.025     # lower SA period considered in selection
-    t_upper = 6         # upper SA period considered in selection
-    n_periods = 20      # number of periods to consider in selection
-
-    conditioning_imt: IMT = AvgSA([0,6])                      
-    nonSA_imts: list[IMT] = [AvgSA([0,6]), RSD595(), PGA()] 
-    sa_periods = np.round(np.geomspace(t_lower, t_upper, num=n_periods), 3)
-    SA_imts: list[IMT] = [SA(period) for period in sa_periods]
-    selection_imts: list[IMT] = nonSA_imts[1:] + SA_imts
-    nonSA_imt_strs: list[str] = [im.string for im in nonSA_imts] # strings match the correlation matrix
-
-    # weights of the IMs
-    weight_rsd595 = 0.3
-    n_other_ims = len([imt for imt in selection_imts if imt.name == "SA" or imt.name == "PGA"])
-    imt_weights = np.array([(1-weight_rsd595) / n_other_ims if imt.name != "RSD595" 
-                            else weight_rsd595 for imt in selection_imts])
-    imt_weights /= imt_weights.sum()
-
-    # some other things
-    disagg_type = "TRT_Mag_Dist_Eps"
-    percentiles = [0.05, 0.16, 0.5, 0.84, 0.95]     # percentiles of the gcim distribution to return  
-    assumed_rake = 0                                # assumed rake for RSD595 calculation
-
-    # filter the gm_database so that only the selection and conditioning ims are present
-    gm_db_AvgSA_06 = gm_database.copy()
-    updated_ims = mf.filter_gm_database_on_imts(
-        gm_db_AvgSA_06["ims"], selection_imts + [conditioning_imt])
-    updated_ims.columns = pd.MultiIndex.from_product([['ims'], updated_ims.columns])
-    gm_db_AvgSA_06 = pd.concat([gm_db_AvgSA_06.drop('ims', axis=1, level=0), updated_ims], axis=1)
-
-    # Create the GMM Map for AvgSA by reading the logic tree
-    AvgSA_06_lt_fp = cfg["hazard_models"]["eshm20_AvgSA"] / "gmpe_logic_tree_AvgSA_0to6_median_branch.xml"
-    AvgSA_06_gmm_map = create_gmm_map(AvgSA_06_lt_fp)
-
-    # get the correlation model map
-    AvgSA_06_corr_map = create_corr_model_map(nonSA_imt_strs, sa_periods)
-
-    # set up the selection context:
-    selection_ctx_AvgSA_06 = {
-        "n_ensembles": 50,
-        "n_samples": 25,
-        "conditioning_imt": conditioning_imt ,
-        "disagg_imt": conditioning_imt.name , # this only works for AvgSA. otherwise used .string 
-        "selection_imts": selection_imts ,
-        "imt_weights": imt_weights ,
-        "sites": sites ,
-        "ctx_builder": ESHM20SiteRupCtxBuilder ,
-        "ctx_builder_params": ["average_depths", "assumed_rake"] ,
-        "average_depths": average_depths ,
-        "assumed_rake": assumed_rake ,
-        "gmm_map": AvgSA_06_gmm_map ,
-        "corr_map": AvgSA_06_corr_map ,
-        "m_bound_model": "tarbali_and_bradley_2016" ,
-        "d_bound_model": "tarbali_and_bradley_2016" ,
-        "vs30_bound_model": "tarbali_and_bradley_2016" ,
-        "sf_bounds": None,#(0.25, 4) ,
-        "usable_T": t_upper ,
-        "max_n_recs": 3 ,
-        "p_value": 0.05 ,
-        "ok_trt_matches": OK_TRT_MATCHES ,
-        "occurence": True ,
-    }
-
-    site = 30
-    rng_seed = 2
-
-    site_gcim_dists_06 = get_gcim_distributions_for_single_site(
-        site, disagg_data_AvgSA_06, disagg_stats_AvgSA_06, selection_ctx_AvgSA_06)
-
-    record_selection_results_AvgSA06 = get_record_ensembles_for_single_site(
-        site, disagg_data_AvgSA_06, disagg_stats_AvgSA_06, site_gcim_dists_06, gm_db_AvgSA_06, selection_ctx_AvgSA_06, rng_seed)
+        
+        # load the gcim distributions
+    if gcim_dist_fp.is_file():
+        with open(gcim_dist_fp, "rb") as file:
+            gcim_dists = pickle.load(file)
+        print("Existing GCIM distribution data loaded...")
+    else:
+        print("No existing GCIM distribution data found...")
     
-    records = record_selection_results_AvgSA06[0.0001]
-    es = records["all_ensembles"]
-    e = es[0]
-    print(e.keys())
-    for ei in es:
-        print(f"{ei["ks_passed"]}, {ei["R-score"]:.4f}, {ei["ks_failed_ims"]}")
+    only_select = [(6, 0.002103)]
+
+    # set up the record selection
+    site_poe_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db = setup_AvgSA03_gcim_gm_selection()
+
+    c1_ensembles, prelim_ensembles_not_passing, no_preliminary_ensembles, candidates = preliminary_record_selection(
+        site_poe_disaggs, disagg_stats, gcim_dists, gm_db, basic_selection_ctx, site_model, rng_seed, 
+        preliminary_selection_fp=None, only_select=only_select, load_rs_if_exists=False)
     ...
+    
