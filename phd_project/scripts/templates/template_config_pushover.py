@@ -4,13 +4,28 @@ from standes.analysis.load_patterns import ec8_triangular_load_pattern
 from structural_model import model_init # type: ignore
 
 
+""" 
+No comments or spaces can be placeed inside the config ditionary after the last comma
+as this messes with the
+copy and edit functions that are used to create new config files from this template.
+
+Place all comments here:
+--------------------------
+results_folder_name should be the first variable in this file, as the copy and 
+edit functions expect this when creating new config files from this template.
+
+"""
+results_folder_name = ""
+
+
 config = {
-    "result_dst": Path(__file__).parent / f'pushover',
+    "result_dst": Path(__file__).parent / f'{results_folder_name}',
     "model_init": model_init,
     "load_pattern": ec8_triangular_load_pattern,
     "ctrl_node": 101010400,
-    "U_max": ["drift", 6.0],
-    "dU": 0.01,                 # step: same units as U_max
+    "displacement_type": "drift",
+    "U_max": 6.0,
+    "dU": 0.01,
     "analysis_parameters": SpoParameters,
     'tseries_tag': 2,
     'pattern_tag': 2,

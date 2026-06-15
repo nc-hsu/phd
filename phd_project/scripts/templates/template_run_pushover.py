@@ -11,10 +11,11 @@ def run(config_data: str|Path|dict):
     # loading the configuration data from the provided file path
     if isinstance(config_data, str):
         config_data = Path(config_data)
+        
+    if isinstance(config_data, Path):
         if not (config_data.exists() and config_data.is_file()):
             raise ValueError(f"Invalid path for config_data: {config_data}")
-
-    if isinstance(config_data, Path):
+        
         # import the configuration data from module path
         config_module = import_from_path(config_data)
         config: dict = config_module.config
@@ -25,29 +26,41 @@ def run(config_data: str|Path|dict):
     else:
         config = config_data
 
-    # actually starting the structural analysis stuff
-    # Determine the maximum displacement and the step size:
-    if config_data["U_max"][0] == "drift":
-        max_drift = config_data["U_max"][1]
-        U_max = ops.nodeCoord(config_data["ctrl_node"])[1] * max_drift / 100
-        dU = U_max * config_data["dU"] / max_drift
-
-    analysis_parameters = config_data["analysis_parameters"](config_data["ctrl_node"], U_max, dU, 
-                                                             config_data["excitation_dof"])
-
-    # create the model
+    # create the opensees model
     recorders, ls_recorders = config["model_init"]()
 
+    # actually starting the structural analysis stuff
+    # Determine the maximum displacement and the step size:
+    U_max = config["U_max"]
+    dU = config["dU"]
+
+    if config["displacement_type"] == "drift":
+        coord = ops.nodeCoord(config["ctrl_node"])
+        if len(coord) == 2:
+            height = coord[1]
+        elif len(coord) == 3:
+            height = coord[2]
+
+        # convert the drifts to displacements
+        U_max = height * U_max / 100
+        dU = height * dU / 100
+
+    elif config["displacement_type"] != "disp":
+        raise ValueError("Invalid displacement type: either 'drift', or 'disp'")
+
+    analysis_parameters = config["analysis_parameters"](config["ctrl_node"], U_max, dU, 
+                                                        config["excitation_dof"])
+    
     # create loading
     # create new load pattern
     ops.timeSeries("Linear", config["tseries_tag"]) 
     ops.pattern("Plain", config["pattern_tag"], config["tseries_tag"])
-    _ = config_data["load_pattern"](config_data["excitation_dof"], 1)
+    _ = config["load_pattern"](config["excitation_dof"], 1)
 
     lf, disps = pushover_analysis(analysis_parameters, recorders, ls_recorders, 
-                                    config_data["allow_negative_load_factor"])
+                                    config["allow_negative_load_factor"])
 
-    po_curve = np.hstack([disps, lf])
+    po_curve = np.column_stack([disps, lf])
 
     # save the recorders 
     output_folder: Path = config["result_dst"]
@@ -59,5 +72,7 @@ def run(config_data: str|Path|dict):
     with open(output_folder / f"lsrecorders.pickle", "wb") as file:
         pickle.dump(ls_recorders, file)
 
-    with open(output_folder / f"po_curve.pickle", "wb") as file:
-        pickle.dump(po_curve, file)
+    np.savetxt(output_folder / f"po_curve.csv", po_curve, delimiter=",")
+
+if __name__ == "__main__":
+    run(Path(__file__).parent / "config_pushover.py")

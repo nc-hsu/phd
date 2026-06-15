@@ -69,24 +69,30 @@ def _get_SA_periods_SA_strings(ims: list[str]):
 
 def plot_conditional_distribution(
         ax: plt.Axes, gcim_cdf: np.ndarray, with_ks_bounds:bool=False,
-        take_exp=True,
+        take_exp=False, take_log=False,
         style={
             "lb": {"ls": "--", "color":"0.8"},
             "cdf": {"ls": "-", "color":"0.8"},
             "ub": {"ls": "--", "color":"0.8"}
         }):
     
+    y_values = gcim_cdf[:,1:]
+
     if take_exp:
-        data = np.exp(gcim_cdf)
+        x_values = np.exp(gcim_cdf[:, 0])
+    elif take_log:
+        x_values = np.log(gcim_cdf[:, 0])
     else:
-        data = gcim_cdf
+        x_values = gcim_cdf[:, 0]
+
+    
 
     if with_ks_bounds:
-        ax.plot(data[:,0], data[:,1], **style["lb"])
-        ax.plot(data[:,0], data[:,2], **style["cdf"])
-        ax.plot(data[:,0], data[:,3], **style["ub"])
+        ax.plot(x_values, y_values[:,0], **style["lb"])
+        ax.plot(x_values, y_values[:,1], **style["cdf"])
+        ax.plot(x_values, y_values[:,2], **style["ub"])
     else:
-        ax.plot(data[:,0], data[:,1], **style["cdf"])
+        ax.plot(x_values, y_values, **style["cdf"])
 
     ax.set_xlim(0)
     ax.set_ylim(0, 1)

@@ -28,7 +28,10 @@ def run(config_data: str|Path|dict):
     else:
         config = config_data
 
-    # acutally starting the structural analysis stuff
+    #print some stuff to screen
+    print(f"NLTHA --> Record: {config['gm_json_file'][:-4]} :: Scale Factor: {config['scale_factor']}")
+
+    # actually starting the structural analysis stuff
     # load the record
     gm = load_ground_motion_from_json(config["gm_json_src"] / config["gm_json_file"])
 
