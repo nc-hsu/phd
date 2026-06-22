@@ -13,6 +13,8 @@ raw_data:
   eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
   esm_download_manifest: "data_raw/gm_records/esm_hdf5_download_manifest.csv"
+  esm_hdf5_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/01_ESM"
+  ngasub_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/02_NGASub"
   
 proc_data:
   root: "data_processed"
@@ -23,6 +25,7 @@ proc_data:
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
   gcim_dists: "data_processed/05_gcim_distributions"
   gm_selection: "data_processed/06_gm_selection"
+  gm_records: "data_processed/07_gm_records"
   dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
