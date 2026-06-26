@@ -47,6 +47,13 @@ from pickagm.corrmodels import (
     CORR_MODELS
 )
 
+from phd_project.scripts.WP1_ground_motion_set.cache_utils import (
+    fingerprint,
+    load_or_compute,
+    write_manifest,
+    StaleCacheError,
+)
+
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 from phd_project.scripts.oqhelpers import parse_nrml_logic_tree
 
@@ -335,7 +342,8 @@ def get_ground_motion_ensembles_for_sites(
         basic_selection_ctx: dict,
         site_model: pd.DataFrame,
         rng_seed: int,
-        only: list[tuple[int, float]]=[]
+        only: list[tuple[int, float]]=[],
+        desc: str="Selecting GM Ensembles"
         ) -> dict:
     """ 
     site_poe_disaggs is a dictionary with the following levels
@@ -390,10 +398,10 @@ def get_ground_motion_ensembles_for_sites(
     else:
         keys = list(site_poe_disaggs.keys())
     
-    ii_loop = tqdm(range(len(keys)), desc="Selecting GM Ensembles")
+    ii_loop = tqdm(range(len(keys)), desc=desc)
     for ii in ii_loop:
         site, poe = keys[ii]
-       
+
         ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
         poe_disagg = site_poe_disaggs[(site, poe)]
 
@@ -1642,36 +1650,39 @@ def preliminary_record_selection(
         preliminary_selection_fp: Path|None,
         only_select: list[tuple]=[],
         load_rs_if_exists: bool=False,
-        penalty_constant: float=10):
-    
+        penalty_constant: float=10,
+        input_fingerprint: dict|None=None,
+        force_recompute: bool=False,
+        desc: str|None=None):
+
     """
-    performs the preliminary record selection step of the workflow. 
-    This involves selecting a set of candidate ensembles for each site and poe, 
-    then selecting the best ensemble for each site and poe based on the 
-    weighted KS statistic and a penalty for failing IMs. The results are 
-    saved to a file if preliminary_selection_fp is provided. 
-    If load_rs_if_exists is True, the function will attempt to load the 
-    preliminary selection from the file before performing the calculations.
+    performs the preliminary record selection step of the workflow.
+    This involves selecting a set of candidate ensembles for each site and poe,
+    then selecting the best ensemble for each site and poe based on the
+    weighted KS statistic and a penalty for failing IMs. The results are
+    saved to a file if preliminary_selection_fp is provided.
+
+    Caching: if ``input_fingerprint`` is provided, the preliminary ensembles are
+    loaded/saved through :func:`cache_utils.load_or_compute`, which verifies that
+    the cached file was produced by the same inputs and raises
+    :class:`cache_utils.StaleCacheError` otherwise (override with
+    ``force_recompute=True``). This is the preferred path. If
+    ``input_fingerprint`` is None the legacy ``load_rs_if_exists`` behaviour is
+    used (no provenance check).
     """
 
-    if load_rs_if_exists: # load the preliminary record selection instead of calculating 
-        no_file = False
-        if preliminary_selection_fp.is_file():
-            with open(preliminary_selection_fp, "rb") as file:
-                preliminary_ensembles = pickle.load(file)
-                candidate_ensembles = None
-            print("Existing record selection data loaded...")
-        else:
-            no_file = True
-            print("No existing record selection data found...")
-            
-    if (not load_rs_if_exists) or no_file or preliminary_selection_fp is None:
+    # candidate_ensembles is only available when the selection is actually
+    # computed (not when a cached result is loaded); preserve that semantics.
+    candidate_ensembles = None
 
+    def _compute_preliminary():
+        nonlocal candidate_ensembles
         # select multiple candidtate ensembles for all sites
         candidate_ensembles = get_ground_motion_ensembles_for_sites(
-            site_poe_disaggs, disagg_stats, gcim_dists, 
-            gm_db, basic_selection_ctx, site_model, rng_seed, only_select)
-        
+            site_poe_disaggs, disagg_stats, gcim_dists,
+            gm_db, basic_selection_ctx, site_model, rng_seed, only_select,
+            desc=desc if desc is not None else "Selecting GM Ensembles")
+
         # get the best of the candidate ensembles for each site and poe
         obj_func = total_ks_statistic_and_failing_im_penalty
 
@@ -1686,32 +1697,54 @@ def preliminary_record_selection(
 
             target_cdfs = gcim_dists[(site, poe)]["cdfs"]
             ks_bounds = ensemble_ks_bounds(
-                target_cdfs, 
+                target_cdfs,
                 basic_selection_ctx["n_samples"],
                 basic_selection_ctx["p_value"])
-            
+
             im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
 
             obj_func_kwargs = {
-                "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]]) 
+                "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]])
                                     for k, ksb in ks_bounds.items() if k in im_strings],
-                "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]]) 
+                "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]])
                                         for k, ksb in ks_bounds.items() if k in im_strings],
-                "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]]) 
+                "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]])
                                         for k, ksb in ks_bounds.items() if k in im_strings],
                 "n_recs": basic_selection_ctx["n_samples"],
                 "penalty_constant": penalty_constant
             }
 
             e = get_best_ensemble_in_list(
-                ensembles, basic_selection_ctx["conditioning_imt"].string, 
+                ensembles, basic_selection_ctx["conditioning_imt"].string,
                 obj_func, obj_func_kwargs)
             preliminary_ensembles[(site, poe)] = e
 
-        # Save the results
-        if preliminary_selection_fp is not None:
-            with open(preliminary_selection_fp, "wb") as file:
-                pickle.dump(preliminary_ensembles, file)
+        return preliminary_ensembles
+
+    if input_fingerprint is not None and preliminary_selection_fp is not None:
+        # Provenance-checked cache (preferred path).
+        preliminary_ensembles = load_or_compute(
+            preliminary_selection_fp, input_fingerprint, _compute_preliminary,
+            force_recompute=force_recompute)
+
+    else:
+        # Legacy path: load on fixed filename without provenance check.
+        no_file = False
+        if load_rs_if_exists:
+            if preliminary_selection_fp.is_file():
+                with open(preliminary_selection_fp, "rb") as file:
+                    preliminary_ensembles = pickle.load(file)
+                print("Existing record selection data loaded...")
+            else:
+                no_file = True
+                print("No existing record selection data found...")
+
+        if (not load_rs_if_exists) or no_file or preliminary_selection_fp is None:
+            preliminary_ensembles = _compute_preliminary()
+            # Save the results
+            if preliminary_selection_fp is not None:
+                with open(preliminary_selection_fp, "wb") as file:
+                    pickle.dump(preliminary_ensembles, file)
 
     # Check if all the sites and poes found a set of suitable ground motions
     prelim_ensembles_not_passing = []
@@ -1750,29 +1783,42 @@ def optimise_record_selection(
         rng_seed: int=1,
         description: str="",
         load_rs_if_exists: bool=False,
-        penalty_constant: float=10):
+        penalty_constant: float=10,
+        input_fingerprint: dict|None=None,
+        force_recompute: bool=False):
 
-    if load_rs_if_exists: 
-        no_file = False
-        if optimised_selection_fp.is_file():
-            with open(optimised_selection_fp, "rb") as file:
-                optimised_ensembles = pickle.load(file)
-            print("Existing optimised ensembles loaded...")
-        else:
-            no_file = True
-            print("No existing optimised ensembles found...")
-
-    if (not load_rs_if_exists) or no_file:
-        # do the ensemble optimisation and save the results
+    def _compute_optimised():
+        # do the ensemble optimisation
         optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites(
             preliminary_ensembles, site_poe_disaggs, disagg_stats,
-            gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise, 
-            penalty_constant=penalty_constant, shuffle=shuffle, 
+            gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise,
+            penalty_constant=penalty_constant, shuffle=shuffle,
             rng_seed=rng_seed, descr=description)
+        return optimised_ensembles
 
-        # Save the results
-        with open(optimised_selection_fp, "wb") as file:
-            pickle.dump(optimised_ensembles, file)
+    if input_fingerprint is not None and optimised_selection_fp is not None:
+        # Provenance-checked cache (preferred path).
+        optimised_ensembles = load_or_compute(
+            optimised_selection_fp, input_fingerprint, _compute_optimised,
+            force_recompute=force_recompute)
+
+    else:
+        # Legacy path: load on fixed filename without provenance check.
+        no_file = False
+        if load_rs_if_exists:
+            if optimised_selection_fp.is_file():
+                with open(optimised_selection_fp, "rb") as file:
+                    optimised_ensembles = pickle.load(file)
+                print("Existing optimised ensembles loaded...")
+            else:
+                no_file = True
+                print("No existing optimised ensembles found...")
+
+        if (not load_rs_if_exists) or no_file:
+            optimised_ensembles = _compute_optimised()
+            # Save the results
+            with open(optimised_selection_fp, "wb") as file:
+                pickle.dump(optimised_ensembles, file)
 
     # Check if all the sites and poes found a set of suitable ground motions
     optim_ensembles_not_passing = []
@@ -1790,6 +1836,246 @@ def optimise_record_selection(
         print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and poe")
 
     return optimised_ensembles, optim_ensembles_not_passing
+
+
+def _ctx_with_unbounded(base_ctx: dict, unbounded: list[str]) -> dict:
+    """Copy ``base_ctx`` and set the named causal-parameter bounds to ``None``.
+
+    ``unbounded`` contains any of ``"m"``, ``"d"``, ``"vs30"`` — the corresponding
+    ``m_bound_model`` / ``d_bound_model`` / ``vs30_bound_model`` keys are dropped
+    (set to ``None``) so that round's selection/optimisation ignores that bound.
+    """
+    name_map = {"m": "m_bound_model", "d": "d_bound_model", "vs30": "vs30_bound_model"}
+    ctx = base_ctx.copy()
+    for b in unbounded:
+        if b not in name_map:
+            raise ValueError(f"unbounded entry must be one of {list(name_map)}, got {b!r}")
+        ctx[name_map[b]] = None
+    return ctx
+
+
+def _ensemble_passes(ensemble) -> bool:
+    """True if an ensemble exists and passed the KS test."""
+    return ensemble is not None and ensemble["ks_passed"]
+
+
+def _round_select_optimise_unbounded(spec) -> tuple[list[str], list[str]]:
+    """Return ``(select_unbounded, optimise_unbounded)`` for one round spec.
+
+    A ``list``/``tuple`` applies the same dropped bounds to both the selection and
+    the optimisation step of that round. A ``dict`` ``{"select": [...],
+    "optimise": [...]}`` lets the two steps differ — e.g. reselect with only the
+    distance bound free but optimise with distance + vs30 free (the AvgSA_06
+    scheme). Missing dict keys default to ``[]`` (all bounds kept).
+    """
+    if isinstance(spec, dict):
+        return list(spec.get("select", [])), list(spec.get("optimise", []))
+    return list(spec), list(spec)
+
+
+def _selection_ctx_fingerprint_inputs(ctx: dict) -> dict:
+    """Extract the selection-context entries that affect the selected records.
+
+    Returned as a flat dict of plain/hashable values for :func:`fingerprint`.
+    Object-valued entries (IMTs) are reduced to their stable ``.string`` form.
+    """
+    return {
+        "n_ensembles": ctx["n_ensembles"],
+        "n_samples": ctx["n_samples"],
+        "p_value": ctx["p_value"],
+        "usable_T": ctx["usable_T"],
+        "max_n_recs": ctx["max_n_recs"],
+        "m_bound_model": ctx["m_bound_model"],
+        "d_bound_model": ctx["d_bound_model"],
+        "vs30_bound_model": ctx["vs30_bound_model"],
+        "occurence": ctx["occurence"],
+        "conditioning_imt": ctx["conditioning_imt"].string,
+        "selection_imts": tuple(im.string for im in ctx["selection_imts"]),
+        "imt_weights": np.asarray(ctx["imt_weights"]),
+    }
+
+
+def build_final_ensembles(
+        site_poe_disaggs: dict,
+        disagg_stats: dict,
+        gcim_dists: dict,
+        gm_db: pd.DataFrame,
+        basic_selection_ctx: dict,
+        site_model: pd.DataFrame,
+        *,
+        source_fps: dict,
+        stage_fps: dict,
+        output_fp: Path,
+        round_unbounded: list[list[str]] = ([], ["d"], ["m", "d", "vs30"]),
+        force_optimisation: list[bool] | None = None,
+        rng_seed: int = 1,
+        force_recompute: bool = False):
+    """Run a configurable N-round selection + optimisation pipeline.
+
+    This centralises the orchestration that previously lived in the AvgSA
+    selection notebook so the slow compute is reproducible and provenance
+    checked. Each round runs two cached steps — a *selection* (only for sites
+    that don't yet have a record set) and an *optimisation* — using that round's
+    causal-parameter bounds. The assembled ``final_ensembles`` is saved to
+    ``output_fp`` with a ``.manifest.json`` sidecar. The returned dict is the
+    *pre-post-processing* ``final_ensembles`` (the post-processing notebook adds
+    ``record_identifier`` / ``trt_stats`` columns).
+
+    Parameters
+    ----------
+    source_fps : dict
+        Paths used for cheap, content-based input fingerprinting. Keys:
+        ``gm_db_file``, ``gcim_file``, ``disagg_data_file``,
+        ``disagg_stats_file``, ``site_model_file``.
+    stage_fps : dict
+        Output pickle paths per round, as ``{"select": [fp_r1, ...],
+        "optimise": [fp_r1, ...]}`` (one entry per round).
+    output_fp : Path
+        Canonical ``*_final_ensembles.pickle`` path.
+    round_unbounded : list
+        One entry per round (length sets the number of rounds). Each entry is
+        either a ``list`` of bounds to drop — any of ``"m"``, ``"d"``, ``"vs30"``,
+        ``[]`` keeps all — applied to both that round's selection and
+        optimisation, or a ``dict`` ``{"select": [...], "optimise": [...]}`` to
+        drop different bounds in the two steps (e.g. AvgSA_06 round 2 reselects
+        with distance free but optimises with distance + vs30 free).
+    force_optimisation : list[bool] | None
+        One bool per round (same length as ``round_unbounded``). For round ``r``:
+        ``False`` (the default for every round) optimises only sites still failing
+        after that round's selection (a site reselected into a passing state is
+        left alone); ``True`` optimises the whole round work-set (passing +
+        failing). ``None`` is treated as all ``False``.
+    force_recompute : bool
+        Recompute and overwrite every stage + the final artifact, ignoring any
+        existing cache (bypasses the staleness guard).
+    """
+    output_fp = Path(output_fp)
+    n_rounds = len(round_unbounded)
+    round_specs = [_round_select_optimise_unbounded(s) for s in round_unbounded]
+    if force_optimisation is None:
+        force_optimisation = [False] * n_rounds
+    force_optimisation = list(force_optimisation)
+    if len(force_optimisation) != n_rounds:
+        raise ValueError(f"force_optimisation must have one bool per round "
+                         f"({n_rounds}); got {len(force_optimisation)}")
+
+    all_keys = list(site_poe_disaggs.keys())
+
+    # Base inputs common to every stage. Source files are hashed by their bytes
+    # (cheap and stable) rather than re-hashing the large in-memory objects.
+    base_inputs = {
+        "gm_db_file": source_fps["gm_db_file"],
+        "gcim_file": source_fps["gcim_file"],
+        "disagg_data_file": source_fps["disagg_data_file"],
+        "disagg_stats_file": source_fps["disagg_stats_file"],
+        "site_model_file": source_fps["site_model_file"],
+        "rng_seed": rng_seed,
+    }
+
+    def stage_fingerprint(ctx: dict, stage: str, only: list, **extra) -> dict:
+        # Base inputs fully determine every stage's result; ``stage`` + ``only``
+        # + the stage's own ctx params (+ any extra, e.g. the force flag)
+        # disambiguate the cached artifacts and invalidate a cache when its
+        # scope/bounds/flags change.
+        return fingerprint(
+            **base_inputs, stage=stage, only=tuple(sorted(only)),
+            **_selection_ctx_fingerprint_inputs(ctx), **extra,
+        )
+
+    def bounds_label(unbounded: list[str]) -> str:
+        return "all bounds" if not unbounded else "free: " + ",".join(unbounded)
+
+    # Two layers, matching the legacy notebook: ``base`` holds the *selection*
+    # results only (preliminary + reselections) and is what every optimise round
+    # starts from; ``ensembles`` is the running best (base overwritten by each
+    # round's optimised output, latest round wins) and drives the work-set / final
+    # result. Optimise rounds are NOT chained — each re-optimises the selection
+    # base with its own bounds, so a later round never optimises an earlier
+    # round's optimised ensemble.
+    base: dict = {}
+    ensembles: dict = {}
+    work_set = list(all_keys)
+
+    for r, (sel_unbounded, opt_unbounded) in enumerate(round_specs):
+        select_ctx = _ctx_with_unbounded(basic_selection_ctx, sel_unbounded)
+        optimise_ctx = _ctx_with_unbounded(basic_selection_ctx, opt_unbounded)
+        force = force_optimisation[r]
+
+        # SELECTION: round 0 selects everything; later rounds re-select only the
+        # work-set sites that still have no record set (None selection result).
+        if r == 0:
+            sel_keys = list(work_set)
+        else:
+            sel_keys = [k for k in work_set if base.get(k) is None]
+
+        if sel_unbounded == opt_unbounded:
+            bounds_txt = f"bounds {bounds_label(sel_unbounded)}"
+        else:
+            bounds_txt = (f"select {bounds_label(sel_unbounded)} / "
+                          f"optimise {bounds_label(opt_unbounded)}")
+        print(f"-- Round {r + 1}/{n_rounds} -- {bounds_txt} | "
+              f"select: {len(sel_keys)} sites" + ("" if not force else " | force-optimise all"))
+
+        if sel_keys:
+            sel = preliminary_record_selection(
+                site_poe_disaggs, disagg_stats, gcim_dists, gm_db,
+                select_ctx, site_model, rng_seed,
+                preliminary_selection_fp=stage_fps["select"][r],
+                only_select=sel_keys,
+                input_fingerprint=stage_fingerprint(select_ctx, f"select_r{r + 1}", sel_keys),
+                desc=f"R{r + 1}/{n_rounds} select [{bounds_label(sel_unbounded)}] ({len(sel_keys)} sites)",
+                force_recompute=force_recompute)[0]
+            for k in sel_keys:
+                base[k] = sel[k]
+                ensembles[k] = sel[k]
+
+        # OPTIMISATION work-set, computed AFTER selection so reselected sites are
+        # included: whole round work-set if forced, else only sites still failing.
+        # (None entries are skipped inside optimise.)
+        if force:
+            opt_keys = [k for k in work_set if ensembles.get(k) is not None]
+        else:
+            opt_keys = [k for k in work_set if not _ensemble_passes(ensembles.get(k))]
+
+        if opt_keys:
+            # Start from the selection ``base`` (NOT the running best), matching the
+            # legacy behaviour where each optimise round re-optimises the prelim /
+            # reselected ensemble.
+            opt, _ = optimise_record_selection(
+                site_poe_disaggs, disagg_stats, gcim_dists, gm_db,
+                optimise_ctx, site_model, base,
+                optimised_selection_fp=stage_fps["optimise"][r],
+                only_optimise=opt_keys, shuffle=False, rng_seed=rng_seed,
+                input_fingerprint=stage_fingerprint(optimise_ctx, f"optimise_r{r + 1}", opt_keys,
+                                                    force_optimisation=force),
+                description=f"R{r + 1}/{n_rounds} optimise [{bounds_label(opt_unbounded)}] ({len(opt_keys)} sites)",
+                force_recompute=force_recompute)
+            for k in opt_keys:
+                ensembles[k] = opt[k]
+
+        # carry the sites that still don't have a passing record set
+        work_set = [k for k in all_keys if not _ensemble_passes(ensembles.get(k))]
+
+    final_ensembles = ensembles
+
+    if work_set:
+        print(f"Sub-Optimal! - {len(work_set)} (site, poe) still without a passing "
+              f"ensemble after {n_rounds} rounds")
+    else:
+        print(f"OK! - all (site, poe) have a passing ensemble after {n_rounds} rounds")
+
+    # Save the canonical artifact + manifest.
+    output_fp.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_fp, "wb") as file:
+        pickle.dump(final_ensembles, file)
+    final_fp = fingerprint(
+        **base_inputs, stage="final_ensembles",
+        round_unbounded=tuple((tuple(s), tuple(o)) for s, o in round_specs),
+        force_optimisation=tuple(force_optimisation),
+        **_selection_ctx_fingerprint_inputs(basic_selection_ctx))
+    write_manifest(output_fp, final_fp)
+
+    return final_ensembles
 
 
 if __name__ == "__main__":

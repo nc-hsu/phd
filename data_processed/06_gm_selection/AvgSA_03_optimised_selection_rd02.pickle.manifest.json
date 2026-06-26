@@ -1,0 +1,97 @@
+{
+  "inputs": {
+    "gm_db_file": {
+      "hash": "4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e",
+      "summary": "file ESM-NGAsub_combined.csv (119815913 bytes)"
+    },
+    "gcim_file": {
+      "hash": "e76eed63622f322ce8ce7a4040debe99384ed2c0d15e48701048bef333cebc1e",
+      "summary": "file gcim_dist_AvgSA_03.pickle (51970008 bytes)"
+    },
+    "disagg_data_file": {
+      "hash": "b84daca045e0b12dc1109202edf89a955a63dd34b717bba9268f59ddb80d086d",
+      "summary": "file AvgSA_03_disagg_data_60sites.pickle (1026713875 bytes)"
+    },
+    "disagg_stats_file": {
+      "hash": "962c8ec9b1516658f45a602fcaad5ff66df46cca4861c5f3bd0b8dc68f64a730",
+      "summary": "file AvgSA_03_disagg_stats_60sites.pickle (41548 bytes)"
+    },
+    "site_model_file": {
+      "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+      "summary": "file site_model_all_sites.csv (2641 bytes)"
+    },
+    "rng_seed": {
+      "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "summary": "int=1"
+    },
+    "stage": {
+      "hash": "c96fda6241021135ef10e807e91b7396e4ad11bc5724c79ef3296cf589bfd81f",
+      "summary": "str 'optimise_r2'"
+    },
+    "only": {
+      "hash": "e695b593f3f54d1df5db45d332765b1154802b5ba458b7fb1378082648de1924",
+      "summary": "tuple"
+    },
+    "n_ensembles": {
+      "hash": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
+      "summary": "int=20"
+    },
+    "n_samples": {
+      "hash": "624b60c58c9d8bfb6ff1886c2fd605d2adeb6ea4da576068201b6c6958ce93f4",
+      "summary": "int=30"
+    },
+    "p_value": {
+      "hash": "0602d7c813c1f6e7351a5832730f29daf739674976caba8d9dd955be838d46ea",
+      "summary": "float=0.05"
+    },
+    "usable_T": {
+      "hash": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+      "summary": "int=3"
+    },
+    "max_n_recs": {
+      "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "summary": "int=5"
+    },
+    "m_bound_model": {
+      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
+      "summary": "str 'tarbali_and_bradley_2016'"
+    },
+    "d_bound_model": {
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
+    },
+    "vs30_bound_model": {
+      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
+      "summary": "str 'tarbali_and_bradley_2016'"
+    },
+    "occurence": {
+      "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
+      "summary": "bool=True"
+    },
+    "conditioning_imt": {
+      "hash": "99676dde8afa92b2f25dc1bfcdbd66d5f0d70177c48f99d1e10c96ae6e25b145",
+      "summary": "str 'AvgSA([0, 3])'"
+    },
+    "selection_imts": {
+      "hash": "9cab810de361eb48368b3ec6774475ff25f1c818f862a48fd915a2d411fdc5a6",
+      "summary": "tuple"
+    },
+    "imt_weights": {
+      "hash": "d95377687d4e61c9a39b4da98251c9da973ebf960282959ed4a3fd76f35fce0f",
+      "summary": "ndarray shape=(22,) dtype=float64"
+    },
+    "force_optimisation": {
+      "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
+      "summary": "bool=True"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    }
+  },
+  "_meta": {
+    "artifact": "AvgSA_03_optimised_selection_rd02.pickle",
+    "git_commit": "407d8ad",
+    "written_at": "2026-06-25T16:32:52.438137+00:00"
+  }
+}
