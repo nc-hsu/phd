@@ -30,7 +30,8 @@ proc_data:
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
   sdof_optimisation: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/optimisation_results" 
-  approx_sdof_systems: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/approx_sdof_systems" 
+  approx_sdof_systems: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/approx_sdof_systems"
+  site_specific_sdofs: "data_processed/10_site_specific_sdofs"
 
 results:
   root: "results"
@@ -59,6 +60,7 @@ scripts:
 models:
   case_study: "casestudy_structures"
   casestudy_designs_ec8_gen2: "casestudy_structures/concentrically_braced_frames/ec8_gen2"
+  casestudy_designs_site_specific: "casestudy_structures/concentrically_braced_frames/ec8_gen2_site_specific_designs"
   examples: "calculation_examples"
 
 templates:
@@ -82,6 +84,11 @@ templates:
   config_ida_htf: "phd_project/scripts/templates/template_config_ida_htf.py"
   run_ida_htf_multiple_records: "phd_project/scripts/templates/template_run_ida_htf_multiple_records.py"
   model_cbf_sdof: "phd_project/scripts/templates/template_model_cbf_sdof.py"
+  config_msa: "phd_project/scripts/templates/template_config_msa.py"
+  run_msa_site: "phd_project/scripts/templates/template_run_msa_site.py"
+  run_batch_msa_per_stripe_record: "phd_project/scripts/templates/template_run_batch_msa_per_stripe_record.py"
+  run_msa_serial: "phd_project/scripts/templates/template_run_msa_serial.py"
+  run_batch_msa_sites: "phd_project/scripts/templates/template_run_batch_msa_sites.py"
 
 analysis_data:
   root: "E:"

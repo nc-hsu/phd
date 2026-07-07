@@ -20,5 +20,5 @@ config = {
     "result_dst": Path(__file__).parent / f'{results_folder_name}',
     "model_init": model_init,
     "n_modes": 1,
-    "solver":"-genBandArpack"
+    "solver":"-genBandArpack",
 }
