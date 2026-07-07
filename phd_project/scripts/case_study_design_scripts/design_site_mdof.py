@@ -198,7 +198,9 @@ def design_site_mdof(
 
 def default_n_workers() -> int:
     """``max(cpu_count - 3, 1)`` — same convention as the rest of the repo."""
-    return max((os.cpu_count() or 1) - 3, 1)
+    ideal = max((os.cpu_count() or 1) - 3, 1)
+    max_allowed = 61 - 3 # (windows spawn limit)
+    return min(ideal, max_allowed)
 
 
 def design_sites_parallel(jobs, *, n_workers=None, **design_kwargs):
