@@ -229,17 +229,24 @@ def configure_batch_run_file(
         # Convert to string first to handle both Path objects and raw strings
         # Then replace any backslashes with forward slashes
         script_val = str(entry['script']).replace('\\', '/')
-        
+
         # Apply the same logic to the list of config paths
         configs_list = [f"Path('{str(p).replace('\\', '/')}')" for p in entry['config']]
         configs_val = ", ".join(configs_list)
-        
-        return (
-            f'{{\n'
-            f'        "script": Path("{script_val}"),\n'
-            f'        "config": [{configs_val}]\n'
-            f'    }}'
-        )
+
+        lines = [
+            f'        "script": Path("{script_val}"),',
+            f'        "config": [{configs_val}]',
+        ]
+
+        # Optional per-config window titles (list aligned to "config")
+        if entry.get('name') is not None:
+            names_val = ", ".join(repr(str(n)) for n in entry['name'])
+            lines[-1] += ','
+            lines.append(f'        "name": [{names_val}]')
+
+        inner = "\n".join(lines)
+        return f'{{\n{inner}\n    }}'
 
     # Build the full list string
     formatted_items = ",\n    ".join([format_entry(e) for e in scripts_configs_list])
