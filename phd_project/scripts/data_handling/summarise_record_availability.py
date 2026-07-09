@@ -159,15 +159,20 @@ def collect_requirements(im, pickle_path, available_ngasub, available_esm):
 # ---------------------------------------------------------------------------
 # Step 4 -- greedy ordering of missing NGA-Sub RSNs by (site, IM) completion
 # ---------------------------------------------------------------------------
-def order_missing_rsns(unit_missing):
+def order_missing_rsns(unit_missing, im_priority=None):
     """Order missing RSNs so early downloads complete the most (site, IM) units.
 
     ``unit_missing`` maps each (im, site) unit to its set of missing NGA-Sub RSNs.
-    Greedy: repeatedly take the not-yet-complete unit needing the fewest remaining
-    RSNs (ties -> the unit whose RSNs are shared by the most other units), queue
-    its RSNs (shared-most first), mark them downloaded, and recompute. Returns a
-    de-duplicated list covering every missing RSN.
+    ``im_priority`` maps an IM label to a rank; units of a lower-rank IM are fully
+    completed before higher-rank ones (so, e.g., AvgSA_03 sites finish before
+    AvgSA_06). Within an IM the greedy picks the unit needing the fewest remaining
+    RSNs (ties -> the unit whose RSNs are shared by the most other units), queues
+    its RSNs (shared-most first), marks them downloaded, and recomputes. Returns a
+    de-duplicated list covering every missing RSN. Because RSNs are shared across
+    IMs, completing the priority IM also chips away at the other.
     """
+    im_priority = im_priority or {}
+
     # How many units need each RSN (drives tie-breaking and inner ordering).
     rsn_unit_count = {}
     for missing in unit_missing.values():
@@ -179,10 +184,11 @@ def order_missing_rsns(unit_missing):
     queued = set()
 
     while any(remaining.values()):
-        # Unit closest to completion first; then the one sharing the most RSNs.
+        # Priority IM first; then unit closest to completion; then most-shared.
         unit = min(
             (u for u, s in remaining.items() if s),
             key=lambda u: (
+                im_priority.get(u[0], len(im_priority)),
                 len(remaining[u]),
                 -sum(rsn_unit_count[r] for r in remaining[u]),
                 u,
@@ -199,14 +205,14 @@ def order_missing_rsns(unit_missing):
 
 
 def completion_curve(ordered, unit_missing):
-    """For each (im, site) unit, the number of ordered RSNs downloaded before it
+    """Map each (im, site) unit to the number of ordered RSNs downloaded before it
     completes (its last missing RSN's 1-based position); units with no missing
-    RSNs complete at 0. Returns a sorted list of completion positions."""
+    RSNs complete at 0."""
     pos = {rsn: i + 1 for i, rsn in enumerate(ordered)}
-    completions = []
-    for missing in unit_missing.values():
-        completions.append(max((pos[r] for r in missing), default=0))
-    return sorted(completions)
+    return {
+        unit: max((pos[r] for r in missing), default=0)
+        for unit, missing in unit_missing.items()
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +346,9 @@ def main(argv=None):
             missing |= r["missing_ngasub"]
         unit_missing[unit] = missing
 
-    ordered = order_missing_rsns(unit_missing)
+    # Prioritise completing AvgSA_03 units, then AvgSA_06 (order of _IMS).
+    im_priority = {im: rank for rank, im in enumerate(_IMS)}
+    ordered = order_missing_rsns(unit_missing, im_priority)
 
     # Write outputs.
     summary_path = out_dir / "records_availability_summary.csv"
@@ -359,12 +367,17 @@ def main(argv=None):
     print(f"✅ {n_complete}/{len(site_im_complete)} (site, IM) units fully available")
     print(f"ℹ️  {len(ordered)} NGA-Sub RSNs still to download")
 
-    # Ordering sanity: how many units complete after each download session.
+    # Ordering sanity: how many units complete after each download session,
+    # broken down by IM (AvgSA_03 is completed before AvgSA_06).
     curve = completion_curve(ordered, unit_missing)
+    im_totals = {im: sum(1 for u in site_im_complete if u[0] == im) for im in _IMS}
     print("   completed (site, IM) units vs RSNs downloaded:")
     for n in range(0, len(ordered) + SESSION_LIMIT, SESSION_LIMIT):
-        done = sum(1 for c in curve if c <= n)
-        print(f"     after {min(n, len(ordered)):4d} RSNs: {done}/{len(site_im_complete)} units")
+        by_im = " ".join(
+            f"{im}={sum(1 for u, c in curve.items() if u[0] == im and c <= n)}/{im_totals[im]}"
+            for im in _IMS
+        )
+        print(f"     after {min(n, len(ordered)):4d} RSNs: {by_im}")
         if n >= len(ordered):
             break
 
