@@ -50,11 +50,14 @@ scripts_and_configs = [
 ]
 
 
-def launch_script(script_path: Path, config_path: Path):
+def launch_script(script_path: Path, config_path: Path, window_title: str | None = None):
     SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
 
-    window_title = f"{script_path.parts[-2]}/{script_path.name} [{config_path.name}]"
+    # default title = the config file's full path (unique per job); an explicit
+    # window_title (e.g. from a job's "name" list) overrides it
+    if window_title is None:
+        window_title = str(config_path)
 
     py_code = (
         f"import importlib.util; "
@@ -104,8 +107,9 @@ def main():
 
     for entry in scripts_and_configs:
         script, config_paths = entry["script"], entry["config"]
-        
-        for cfg_path in config_paths:
+        names = entry.get("name")  # optional list of window titles aligned to config_paths
+
+        for i, cfg_path in enumerate(config_paths):
             # ACTIVE WAITING: Check for finished jobs while waiting for a slot
             while True:
                 check_for_finished(pbar) # This ensures the bar moves during the launch phase
@@ -113,7 +117,8 @@ def main():
                     break
                 time.sleep(0.1)
 
-            proc, display_name = launch_script(script, cfg_path)
+            title = names[i] if names and i < len(names) else None
+            proc, display_name = launch_script(script, cfg_path, window_title=title)
             acquire_slot(proc.pid)
             
             pbar.write(f"▶️ Launched: {display_name}")
