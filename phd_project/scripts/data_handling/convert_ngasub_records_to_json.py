@@ -26,6 +26,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from standes.groundmotion import record_json_filename, ngasub_record_identifier
+
 # Console messages use emoji; make sure they survive a non-UTF-8 stdout (e.g.
 # the default Windows cp1252 console) instead of crashing the run.
 try:
@@ -206,7 +208,7 @@ def convert_record(rsn, component, src, filename_map, metadata, dst):
         "record": record,
     }
 
-    out_path = Path(dst) / f"{rsn}__{component}.json"
+    out_path = Path(dst) / record_json_filename(ngasub_record_identifier(rsn), component)
     with open(out_path, "w") as f:
         json.dump(record_dict, f, indent=4)
 
@@ -281,7 +283,7 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
                     "reason": "unexpected component",
                 })
                 continue
-            out_path = dst / f"{rsn}__{component}.json"
+            out_path = dst / record_json_filename(ngasub_record_identifier(rsn), component)
             if out_path.exists() and not overwrite:
                 skipped_existing += 1
                 continue

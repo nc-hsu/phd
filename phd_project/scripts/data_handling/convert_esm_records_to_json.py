@@ -32,6 +32,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
+from standes.groundmotion import record_json_filename, parse_esm_record_identifier
+
 # Console messages use emoji; make sure they survive a non-UTF-8 stdout (e.g.
 # the default Windows cp1252 console) instead of crashing the run.
 try:
@@ -111,21 +113,6 @@ def read_selection(path):
         yield record_identifier, component
 
 
-def parse_record_identifier(record_identifier):
-    """Split ``{event_id}_{station_code}_{location_code}`` from the right.
-
-    ``event_id`` may itself contain underscores (e.g. ``EMSC-20040223_0000011``)
-    while station/location codes do not, so split on the last two underscores.
-    """
-    parts = record_identifier.rsplit("_", 2)
-    if len(parts) != 3:
-        raise ValueError(
-            f"record_identifier '{record_identifier}' does not have the form "
-            f"event_id_station_code_location_code."
-        )
-    return parts[0], parts[1], parts[2]
-
-
 def resolve_hdf5_path(src, event_id, station_code, location_code):
     """Locate the HDF5 file for a record, tolerating a zero-padded location.
 
@@ -172,9 +159,10 @@ def convert_record(record_identifier, component, src, dst):
     was skipped.
     """
     try:
-        event_id, station_code, location_code = parse_record_identifier(record_identifier)
-    except ValueError as e:
-        print(f"⚠️  {e} — skipped.")
+        event_id, station_code, location_code = parse_esm_record_identifier(record_identifier)
+    except ValueError:
+        print(f"⚠️  record_identifier '{record_identifier}' does not have the "
+              f"form event_id_station_code_location_code — skipped.")
         return "bad record_identifier"
 
     if component not in _COMPONENT_INDEX:
@@ -222,7 +210,7 @@ def convert_record(record_identifier, component, src, dst):
         "record": record,
     }
 
-    out_path = Path(dst) / f"{record_identifier}__{component}.json"
+    out_path = Path(dst) / record_json_filename(record_identifier, component)
     with open(out_path, "w") as f:
         json.dump(record_dict, f, indent=4)
 
@@ -255,7 +243,7 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=Fal
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
         for record_identifier, component in rows:
-            out_path = dst / f"{record_identifier}__{component}.json"
+            out_path = dst / record_json_filename(record_identifier, component)
             if out_path.exists() and not overwrite:
                 skipped_existing += 1
                 continue
