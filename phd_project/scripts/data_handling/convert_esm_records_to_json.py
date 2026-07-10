@@ -230,16 +230,17 @@ def convert_record(record_identifier, component, src, dst):
     return None
 
 
-def convert_esm_records(src, selection_csv, dst, max_workers=None):
+def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=False):
     """Convert all ``(record_identifier, component)`` rows of the selection CSV.
 
     ``src``, ``selection_csv`` and ``dst`` may be paths or strings. Records are
     read from the (often network-mounted) source in parallel using a thread
     pool, since the work is I/O-bound. ``max_workers`` defaults to
-    ``max(cpu_count - 3, 1)``. Returns ``(converted_count, skipped_records)``
-    where ``skipped_records`` is a list of
-    ``{"record_identifier", "component", "reason"}`` dicts for every row that
-    could not be converted.
+    ``max(cpu_count - 3, 1)``. Rows whose target JSON already exists in ``dst``
+    are skipped without reading the source, unless ``overwrite`` is True.
+    Returns ``(converted_count, skipped_records)`` where ``skipped_records`` is a
+    list of ``{"record_identifier", "component", "reason"}`` dicts for every row
+    that could not be converted.
     """
     if max_workers is None:
         max_workers = max((os.cpu_count() or 1) - 3, 1)
@@ -249,13 +250,18 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None):
 
     rows = list(read_selection(selection_csv))
     converted = 0
+    skipped_existing = 0
     skipped_records = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            (record_identifier, component,
-             executor.submit(convert_record, record_identifier, component, src, dst))
-            for record_identifier, component in rows
-        ]
+        futures = []
+        for record_identifier, component in rows:
+            out_path = dst / f"{record_identifier}__{component}.json"
+            if out_path.exists() and not overwrite:
+                skipped_existing += 1
+                continue
+            futures.append((record_identifier, component,
+                            executor.submit(convert_record, record_identifier,
+                                            component, src, dst)))
         for record_identifier, component, future in futures:
             reason = future.result()
             if reason is None:
@@ -267,8 +273,8 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None):
                     "reason": reason,
                 })
 
-    print(f"\nDone: {converted} converted, {len(skipped_records)} skipped "
-          f"(max_workers={max_workers}).")
+    print(f"\nDone: {converted} converted, {skipped_existing} already present "
+          f"(skipped), {len(skipped_records)} failed (max_workers={max_workers}).")
     if skipped_records:
         print("Skipped records:")
         for s in skipped_records:
@@ -285,10 +291,12 @@ def main(argv=None):
     parser.add_argument("dst", help="Output folder for JSON files.")
     parser.add_argument("--max-workers", type=int, default=None,
                         help="Number of parallel workers (default: max(cpu_count - 3, 1)).")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Reconvert records even if their JSON already exists in dst.")
     args = parser.parse_args(argv)
 
     convert_esm_records(args.src, args.selection_csv, args.dst,
-                        max_workers=args.max_workers)
+                        max_workers=args.max_workers, overwrite=args.overwrite)
     return 0
 
 

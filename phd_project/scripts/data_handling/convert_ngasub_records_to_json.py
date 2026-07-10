@@ -238,16 +238,17 @@ def read_selection(path):
 
 
 def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
-                           max_workers=None):
+                           max_workers=None, overwrite=False):
     """Convert all ``(record_identifier, component)`` rows of the selection CSV.
 
     ``record_identifier`` is the RSN. ``filename_map`` and ``metadata`` are paths
     (loaded once here); ``metadata`` may be ``None``, in which case event_id and
     station_code are left empty. Records are read from the (often
     network-mounted) source in parallel using a thread pool, since the work is
-    I/O-bound; ``max_workers`` defaults to ``max(cpu_count - 3, 1)``.
-    Non-interactive. Returns ``(converted_count, skipped_records)`` where
-    ``skipped_records`` is a list of
+    I/O-bound; ``max_workers`` defaults to ``max(cpu_count - 3, 1)``. Rows whose
+    target JSON already exists in ``dst`` are skipped without reading the source,
+    unless ``overwrite`` is True. Non-interactive. Returns
+    ``(converted_count, skipped_records)`` where ``skipped_records`` is a list of
     ``{"record_identifier", "component", "reason"}`` dicts.
     """
     if max_workers is None:
@@ -268,6 +269,7 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
                   f"event_id/station_code left empty.")
 
     converted = 0
+    skipped_existing = 0
     skipped_records = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
@@ -278,6 +280,10 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
                     "record_identifier": rsn, "component": component,
                     "reason": "unexpected component",
                 })
+                continue
+            out_path = dst / f"{rsn}__{component}.json"
+            if out_path.exists() and not overwrite:
+                skipped_existing += 1
                 continue
             futures.append((rsn, component,
                             executor.submit(convert_record, rsn, component,
@@ -291,8 +297,8 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
                     "record_identifier": rsn, "component": component, "reason": reason,
                 })
 
-    print(f"\nDone: {converted} converted, {len(skipped_records)} skipped "
-          f"(max_workers={max_workers}).")
+    print(f"\nDone: {converted} converted, {skipped_existing} already present "
+          f"(skipped), {len(skipped_records)} failed (max_workers={max_workers}).")
     if skipped_records:
         print("Skipped records:")
         for s in skipped_records:
@@ -313,6 +319,8 @@ def main(argv=None):
                         help="Path to NGASub_Metadata_SA_rotD50.csv (optional).")
     parser.add_argument("--max-workers", type=int, default=None,
                         help="Number of parallel workers (default: max(cpu_count - 3, 1)).")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Reconvert records even if their JSON already exists in dst.")
     args = parser.parse_args(argv)
 
     # CLI nicety: if no usable metadata flatfile, confirm before proceeding with
@@ -331,7 +339,7 @@ def main(argv=None):
 
     convert_ngasub_records(args.src, args.selection_csv, args.dst,
                            args.filename_map, args.metadata,
-                           max_workers=args.max_workers)
+                           max_workers=args.max_workers, overwrite=args.overwrite)
     return 0
 
 
