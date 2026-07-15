@@ -192,12 +192,12 @@ run.
 
 ```
 3s_cbf_dc2_10_sdof/
-├─ 3s_cbf_dc2_10_out.json            design file
+├─ 3s_cbf_dc2_10_out.json            ← design file
 ├─ structural_model.py
 ├─ injection_functions.py
 ├─ ida_process_recorders.py
-├─ config_im_SA.py                   intensity measure (selected by config_im_file)
-├─ config_ida_htf_femap695_set.py    the IDA config
+├─ config_im_SA.py                   ← intensity measure (selected by config_im_file)
+├─ config_ida_htf_femap695_set.py    ← the IDA config
 ├─ run_ida_htf_multiple_records.py   ← swap for run_ida_htf_single_record.py for one record
 └─ ida_femap695/                     ← created by the run (named by results_folder_name)
    ├─ record_0/  …  record_21/
@@ -218,8 +218,8 @@ alongside the coordinator; `worker_logs/` appears inside the results folder only
 ├─ ida_process_recorders.py
 ├─ config_im_SA.py
 ├─ config_ida_htf_femap695_set.py
-├─ run_batch_ida_per_record.py       coordinator
-├─ run_ida_htf_per_record.py         worker (sibling of exactly this name — required)
+├─ run_batch_ida_per_record.py       ← coordinator
+├─ run_ida_htf_per_record.py         ← worker (sibling of exactly this name — required)
 └─ ida_femap695/                     ← created by the run
    ├─ record_0/  …  record_21/
    ├─ ida_results.pickle
@@ -234,11 +234,11 @@ each building subfolder is a complete "parallel, single building" layout:
 
 ```
 03_wp1pt4pt1_dc2_sdof_fitting/
-├─ run_batch_ida_buildings.py        the single launch script (edit its `buildings` list)
+├─ run_batch_ida_buildings.py        ← the single launch script (edit its `buildings` list)
 ├─ 3s_cbf_dc2_10_sdof/
 │  ├─ … structural_model.py, config_im_SA.py, config_ida_htf_femap695_set.py, …
-│  ├─ run_batch_ida_per_record.py    coordinator
-│  ├─ run_ida_htf_per_record.py      worker
+│  ├─ run_batch_ida_per_record.py    ← coordinator
+│  ├─ run_ida_htf_per_record.py      ← worker
 │  └─ ida_femap695/                  ← created
 ├─ 3s_cbf_dc2_20_sdof/
 │  └─ … same layout
@@ -300,14 +300,14 @@ after a run.
 
 ```
 3s_cbf_dc2_41_ss/
-├─ 3s_cbf_dc2_41_out.json            design file
+├─ 3s_cbf_dc2_41_out.json            ← design file
 ├─ structural_model.py
 ├─ injection_functions.py
 ├─ msa_process_recorders.py
-├─ config_msa.py                     the MSA config (points at the stripe pickles)
+├─ config_msa.py                     ← the MSA config (points at the stripe pickles)
 ├─ run_msa_serial.py
 └─ msa/                              ← created by the run (named by results_folder_name)
-   ├─ stripe_1/  …  stripe_n/        per-record pickles + record_<t>_log.json + msa_log_stripe_<n>.json
+   ├─ stripe_1/  …  stripe_n/        ← per-record pickles + record_<t>_log.json + msa_log_stripe_<n>.json
    ├─ msa_log.json
    ├─ msa_summary.json
    └─ collapse_fragility.json
@@ -324,8 +324,8 @@ after a run.
 ├─ injection_functions.py
 ├─ msa_process_recorders.py
 ├─ config_msa.py
-├─ run_batch_msa_per_stripe_record.py   coordinator  ← or run_batch_msa_per_record.py
-├─ run_msa_per_record.py                worker (sibling of exactly this name — required)
+├─ run_batch_msa_per_stripe_record.py   ← coordinator  ← or run_batch_msa_per_record.py
+├─ run_msa_per_record.py                ← worker (sibling of exactly this name — required)
 └─ msa/                                 ← created by the run
    ├─ stripe_1/  …  stripe_n/
    ├─ msa_log.json
