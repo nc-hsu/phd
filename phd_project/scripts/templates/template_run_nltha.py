@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 from tqdm import tqdm
@@ -94,3 +95,16 @@ def run(config_data: str|Path|dict):
     with open(output_folder / "collapse.json", "w") as file:
         json.dump(results, file)
 
+if __name__ == "__main__":
+    # launch from the terminal, e.g.
+    #   python run_nltha.py config_nltha.py
+    parser = argparse.ArgumentParser(description="Run a nonlinear time-history analysis for one record.")
+    parser.add_argument("config", nargs="?", default="config_nltha.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
+    run(config_path)

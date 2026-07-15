@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -156,31 +157,16 @@ def run(config_data: str|Path|dict):
     with open(result_dst / "recorders.pickle", "wb") as file:
         pickle.dump(recorders, file)
 
+if __name__ == "__main__":
+    # launch from the terminal, e.g.
+    #   python run_snapback.py config_snapback.py
+    parser = argparse.ArgumentParser(description="Run a snapback analysis to check damping.")
+    parser.add_argument("config", nargs="?", default="config_snapback.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    args = parser.parse_args()
 
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    run(config_path)
