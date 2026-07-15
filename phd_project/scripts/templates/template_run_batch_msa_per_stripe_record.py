@@ -58,7 +58,8 @@ def run(config_data: str | Path,
         record_tags=tags,
         max_workers=max_workers,
         semaphore_module=semaphore_module,
-        show_worker_windows=show_worker_windows)
+        show_worker_windows=show_worker_windows,
+        log_dir=output_folder / "worker_logs")
 
     elapsed_time = datetime.now() - start_time
     print(f"All jobs complete. Time elapsed: {elapsed_time}")

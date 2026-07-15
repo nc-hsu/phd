@@ -43,13 +43,23 @@ def run(config_data: str | Path,
     semaphore_module = None
     if use_semaphore:
         import importlib
-        try:
-            semaphore_module = importlib.import_module("process_semaphore.process_semaphore")
-        except ModuleNotFoundError as exc:
+        # phd_project is installed (editable), so the package-qualified name works
+        # without PYTHONPATH fiddling; fall back to the bare name for setups that
+        # put the folder containing process_semaphore on PYTHONPATH directly.
+        for module_name in ("phd_project.process_semaphore.process_semaphore",
+                            "process_semaphore.process_semaphore"):
+            try:
+                semaphore_module = importlib.import_module(module_name)
+                break
+            except ModuleNotFoundError:
+                continue
+        if semaphore_module is None:
             raise ModuleNotFoundError(
-                "use_semaphore=True but 'process_semaphore' is not importable. "
-                "Add the folder containing the process_semaphore package to "
-                "PYTHONPATH, or run with use_semaphore=False (max_workers).") from exc
+                "use_semaphore=True but the process_semaphore module could not be "
+                "imported as 'phd_project.process_semaphore.process_semaphore' or "
+                "'process_semaphore.process_semaphore'. Install phd_project or add "
+                "the folder containing process_semaphore to PYTHONPATH, or run with "
+                "use_semaphore=False (max_workers).")
 
     print(f"Launch Time: {datetime.now()}")
     start_time = datetime.now()
@@ -61,7 +71,8 @@ def run(config_data: str | Path,
         record_tags=record_tags,
         max_workers=max_workers,
         semaphore_module=semaphore_module,
-        show_worker_windows=show_worker_windows)
+        show_worker_windows=show_worker_windows,
+        log_dir=output_folder / "worker_logs")
 
     elapsed_time = datetime.now() - start_time
     print(f"All records complete. Time elapsed: {elapsed_time}")

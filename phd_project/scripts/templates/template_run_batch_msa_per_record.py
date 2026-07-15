@@ -57,7 +57,8 @@ def run(config_data: str | Path,
             record_tags=tags,
             max_workers=max_workers,
             semaphore_module=semaphore_module,
-            show_worker_windows=show_worker_windows)
+            show_worker_windows=show_worker_windows,
+            log_dir=output_folder / "worker_logs")
 
         # assemble this stripe's log from the per-record logs just written
         collate_stripe(output_folder, stripe_idx, stripe_pickle)
