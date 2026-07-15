@@ -7,6 +7,23 @@ from phd_project.scripts.oqhelpers import (
     get_disagg_from_datastore)
 
 
+def poe_to_mafe(poe: float, t: float=1) -> float:
+    """ converts probability of exceedance in time span `t` to mean annual 
+    frequency of exceedance"""
+    return -np.log(1-poe) / t
+
+
+def mafe_to_poe(mafe: float, t:float=1) -> float:
+    """ converts mean annual frequency of exceedance to 
+    probability of exceedance in time span `t` """
+    return 1 - np.exp((-mafe * t))
+
+
+def poe_to_rtp(poe: float, t: float=1) -> float:
+    """ converts probability of exceedance in time span `t` to mean return period"""
+    return 1 / poe_to_mafe(poe, t)
+
+
 def group_hazard_curves(groups: list[tuple], metadata, dstore,
                         calculate_mean_curves:bool=True):
 
