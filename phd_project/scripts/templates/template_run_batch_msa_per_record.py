@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -89,5 +90,23 @@ def _load_semaphore():
 
 
 if __name__ == "__main__":
-    config_path = Path(__file__).parent / "config_msa.py"
-    run(config_path)
+    # launch from the terminal, e.g.
+    #   python run_batch_msa_per_record.py config_msa.py --max-workers 4
+    parser = argparse.ArgumentParser(description="Run an MSA for a single building, parallelised across records.")
+    parser.add_argument("config", nargs="?", default="config_msa.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    parser.add_argument("--max-workers", type=int, default=None,
+                        help="max subprocesses to run at once (default: physical cores - 3)")
+    parser.add_argument("--use-semaphore", action="store_true",
+                        help="use the machine-global process_semaphore instead of --max-workers")
+    parser.add_argument("--quiet", action="store_true",
+                        help="no worker windows; stream worker output to worker_logs/ instead")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
+    run(config_path, max_workers=args.max_workers,
+        use_semaphore=args.use_semaphore,
+        show_worker_windows=not args.quiet)

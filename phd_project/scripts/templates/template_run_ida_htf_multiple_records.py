@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 import json
 import pickle
@@ -81,6 +82,15 @@ def run(config_data: str|Path|dict):
         
 
 if __name__ == "__main__":
-    # example usage
-    config_path = Path(__file__).parent / "config_ida_htf.py"
+    # launch from the terminal, e.g.
+    #   python run_ida_htf_multiple_records.py config_ida_htf.py
+    parser = argparse.ArgumentParser(description="Run an IDA for a single building, serially over all records.")
+    parser.add_argument("config", nargs="?", default="config_ida_htf.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
     run(config_path)

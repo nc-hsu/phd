@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 import json
 from pathlib import Path
@@ -66,6 +67,17 @@ def run(config_data: str | Path | dict, record_tag: str):
 
 
 if __name__ == "__main__":
-    # example usage: run a single record (tag "0") for debugging
-    config_path = Path(__file__).parent / "config_ida_htf.py"
-    run(config_path, "0")
+    # launch from the terminal, e.g.
+    #   python run_ida_htf_per_record.py config_ida_htf.py 0
+    parser = argparse.ArgumentParser(description="Run the hunt-trace-fill IDA for a SINGLE record of the config.")
+    parser.add_argument("config", nargs="?", default="config_ida_htf.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    parser.add_argument("tag", nargs="?", default="0",
+                        help="the single record/stripe tag to run")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
+    run(config_path, args.tag)

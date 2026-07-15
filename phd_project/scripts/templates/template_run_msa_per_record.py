@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -57,6 +58,17 @@ def run(config_data: str | Path | dict, tag: str):
 
 
 if __name__ == "__main__":
-    # example usage: run a single (stripe, record) for debugging
-    config_path = Path(__file__).parent / "config_msa.py"
-    run(config_path, "1:0")
+    # launch from the terminal, e.g.
+    #   python run_msa_per_record.py config_msa.py 1:0
+    parser = argparse.ArgumentParser(description="Run the MSA for a SINGLE (stripe, record) of the config.")
+    parser.add_argument("config", nargs="?", default="config_msa.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    parser.add_argument("tag", nargs="?", default="1:0",
+                        help="the single record/stripe tag to run")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
+    run(config_path, args.tag)

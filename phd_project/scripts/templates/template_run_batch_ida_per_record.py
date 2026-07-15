@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -17,7 +18,8 @@ from standes.utils import import_from_path
 def run(config_data: str | Path,
         max_workers: int | None = None,
         use_semaphore: bool = False,
-        worker_script: str | Path | None = None):
+        worker_script: str | Path | None = None,
+        show_worker_windows: bool = True):
 
     config_path = Path(config_data)
     if not (config_path.exists() and config_path.is_file()):
@@ -58,7 +60,8 @@ def run(config_data: str | Path,
         config_path=config_path,
         record_tags=record_tags,
         max_workers=max_workers,
-        semaphore_module=semaphore_module)
+        semaphore_module=semaphore_module,
+        show_worker_windows=show_worker_windows)
 
     elapsed_time = datetime.now() - start_time
     print(f"All records complete. Time elapsed: {elapsed_time}")
@@ -79,6 +82,25 @@ def run(config_data: str | Path,
 
 
 if __name__ == "__main__":
-    # example usage
-    config_path = Path(__file__).parent / "config_ida_htf.py"
-    run(config_path)
+    # launch from the terminal, e.g.
+    #   python run_batch_ida_per_record.py config_ida_htf_femap695_set.py
+    #   python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --max-workers 4
+    parser = argparse.ArgumentParser(
+        description="Run an IDA for a single building, parallelised across ground motion records.")
+    parser.add_argument("config", nargs="?", default="config_ida_htf.py",
+                        help="IDA config file (relative to this folder, or an absolute path)")
+    parser.add_argument("--max-workers", type=int, default=None,
+                        help="max records to run at once (default: physical cores - 3)")
+    parser.add_argument("--use-semaphore", action="store_true",
+                        help="use the machine-global process_semaphore instead of --max-workers")
+    parser.add_argument("--quiet", action="store_true",
+                        help="no worker windows; stream worker output to worker_logs/ instead")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
+    run(config_path, max_workers=args.max_workers,
+        use_semaphore=args.use_semaphore,
+        show_worker_windows=not args.quiet)

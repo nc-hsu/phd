@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -59,5 +60,15 @@ def run(config_data: str | Path | dict):
 
 
 if __name__ == "__main__":
-    config_path = Path(__file__).parent / "config_msa.py"
+    # launch from the terminal, e.g.
+    #   python run_msa_serial.py config_msa.py
+    parser = argparse.ArgumentParser(description="Run an MSA for a single building, serially over all stripes and records.")
+    parser.add_argument("config", nargs="?", default="config_msa.py",
+                        help="config file (relative to this folder, or an absolute path)")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).parent / config_path
+
     run(config_path)
