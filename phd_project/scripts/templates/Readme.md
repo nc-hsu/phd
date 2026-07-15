@@ -180,6 +180,72 @@ semaphore on), so across all buildings at most `physical cores − 3` record ana
 at once. Each building needs its coordinator + worker + config already in place. See §6
 for why this uses the semaphore and a separate coordinator cap.
 
+### Folder layout per IDA mode
+
+Every IDA folder holds the same input files (structural model + design JSON, injection
+functions, IDA process recorders, an intensity-measure file, and the config). The modes
+differ only in which **run scripts** are present. Files marked `← created` appear after a
+run.
+
+**Single record** (`run_ida_htf_single_record`) and **serial, all records**
+(`run_ida_htf_multiple_records`) — one run script, no worker:
+
+```
+3s_cbf_dc2_10_sdof/
+├─ 3s_cbf_dc2_10_out.json            design file
+├─ structural_model.py
+├─ injection_functions.py
+├─ ida_process_recorders.py
+├─ config_im_SA.py                   intensity measure (selected by config_im_file)
+├─ config_ida_htf_femap695_set.py    the IDA config
+├─ run_ida_htf_multiple_records.py   ← swap for run_ida_htf_single_record.py for one record
+└─ ida_femap695/                     ← created by the run (named by results_folder_name)
+   ├─ record_0/  …  record_21/
+   ├─ ida_results.pickle
+   ├─ record_logs.json
+   └─ collapse_fragility.json
+```
+
+**Parallel, single building** (`run_batch_ida_per_record`) — adds the worker script
+alongside the coordinator; `worker_logs/` appears inside the results folder only under
+`--quiet`:
+
+```
+3s_cbf_dc2_10_sdof/
+├─ 3s_cbf_dc2_10_out.json
+├─ structural_model.py
+├─ injection_functions.py
+├─ ida_process_recorders.py
+├─ config_im_SA.py
+├─ config_ida_htf_femap695_set.py
+├─ run_batch_ida_per_record.py       coordinator
+├─ run_ida_htf_per_record.py         worker (sibling of exactly this name — required)
+└─ ida_femap695/                     ← created by the run
+   ├─ record_0/  …  record_21/
+   ├─ ida_results.pickle
+   ├─ collapse_fragility.json
+   └─ worker_logs/                   ← only with --quiet
+      ├─ worker_record_0.log
+      └─ …
+```
+
+**Many buildings** (`run_batch_ida_buildings`) — one launch script in a parent folder;
+each building subfolder is a complete "parallel, single building" layout:
+
+```
+03_wp1pt4pt1_dc2_sdof_fitting/
+├─ run_batch_ida_buildings.py        the single launch script (edit its `buildings` list)
+├─ 3s_cbf_dc2_10_sdof/
+│  ├─ … structural_model.py, config_im_SA.py, config_ida_htf_femap695_set.py, …
+│  ├─ run_batch_ida_per_record.py    coordinator
+│  ├─ run_ida_htf_per_record.py      worker
+│  └─ ida_femap695/                  ← created
+├─ 3s_cbf_dc2_20_sdof/
+│  └─ … same layout
+└─ 3s_cbf_dc2_31_sdof/
+   └─ … same layout
+```
+
 ---
 
 ## 5. MSA (Multiple-Stripe Analysis)
@@ -220,6 +286,73 @@ Each immediate subfolder that contains `config_msa.py` + `run_msa_site.py` is tr
 site. The launcher runs up to `max_coordinators` site coordinators at once; each
 coordinator draws its NLTHA workers from the shared semaphore, so total live workers stay
 capped machine-wide.
+
+### Folder layout per MSA mode
+
+Every MSA folder holds the same input files: structural model + design JSON, injection
+functions, `msa_process_recorders.py`, and `config_msa.py`. There is **no** intensity-measure
+file — stripes are pre-selected, and the config points at the stripe selection pickles
+(`gm_selection_src`) and record source (`record_src`), which live outside the model folder.
+The modes differ only in which **run scripts** are present. Files marked `← created` appear
+after a run.
+
+**Serial** (`run_msa_serial`) — one run script, no worker:
+
+```
+3s_cbf_dc2_41_ss/
+├─ 3s_cbf_dc2_41_out.json            design file
+├─ structural_model.py
+├─ injection_functions.py
+├─ msa_process_recorders.py
+├─ config_msa.py                     the MSA config (points at the stripe pickles)
+├─ run_msa_serial.py
+└─ msa/                              ← created by the run (named by results_folder_name)
+   ├─ stripe_1/  …  stripe_n/        per-record pickles + record_<t>_log.json + msa_log_stripe_<n>.json
+   ├─ msa_log.json
+   ├─ msa_summary.json
+   └─ collapse_fragility.json
+```
+
+**Parallel — flattened** (`run_batch_msa_per_stripe_record`) and **stripe-by-stripe**
+(`run_batch_msa_per_record`) — both add the same worker; only the coordinator differs.
+`worker_logs/` appears inside the results folder only under `--quiet`:
+
+```
+3s_cbf_dc2_41_ss/
+├─ 3s_cbf_dc2_41_out.json
+├─ structural_model.py
+├─ injection_functions.py
+├─ msa_process_recorders.py
+├─ config_msa.py
+├─ run_batch_msa_per_stripe_record.py   coordinator  ← or run_batch_msa_per_record.py
+├─ run_msa_per_record.py                worker (sibling of exactly this name — required)
+└─ msa/                                 ← created by the run
+   ├─ stripe_1/  …  stripe_n/
+   ├─ msa_log.json
+   ├─ msa_summary.json
+   ├─ collapse_fragility.json
+   └─ worker_logs/                      ← only with --quiet
+      ├─ worker_record_1_0.log          (tag "stripe:record", with ":" → "_")
+      └─ …
+```
+
+**Many sites** (`run_batch_msa_sites`) — one launch script in a parent folder; each site
+subfolder adds the thin `run_msa_site.py` wrapper on top of the flattened layout:
+
+```
+msa_sites/
+├─ run_batch_msa_sites.py            the single launch script (set sites_root / site_names)
+├─ site_bucharest/
+│  ├─ … structural_model.py, msa_process_recorders.py, config_msa.py, …
+│  ├─ run_msa_site.py                per-site entry point (semaphore on, workers quiet)
+│  ├─ run_batch_msa_per_stripe_record.py   coordinator it calls
+│  ├─ run_msa_per_record.py          worker
+│  └─ msa/                           ← created
+├─ site_iasi/
+│  └─ … same layout
+└─ site_focsani/
+   └─ … same layout
+```
 
 ---
 
