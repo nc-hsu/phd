@@ -53,6 +53,9 @@ hazard_models:
   eshm20_AvgSA: "hazard_models/eshm20/regional_AvgSA/"
   eshm20_AvgSA_site_model_all: "hazard_models/eshm20/regional_AvgSA/site_model_all_sites.csv"
   eshm20_AvgSA_03_jobfile: "hazard_models/eshm20/regional_AvgSA/config_eshm20_AvgSA_0to3.ini"
+  eshm20_wp1: "hazard_models/eshm20/wp1"
+  eshm20_wp1_site_model: "hazard_models/eshm20/wp1/site_model_all_sites.csv"
+  eshm20_wp1_psha_manifest: "hazard_models/eshm20/wp1/psha_manifest.json"
 
 scripts: 
   root: "phd_project/scripts"
