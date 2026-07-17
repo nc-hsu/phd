@@ -247,9 +247,26 @@ def _write_manifest_entry(manifest_fp: Path, name: str, entry: dict) -> None:
         json.dump(manifest, f, indent=2)
 
 
+# The engine tags every log line with the calc id and finally reports where the
+# datastore was written, e.g.
+#   [2026-07-17 14:22:42 #11 WARNING] Stored 67.17 MB on ...\calc_11.hdf5 in 177 seconds
+# The datastore filename is the most specific signal, so try it first and fall back
+# to the "#<id>" log prefix.
+_CALC_ID_PATTERNS = (
+    re.compile(r"calc_(\d+)\.hdf5"),
+    re.compile(r"^\[[\d\-]+ [\d:]+ #(\d+) ", re.M),
+)
+
+
 def _calc_id_from_output(text: str) -> int | None:
-    ids = re.findall(r"[Cc]alculation (\d+) (?:started|completed|saved)", text)
-    return int(ids[-1]) if ids else None
+    """Scrape the calc_id out of the engine's log output."""
+    for pattern in _CALC_ID_PATTERNS:
+        ids = pattern.findall(text)
+        if ids:
+            # Every line of a run carries the same id; take the last in case the
+            # log ever contains more than one calculation.
+            return int(ids[-1])
+    return None
 
 
 # Invoke the engine through the *current* interpreter rather than a bare "oq" on
@@ -259,19 +276,55 @@ def _calc_id_from_output(text: str) -> int | None:
 _OQ_CMD = [sys.executable, "-m", "openquake.commands"]
 
 
-def _calc_id_from_listing(description: str) -> int | None:
+def _sibling_descriptions(wp1_dir: Path) -> set[str]:
+    """Descriptions of every analysis config in ``wp1_dir``.
+
+    Read from disk rather than from a constant so that the ambiguity check below
+    always reflects the analyses actually being run — the notebook owns the
+    truncation levels, and a hardcoded copy here would go stale the moment an
+    analyst changed them.
+    """
+    descs = set()
+    for fp in sorted(Path(wp1_dir).glob("config_*.ini")):
+        try:
+            descs.add(_read_key(fp, "description"))
+        except KeyError:
+            continue
+    return descs
+
+
+def _calc_id_from_listing(description: str, wp1_dir: Path) -> int | None:
     """Recover a calc_id by matching the (unique) description in the engine's
-    listing. Fallback for when stdout formatting differs by engine version.
+    listing. Fallback for when the log output cannot be scraped.
+
+    The listing's ``description`` column is *truncated* to a fixed width, so an
+    exact match never fires — compare the shown text as a prefix instead. The
+    per-analysis descriptions differ in their ``epsN`` suffix, so verify the
+    truncation did not cut off what makes them unique before trusting a match.
     """
     out = subprocess.run(
         [*_OQ_CMD, "engine", "--list-hazard-calculations"],
         capture_output=True, text=True,
     )
-    matches = [
-        int(m.group(1))
-        for line in out.stdout.splitlines()
-        if description in line and (m := re.match(r"\s*(\d+)", line))
-    ]
+    all_descs = _sibling_descriptions(wp1_dir)
+
+    matches = []
+    for line in out.stdout.splitlines():
+        cols = [c.strip() for c in line.split("|")]
+        if len(cols) < 5 or not cols[0].isdigit() or not cols[4]:
+            continue
+        shown = cols[4]
+        if not description.startswith(shown):
+            continue
+        # The truncated text must still tell this analysis apart from its siblings
+        # (they differ only in the trailing 'epsN'), or the id could be the wrong one.
+        if sum(1 for d in all_descs if d.startswith(shown)) > 1:
+            raise RuntimeError(
+                f"Cannot identify the calc_id for '{description}': the calculation "
+                f"listing truncates it to '{shown}', which matches more than one "
+                f"analysis."
+            )
+        matches.append(int(cols[0]))
     return max(matches) if matches else None
 
 
@@ -392,7 +445,7 @@ def run_or_reuse(
             f"{text[-4000:]}"
         )
 
-    calc_id = _calc_id_from_output(text) or _calc_id_from_listing(desc)
+    calc_id = _calc_id_from_output(text) or _calc_id_from_listing(desc, wp1_dir)
     if calc_id is None:
         raise RuntimeError(
             f"'{name}' ran but no calc_id could be recovered from the engine output "
