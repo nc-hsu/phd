@@ -1,0 +1,212 @@
+{
+  "AvgSA_03_psha_eps3": {
+    "calc_id": 12,
+    "config": "config_AvgSA_03_psha_eps3.ini",
+    "description": "[ESHM20 AvgSA 0 to 3 - all sites - eps3]",
+    "inputs": {
+      "config": {
+        "hash": "04c94e5217fa9ec7b472d902030474e38dbcee5672336f14e89b4855a7f20eb1",
+        "summary": "file config_AvgSA_03_psha_eps3.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:41:11.533555+00:00"
+    }
+  },
+  "AvgSA_03_psha_eps4": {
+    "calc_id": 13,
+    "config": "config_AvgSA_03_psha_eps4.ini",
+    "description": "[ESHM20 AvgSA 0 to 3 - all sites - eps4]",
+    "inputs": {
+      "config": {
+        "hash": "c10cd7c7ed65a44132968ddebfa3a2e8f3f0cf690ca76a4e3ff6e4362c3cc901",
+        "summary": "file config_AvgSA_03_psha_eps4.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:44:33.740722+00:00"
+    }
+  },
+  "AvgSA_03_psha_eps5": {
+    "calc_id": 14,
+    "config": "config_AvgSA_03_psha_eps5.ini",
+    "description": "[ESHM20 AvgSA 0 to 3 - all sites - eps5]",
+    "inputs": {
+      "config": {
+        "hash": "3fb5d484c9f089aecd5091c36b92c67e8a7fad653d603feb6f8caeed6ccbf71e",
+        "summary": "file config_AvgSA_03_psha_eps5.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:47:06.907334+00:00"
+    }
+  },
+  "AvgSA_06_psha_eps3": {
+    "calc_id": 15,
+    "config": "config_AvgSA_06_psha_eps3.ini",
+    "description": "[ESHM20 AvgSA 0 to 6 - all sites - eps3]",
+    "inputs": {
+      "config": {
+        "hash": "248a5f86db26be4d10423515d1cc702454f20f64b287755375667503adbf4d0f",
+        "summary": "file config_AvgSA_06_psha_eps3.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "66627e21553d00408d6d4c28d5da3243eb63ec1173da49555f0372cc6ae0e749",
+        "summary": "file gmpe_logic_tree_AvgSA_0to6_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:50:11.723052+00:00"
+    }
+  },
+  "AvgSA_06_psha_eps4": {
+    "calc_id": 16,
+    "config": "config_AvgSA_06_psha_eps4.ini",
+    "description": "[ESHM20 AvgSA 0 to 6 - all sites - eps4]",
+    "inputs": {
+      "config": {
+        "hash": "1a05b7e706b1431f1b15c799a2dfd1c569e5b2b3aebf63488d527a69bed75b74",
+        "summary": "file config_AvgSA_06_psha_eps4.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "66627e21553d00408d6d4c28d5da3243eb63ec1173da49555f0372cc6ae0e749",
+        "summary": "file gmpe_logic_tree_AvgSA_0to6_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:53:01.937322+00:00"
+    }
+  },
+  "AvgSA_06_psha_eps5": {
+    "calc_id": 17,
+    "config": "config_AvgSA_06_psha_eps5.ini",
+    "description": "[ESHM20 AvgSA 0 to 6 - all sites - eps5]",
+    "inputs": {
+      "config": {
+        "hash": "a08c8eb8692f19a26650511d513260a448a26849da45d712264142834b81fd58",
+        "summary": "file config_AvgSA_06_psha_eps5.ini (1622 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "66627e21553d00408d6d4c28d5da3243eb63ec1173da49555f0372cc6ae0e749",
+        "summary": "file gmpe_logic_tree_AvgSA_0to6_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_all_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "95a7c3e8064a7998739c61e7833475938ab257a3c1f5715905cd50a9492d859b",
+        "summary": "str \"[('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 354942, 1784290638857520200), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 354942, 1784290638859801000), ('asm_v12e/asm_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 354942, 1784290638861807600), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 354942, 1784290638863313200), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 354942, 1784290638864317100), ('asm_v12e/asm_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 354942, 1784290638865321100), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 355692, 1784290638866325000), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 355692, 1784290638867328900), ('asm_v12e/asm_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 355692, 1784290638868332800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 541268, 1784290638869344800), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 556074, 1784290638871352100), ('asm_v12e/asm_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 570675, 1784290638873359400), ('asm_v12e/asm_ver12e_winGT_fs017_twingr.xml', 6847, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 17973, 1784290638874518200), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 17973, 1784290638875522100), ('deep_v12e/asm_deep_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 17973, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 17993, 1784290638877026700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 17993, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 21036, 1784290638878042400), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 21190, 1784290638879046700), ('deep_v12e/asm_deep_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 21413, 1784290638879046700), ('fsm_v09/fs_ver09e_model_aGR_SRA_MA_fMthr.xml', 1071776, 1784290638884064400), ('fsm_v09/fs_ver09e_model_aGR_SRA_ML_fMthr.xml', 1071800, 1784290638886572300), ('fsm_v09/fs_ver09e_model_aGR_SRA_MU_fMthr.xml', 1071786, 1784290638888582700), ('fsm_v09/fs_ver09e_model_aGR_SRL_MA_fMthr.xml', 1071765, 1784290638890758400), ('fsm_v09/fs_ver09e_model_aGR_SRL_ML_fMthr.xml', 1071762, 1784290638893771100), ('fsm_v09/fs_ver09e_model_aGR_SRL_MU_fMthr.xml', 1071773, 1784290638895779400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MA_fMthr.xml', 1071764, 1784290638897787100), ('fsm_v09/fs_ver09e_model_aGR_SRU_ML_fMthr.xml', 1071783, 1784290638899795400), ('fsm_v09/fs_ver09e_model_aGR_SRU_MU_fMthr.xml', 1071767, 1784290638901803300), ('interface_v12b/CaA_IF2222222_M40.xml', 10835, 1784290638902807000), ('interface_v12b/CyA_IF2222222_M40.xml', 13646, 1784290638902807000), ('interface_v12b/GiA_IF2222222_M40.xml', 12001, 1784290638902807000), ('interface_v12b/HeA_IF2222222_M40.xml', 41208, 1784290638903901000), ('ssm_v09/seis_ver12b_fMthr_asm_ver12e_winGT_fs017_agbrs_point.xml', 21831736, 1784290638993888100), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_low.xml', 2738, 1784290638994892200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_mid.xml', 2738, 1784290638995896200), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_hi_abgrs_maxmag_upp.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_low.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_mid.xml', 2738, 1784290638996510300), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_lo_abgrs_maxmag_upp.xml', 2738, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_low.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_mid.xml', 2744, 1784290638997523800), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_mid_abgrs_maxmag_upp.xml', 2744, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_low.xml', 3381, 1784290638998527500), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_mid.xml', 3455, 1784290638999535400), ('volcanic_v12e/asm_volcanic_ver12e_winGT_fs017_pareto_abgrs_cornermag_upp.xml', 3519, 1784290638999535400)]\""
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "a23baab",
+      "written_at": "2026-07-17T12:56:13.610748+00:00"
+    }
+  }
+}
