@@ -20,6 +20,11 @@ proc_data:
   root: "data_processed"
   site_selection: "data_processed/01_site_selection"
   site_hazard: "data_processed/03_site_hazard"
+  # Target IMLs for the iml-based disaggregation, chosen in notebook 017.
+  # The AvgSA 0-6 file does not exist yet; notebook 020 skips any IM whose file
+  # is missing rather than failing.
+  disagg_imls_AvgSA_03: "data_processed/03_site_hazard/AvgSA_03_imls_for_disaggregation.csv"
+  disagg_imls_AvgSA_06: "data_processed/03_site_hazard/AvgSA_06_imls_for_disaggregation.csv"
   corr_model: "data_processed/02_im_correlation_model"
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
@@ -56,6 +61,7 @@ hazard_models:
   eshm20_wp1: "hazard_models/eshm20/wp1"
   eshm20_wp1_site_model: "hazard_models/eshm20/wp1/site_model_all_sites.csv"
   eshm20_wp1_psha_manifest: "hazard_models/eshm20/wp1/psha_manifest.json"
+  eshm20_wp1_disagg_manifest: "hazard_models/eshm20/wp1/disagg_manifest.json"
 
 scripts: 
   root: "phd_project/scripts"
