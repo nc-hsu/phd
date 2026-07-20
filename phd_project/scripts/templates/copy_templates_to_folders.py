@@ -324,6 +324,87 @@ def configure_optimisation_batch_run(
 
 
 
+def copy_batch_ida_buildings(
+        src: str | Path,
+        dst: str | Path,
+        buildings: list[dict[str, Any]] | None = None,
+        **kwargs
+    ) -> None:
+    """
+    Copies the multi-building IDA launcher template and rewrites its config block.
+
+    Args:
+        src: Source path of the template.
+        dst: Destination path for the new launcher.
+        buildings: List of {"folder": ..., "config": ...} dicts, same shape as in
+            the template. Folders may be str or Path.
+        **kwargs: Other top-level config variables to update, e.g.
+            max_coordinators, runner_script_name, show_worker_windows.
+    """
+    src_path = Path(src)
+    dst_path = Path(dst)
+
+    if not src_path.exists():
+        raise FileNotFoundError(f"Source {src_path} not found.")
+
+    content = src_path.read_text(encoding='utf-8')
+
+    def format_value(v: Any) -> str:
+        """Windows paths become raw strings so backslashes survive."""
+        if isinstance(v, Path) or (isinstance(v, str) and '\\' in v):
+            return f'r"{v}"'
+        if isinstance(v, str):
+            return f'"{v}"'
+        return repr(v)
+
+    # 1. Rewrite the buildings list
+    if buildings is not None:
+        entries = []
+        for entry in buildings:
+            items = list(entry.items())
+            lines = [f'    {{"{items[0][0]}": {format_value(items[0][1])},']
+            for key, value in items[1:]:
+                lines.append(f'     "{key}": {format_value(value)},')
+            lines[-1] = lines[-1][:-1] + '},'  # trailing comma -> close the dict
+            entries.append("\n".join(lines))
+
+        list_str = "[\n" + "\n".join(entries) + "\n]"
+
+        # Group 1 keeps any type annotation on the assignment; the list is
+        # terminated by its closing ']' at column 0, as the template formats it.
+        pattern = r'(buildings(?:\s*:\s*[^=]+?)?\s*=\s*)\[.*?\n\]'
+
+        content, n = re.subn(
+            pattern,
+            lambda m: f'{m.group(1)}{list_str}',
+            content,
+            flags=re.DOTALL
+        )
+        if n == 0:
+            raise ValueError(f"Could not find a 'buildings' list assignment in {src_path}.")
+
+    # 2. Rewrite top-level scalar config variables. The '^' anchor keeps this to
+    # module-level assignments, leaving the same names alone where they appear as
+    # defaults in run() and argparse (those read from the module-level values).
+    for k, v in kwargs.items():
+        # Group 3 captures any trailing '# comment' so it is carried over.
+        var_pattern = rf'(^{k}\s*=\s*)([^#\n]*?)(\s*#.*)?(?=\n)'
+        content, n = re.subn(
+            var_pattern,
+            lambda m, val=format_value(v): f'{m.group(1)}{val}{m.group(3) or ""}',
+            content,
+            flags=re.MULTILINE
+        )
+        if n == 0:
+            raise ValueError(
+                f"No top-level '{k} = ...' assignment found in {src_path}; "
+                f"cannot set it."
+            )
+
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    dst_path.write_text(content, encoding='utf-8')
+
+
 def copy_file(src: str | Path, dst: str | Path) -> None:
     try:
         # copy2 preserves metadata (timestamps, etc.)
