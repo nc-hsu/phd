@@ -153,6 +153,7 @@ def design_ULS_GQWIE(model: Model,
                                   "storey_masses": [s.item() for s in storey_masses],
                                   "ductility_class": model.ductility_class,
                                   "design_period": period,
+                                  "seismic_action_class": model.spectrum_parameters["seismic_action_class"] 
                                  }
                 
         model.set_seismic_design_outputs(seismic_design_outputs)
@@ -559,6 +560,7 @@ def set_seismic_design_output(model, period, seismic_mass, storey_masses, base_s
                             "seismic_mass": seismic_mass,
                             "storey_masses": [s.item() for s in storey_masses],
                             "ductility_class": model.ductility_class,
+                            "seismic_action_class": model.spectrum_parameters["seismic_action_class"],
                             "vertical_regularity": regularity,
                             "q_design": model.q_factor,
                             "q_D": model.q_D,

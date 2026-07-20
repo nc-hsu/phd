@@ -65,7 +65,9 @@ scripts:
 models:
   case_study: "casestudy_structures"
   casestudy_designs_ec8_gen2: "casestudy_structures/concentrically_braced_frames/ec8_gen2"
+  casestudy_designs_dc2_scA_reference: "casestudy_structures/concentrically_braced_frames/ec8_gen2_scA_reference"
   casestudy_designs_site_specific: "casestudy_structures/concentrically_braced_frames/ec8_gen2_site_specific_designs"
+  
   examples: "calculation_examples"
 
 templates:
@@ -105,6 +107,7 @@ analysis_data:
   root: "E:"
   dc2_sdof_fitting: "E:/03_wp1pt4pt1_dc2_sdof_fitting"
   site_influence_investigation: "D:/04_site_influence_investigation"
+  reference_structures_dc2_scA: "D:/06_reference_structures_dc2_scA"
 
 
 
