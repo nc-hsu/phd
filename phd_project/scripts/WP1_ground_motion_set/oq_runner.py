@@ -99,7 +99,7 @@ quantile_hazard_curves = 0.16 0.50 0.84
 poes = 0.019801 0.004988 0.002103 0.001000 0.000404 0.000201 0.000100
 """)
 
-SITE_MODEL_FILE = "site_model_all_sites.csv"
+SITE_MODEL_FILE = "site_model_casestudy_sites.csv"
 SOURCE_MODEL_LOGIC_TREE_FILE = "source_model_logic_tree_eshm20.xml"
 
 GMPE_LOGIC_TREES = {
