@@ -30,10 +30,21 @@ Each **model lives in its own folder**, which contains:
 - any supporting files the configs import (process recorders, injection functions,
   intensity-measure definitions).
 
-Config files are imported **by path** (via `standes.utils.import_from_path`), which
-also puts the model folder on `sys.path` for the duration of the import. That is why
-a config can write `from structural_model import model_init` and have it resolve to
-the `structural_model.py` sitting next to it.
+Config files are imported **by path** (via `standes.utils.import_from_path`). Each config
+names its structural-model file through two top-level variables — `model_file_name` (default
+`"structural_model.py"`) and `init_function` (default `"model_init"`) — and imports it by
+path:
+
+```python
+_model = import_from_path(Path(__file__).parent / model_file_name)
+model_init = getattr(_model, init_function)
+```
+
+The config is the **single place** that imports the model. This is why the model file can
+have any name (the notebooks write it as `nlcbf_structural_model.py`): only the config's
+`model_file_name` needs to point at it. The config then passes the model pieces to its
+sibling helpers — `config_im` and `injection_functions` — which are model-agnostic factories
+(§2) and no longer import `structural_model` themselves.
 
 ### Convention: writing config files that the copy tools can edit
 
@@ -77,20 +88,26 @@ your own). MSA configs import the same style of file as `msa_process_recorders.p
 
 ### `template_nltha_injection_func_update_damping.py` → `injection_functions.py`
 Optional hooks injected into a time-history run at defined points (`pre_nltha`,
-`pre_analyse`, `post_analyse`, `post_nltha`). The supplied example re-applies the modal
-damping model after each step. Configs that don't need hooks can import an empty set.
+`pre_analyse`, `post_analyse`, `post_nltha`). Exposes a factory
+`make_injection_functions(model, **injection_function_params)` that the analysis config calls
+with the model module (plus any extras from its `injection_function_params` dict, default
+`{}`); the supplied example reads `damping_config` / `damping_model` off the model and
+re-applies the modal damping model after each step. Because the config supplies the model,
+this file does not import `structural_model` itself.
 
 ### `template_config_im_SA.py` / `_AvgSA_03.py` / `_AvgSA_06.py` → `config_im_*.py`
-Defines the **intensity measure** used to scale ground motions in an IDA. Exposes a
-module-level `im`:
+Defines the **intensity measure** used to scale ground motions in an IDA. Exposes a factory
+`make_im(model_init)`, which the analysis config calls with its `model_init`:
 
-- `config_im_SA` — spectral acceleration at the model's first-mode period (runs a modal
-  analysis to find it).
-- `config_im_AvgSA_03` / `_06` — geometric-mean spectral acceleration over 0–3 s / 0–6 s.
+- `config_im_SA` — spectral acceleration at the model's first-mode period (calls `model_init()`
+  and runs a modal analysis to find it).
+- `config_im_AvgSA_03` / `_06` — geometric-mean spectral acceleration over 0–3 s / 0–6 s
+  (a fixed period range; they accept `model_init` for a uniform contract but don't use it).
 
 The IDA config selects its IM **by filename** through its `config_im_file` variable, so
 several `config_im_*.py` files can sit in one folder and each IDA config can point at a
-different one without editing import statements.
+different one without editing import statements. Because the config passes `model_init` in,
+these files do not import `structural_model` themselves.
 
 ---
 
@@ -451,8 +468,9 @@ copy_structural_model(
 The workhorse for config files. It:
 
 1. **Rewrites top-level variables** given as keyword arguments (`record_filenames=[...]`,
-   `config_im_file="config_im_AvgSA03.py"`, …). If a variable already exists it is
-   replaced; if not, it is **injected** right after `results_folder_name`.
+   `config_im_file="config_im_AvgSA03.py"`, `model_file_name="nlcbf_structural_model.py"`, …).
+   If a variable already exists it is replaced; if not, it is **injected** right after
+   `results_folder_name`.
 2. **Renames the results folder** via `results_folder_name=...`.
 3. **Edits values inside the `config` dict** via `update_config={...}` (matched by key).
 

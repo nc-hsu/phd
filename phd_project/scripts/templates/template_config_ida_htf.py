@@ -1,10 +1,8 @@
 from pathlib import Path
 from standes.analysis.nltha import NlthaParameters
 from standes.utils import import_from_path
-from structural_model import model_init# type: ignore
-from injection_functions import injection_functions # type: ignore
 from ida_process_recorders import process_recorder_func, edp_tags, edp_idxs # type: ignore
-""" 
+"""
 No comments can be placeed inside the config ditionary as this messing with the
 copy and edit functions that are used to create new config files from this template.
 
@@ -13,14 +11,26 @@ Place all comments here:
 - results_folder_name should be the first variable in this file, as the copy and
 edit functions expect this when creating new config files from this template.
 
-- config_im_file names the module that defines the intensity measure `im`. It is
-loaded by path rather than imported by name, so several config_im_{...}.py files
+- model_file_name and init_function follow results_folder_name and name the structural
+model file (in this folder) and the model-building callable imported from it. This config
+is the single place that imports the model; it passes model_init to the intensity-measure
+factory and the model module to the injection-functions factory.
+
+- config_im_file names the module that defines the intensity measure via make_im(model_init).
+It is loaded by path rather than imported by name, so several config_im_{...}.py files
 can live side by side in the same folder.
+
+- injection_file names the module that defines make_injection_functions(model, **params), and
+injection_function_params (default {}) is the dict of extra keyword parameters passed to it.
 
 """
 
 results_folder_name = "ida"
+model_file_name = "structural_model.py"
+init_function = "model_init"
 config_im_file = "config_im_SA.py"
+injection_file = "injection_functions.py"
+injection_function_params = {}
 gm_json_src_str = 'E:/gm_records_p695'
 record_filenames = ['fema_p695_120111.json']
 gravity = 9810          # mm/s²
@@ -39,7 +49,10 @@ dt = 0.005
 convergece_test = ("NormDispIncr", 1e-6, 50)
 nlth_analysis_parameters = NlthaParameters(test=convergece_test, dt=dt)
 
-im = import_from_path(Path(__file__).parent / config_im_file).im
+_model = import_from_path(Path(__file__).parent / model_file_name)
+model_init = getattr(_model, init_function)
+im = import_from_path(Path(__file__).parent / config_im_file).make_im(model_init)
+injection_functions = import_from_path(Path(__file__).parent / injection_file).make_injection_functions(_model, **injection_function_params)
 
 config = {
     "result_dst": Path(__file__).parent / f"{results_folder_name}",

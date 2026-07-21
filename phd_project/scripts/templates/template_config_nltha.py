@@ -1,22 +1,33 @@
 from pathlib import Path
 from standes.analysis.nltha import NlthaParameters
-from structural_model import model_init, damping_config, damping_model # type: ignore
+from standes.utils import import_from_path
 
-""" 
+"""
 No comments can be placeed inside the config ditionary as this messing with the
 copy and edit functions that are used to create new config files from this template.
 
 Place all comments here:
 --------------------------
-- results_folder_name should be the first variable in this file, as the copy and 
+- results_folder_name should be the first variable in this file, as the copy and
 edit functions expect this when creating new config files from this template.
+
+- model_file_name and init_function follow results_folder_name and name the structural
+model file (in this folder) and the model-building callable imported from it. The damping
+model pieces are read from the same model file.
 
 - damping_config: configuration of damping model needed for updating modal damping model in nltha
 - damping_model: is a function that sets the damping model in opensees, needed for updating modal damping model in nltha
 """
 
 results_folder_name = ""
+model_file_name = "structural_model.py"
+init_function = "model_init"
 gm_json_src_str = 'E:/gm_records_p695'
+
+_model = import_from_path(Path(__file__).parent / model_file_name)
+model_init = getattr(_model, init_function)
+damping_config = _model.damping_config
+damping_model = _model.damping_model
 
 
 config = {
