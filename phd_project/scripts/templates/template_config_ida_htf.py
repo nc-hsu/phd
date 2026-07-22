@@ -45,7 +45,8 @@ trace_delta = 1/3
 trace_tolerance = 0.0
 trace_max_resolution = 0.1
 min_runs = 8
-dt = 0.005      
+do_fill = True
+dt = 0.005
 convergece_test = ("NormDispIncr", 1e-6, 50)
 nlth_analysis_parameters = NlthaParameters(test=convergece_test, dt=dt)
 
@@ -83,7 +84,8 @@ config = {
         "trace_delta": trace_delta,
         "trace_tolerance": trace_tolerance, 
         "trace_max_resolution": trace_max_resolution,
-        "min_runs": min_runs
+        "min_runs": min_runs,
+        "do_fill": do_fill
     },
 
 }

@@ -95,7 +95,7 @@ def copy_nlcbf_model(
     ops_updates: Dict[str, Any] | None = None,
     recorder_updates: Dict[str, Any] | None = None,
     damping_updates: Dict[str, Any] | None = None,
-    reduced: bool = True,
+    reduced: bool = False,
     model_config_name: str | None = None,
 ) -> None:
     """Write the two-file nlcbf model into ``dst_folder``:
@@ -128,7 +128,8 @@ def copy_nlcbf_model(
 
     # 2. initialise_model: recorder handling + model_init (full or reduced recorders)
     init_key = "initialise_model_nltha_reduced" if reduced else "initialise_model_nltha"
-    init_dst = dst_folder / "initialise_model.py"
+    init_fn = "initialise_model_idamsa.py" if reduced else "initialise_model.py"
+    init_dst = dst_folder / init_fn
     copy_structural_model(
         templates[init_key],
         init_dst,
@@ -146,6 +147,7 @@ def copy_nlcbf_model(
         )
         init_dst.write_text(content, encoding="utf-8")
 
+    return init_fn
 
 # def copy_pushover_config(
 #     src: str | Path,
