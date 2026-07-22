@@ -36,6 +36,7 @@ buildings: list[dict[str, str]] = [
      "config": "config_ida_htf_femap695_set.py"},
 ]
 max_coordinators = 10          # how many building coordinators / windows at once
+window_name_index = 1         # the number of folder to go up in directory to get to unique folder name. e.g. 1 = parent folder of config
 runner_script_name = "run_batch_ida_per_record.py"
 # Show a console window per record worker (default). Set to False (or pass
 # --quiet) to hide them and stream each worker's output to worker_logs/ instead --
@@ -73,7 +74,7 @@ def launch_building(runner: Path, config: Path, show_windows: bool):
     """
     SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
-    window_title = config.parent.name
+    window_title = config.parents[window_name_index].name
 
     py_code = (
         f"import importlib.util; "
@@ -157,6 +158,8 @@ if __name__ == "__main__":
                         help="how many building coordinators (windows) to run at once")
     parser.add_argument("--quiet", action="store_true",
                         help="hide per-record worker windows; stream them to worker_logs/ instead")
+    parser.add_argument("--window-name-index", type=int, default=window_name_index,
+                            help="the index of the folder in config.parents to be used as coordinator window title. 1 corresponds to parent folder")
     args = parser.parse_args()
 
     run(max_coordinators=args.max_coordinators,
