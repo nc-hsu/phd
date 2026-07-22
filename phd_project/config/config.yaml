@@ -25,6 +25,14 @@ proc_data:
   # is missing rather than failing.
   disagg_imls_AvgSA_03: "data_processed/03_site_hazard/AvgSA_03_imls_for_disaggregation.csv"
   disagg_imls_AvgSA_06: "data_processed/03_site_hazard/AvgSA_06_imls_for_disaggregation.csv"
+  # Disagg inputs to record selection: the 4-sigma-truncation ("sig4") IML-based set from nb 021
+  AvgSA_03_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_03_disagg_data_wp1sites_eps4.pickle"
+  AvgSA_03_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_03_disagg_stats_wp1sites_eps4.pickle"
+  AvgSA_06_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_06_disagg_data_wp1sites_eps4.pickle"
+  AvgSA_06_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_06_disagg_stats_wp1sites_eps4.pickle"
+  # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-036)
+  AvgSA_03_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_03.json"
+  AvgSA_06_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_06.json"
   corr_model: "data_processed/02_im_correlation_model"
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
@@ -61,6 +69,8 @@ hazard_models:
   eshm20_AvgSA: "hazard_models/eshm20/regional_AvgSA/"
   eshm20_AvgSA_site_model_all: "hazard_models/eshm20/regional_AvgSA/site_model_casestudy_sites.csv"
   eshm20_AvgSA_03_jobfile: "hazard_models/eshm20/regional_AvgSA/config_eshm20_AvgSA_0to3.ini"
+  eshm20_AvgSA_03_median_lt: "hazard_models/eshm20/regional_AvgSA/gmpe_logic_tree_AvgSA_0to3_median_branch.xml"
+  eshm20_AvgSA_06_median_lt: "hazard_models/eshm20/regional_AvgSA/gmpe_logic_tree_AvgSA_0to6_median_branch.xml"
   eshm20_wp1: "hazard_models/eshm20/wp1"
   eshm20_wp1_site_model: "hazard_models/eshm20/wp1/site_model_all_sites.csv"
   eshm20_wp1_psha_manifest: "hazard_models/eshm20/wp1/psha_manifest.json"

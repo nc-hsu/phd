@@ -760,6 +760,20 @@ def get_imtl_from_disaggstats(disagg_stats, site_id, imt, poe):
     return imtl
 
 
+def get_poe_from_disaggstats(disagg_stats, site_id, imt, imtl):
+    """Return the poe for (site_id, imt, imtl), or None if there is no matching
+    stats row (e.g. a zero-hazard / excluded IML). Returns None rather than
+    raising so a requested-but-unusable IML can be skipped gracefully by the
+    caller. The imtl is matched with a tolerance (np.isclose) because the
+    requested value may come from a JSON list with slightly different rounding."""
+    row = disagg_stats[(disagg_stats["site_id"] == site_id) &
+                       (disagg_stats["imt"] == imt) &
+                       (np.isclose(disagg_stats["imtl"], imtl))]
+    if row.empty:
+        return None
+    return float(row["poe"].values[0])
+
+
 def adjust_ensemble_distributions(
         disagg_dist: pd.DataFrame, 
         target_gcim_cdfs: dict, ensemble: dict, selection_ctx: dict,

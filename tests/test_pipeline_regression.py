@@ -214,7 +214,7 @@ def _data_available() -> bool:
     needed = [
         cfg["proc_data"]["gm_database"],
         cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle",
-        cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_data_60sites.pickle",
+        cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
     ]
     return all(Path(p).is_file() for p in needed)
 
@@ -244,8 +244,8 @@ def test_preliminary_slice_matches_golden():
         base = {
             "gm_db_file": cfg["proc_data"]["gm_database"],
             "gcim_file": cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle",
-            "disagg_data_file": cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_data_60sites.pickle",
-            "disagg_stats_file": cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_stats_60sites.pickle",
+            "disagg_data_file": cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
+            "disagg_stats_file": cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"],
             "site_model_file": cfg["hazard_models"]["eshm20_AvgSA_site_model_all"],
             "rng_seed": 1,
         }

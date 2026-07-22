@@ -33,13 +33,13 @@ cfg = load_config()
 
 # Filepaths:
 # input file paths
-fp_disagg_data = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_data_60sites.pickle"
-fp_disagg_stats = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_stats_60sites.pickle"
+fp_disagg_data = cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"]
+fp_disagg_stats = cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"]
 fp_gcim_dists = cfg["proc_data"]["gcim_dists"] / f"gcim_dist_AvgSA_03_rake-90.pickle"
 fp_site_model = cfg["hazard_models"]["eshm20_AvgSA_site_model_all"]
 flatfile_folder = cfg["proc_data"]["corr_model"] / "reverse" / "flatfiles"
 fp_gm_database = cfg["proc_data"]["gm_database"]
-fp_gmm_logic_tree = cfg["hazard_models"]["eshm20_AvgSA"] / "gmpe_logic_tree_AvgSA_0to3_median_branch.xml"
+fp_gmm_logic_tree = cfg["hazard_models"]["eshm20_AvgSA_03_median_lt"]
 
 # output file paths
 preliminary_selection_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_03_prelim_selection_rake-90.pickle"
@@ -131,13 +131,19 @@ gmm_map = create_gmm_map(fp_gmm_logic_tree)
 # get the correlation model map
 corr_map = create_corr_model_map(nonSA_imt_strs, sa_periods)
 
-# organise the disagg data
-site_poe_disaggs = {}
-for (s, r) in disagg_data.keys():
-    for st in disagg_data[(s,r)].keys():
-        for p in disagg_data[(s,r)][st][conditioning_imt.name].keys():
-            if st == site_id and p == poe:
-                poe_disagg = disagg_data[(s,r)][st][conditioning_imt.name][p]
+# organise the disagg data (flat IML-based structure from nb 021:
+# disagg_data[site][imt][iml] -> df). Pick the (site_id, poe) of interest by
+# resolving each iml's poe from disagg_stats (see get_poe_from_disaggstats).
+from phd_project.scripts.WP1_ground_motion_set.gm_selection import get_poe_from_disaggstats
+poe_disagg = None
+for iml, df in disagg_data[site_id][conditioning_imt.name].items():
+    p = get_poe_from_disaggstats(disagg_stats, site_id, conditioning_imt.name, iml)
+    if p is not None and np.isclose(p, poe):
+        poe_disagg = df
+        break
+if poe_disagg is None:
+    raise ValueError(f"No disagg for site {site_id} at poe {poe}; "
+                     f"choose a poe present in disagg_stats for this site.")
 
 
 # set up the selection context:

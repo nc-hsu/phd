@@ -1,16 +1,18 @@
 import os
+import json
 import pickle
 import numpy as np
 import pandas as pd
 
 from openquake.hazardlib.imt import PGA, SA, RSD595, AvgSA, IA, IMT
 
-from phd_project.config.config import load_config 
+from phd_project.config.config import load_config
 
 from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     ESHM20SiteRupCtxBuilder,
     create_gmm_map,
     create_corr_model_map,
+    get_poe_from_disaggstats,
 )
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 
@@ -92,23 +94,52 @@ def _set_up_selection(
     occurence = True    # the record selection should be performed based on occurence
 
     ####################### Load Data ##########################################
-    # Load the disaggregation data
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_data_60sites.pickle"
+    # Load the IML-based disaggregation (the sig4 / eps4 truncation set from nb 021).
+    # disagg_data is flat: disagg_data[site][imt][iml] -> DataFrame
+    # disagg_stats is a flat DataFrame, one row per (site, imt, imtl) with a poe column.
+    fp = cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"]
     with open(fp, "rb") as f:
         disagg_data = pickle.load(f)
 
-    fp = cfg["proc_data"]["site_hazard"] / "AvgSA_03_disagg_stats_60sites.pickle"
+    fp = cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"]
     with open(fp, "rb") as f:
         disagg_stats = pickle.load(f)
 
-    # organise the disagg data
+    # Only build ensembles for a per-site subset of IMLs (one MSA stripe each),
+    # listed in the imls_for_selection JSON: {site_id_str: [iml, ...]}.
+    with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
+        imls_for_selection = json.load(f)
+
+    # organise the disagg data, keyed by (site, poe). poe is looked up from the
+    # stats for each requested iml so the rest of the pipeline can keep the
+    # (site, poe) scheme unchanged.
+    imt = conditioning_imt.name  # "AvgSA" (only works for AvgSA; see disagg_imt comment below)
     site_poe_disaggs = {}
-    for (s, r) in disagg_data.keys():
-        for site in disagg_data[(s,r)].keys():
-            for poe in disagg_data[(s,r)][site][conditioning_imt.name].keys():
-                site_poe_disaggs[(site, poe)] = disagg_data[(s,r)][site][conditioning_imt.name][poe]
+    invalid = []  # (site, iml) requested in the JSON but not usable (no stats row / no disagg df)
+    for site in sorted(disagg_data.keys()):
+        wanted = imls_for_selection.get(str(site))
+        if wanted is None:
+            continue  # site not listed in the subset JSON -> skip
+        iml_keys = list(disagg_data[site][imt].keys())
+        for iml in wanted:
+            poe = get_poe_from_disaggstats(disagg_stats, site, imt, iml)
+            key = next((k for k in iml_keys if np.isclose(k, iml)), None)
+            if poe is None or key is None:
+                # e.g. a zero-hazard / excluded iml (dropped from stats in nb 021) or
+                # an iml that was never disaggregated -> skip gracefully.
+                invalid.append((site, iml))
+                continue
+            site_poe_disaggs[(site, poe)] = disagg_data[site][imt][key]
     site_poes = sorted(list(site_poe_disaggs.keys()), key=lambda x: x[0])
-    site_poe_disaggs = {k:site_poe_disaggs[k] for k in site_poes}
+    site_poe_disaggs = {k: site_poe_disaggs[k] for k in site_poes}
+
+    print(f"Built {len(site_poe_disaggs)} (site, poe) disaggregations "
+          f"across {len({s for s, _ in site_poe_disaggs})} sites.")
+    if invalid:
+        print(f"WARNING: {len(invalid)} (site, iml) requested in imls_for_selection are not "
+              f"present in disagg_stats/disagg_data and were skipped:")
+        for site, iml in invalid:
+            print(f"    site {site}: iml {iml}")
 
     # load the site file
     site_model = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
@@ -133,8 +164,8 @@ def _set_up_selection(
     updated_ims.columns = pd.MultiIndex.from_product([['ims'], updated_ims.columns])
     gm_db = pd.concat([gm_db.drop('ims', axis=1, level=0), updated_ims], axis=1)
 
-    # Create the GMM Map for AvgSA by reading the logic tree
-    AvgSA_03_lt_fp = cfg["hazard_models"]["eshm20_AvgSA"] / "gmpe_logic_tree_AvgSA_0to3_median_branch.xml"
+    # Create the GMM Map for AvgSA by reading the median-branch logic tree
+    AvgSA_03_lt_fp = cfg["hazard_models"]["eshm20_AvgSA_03_median_lt"]
     gmm_map = create_gmm_map(AvgSA_03_lt_fp)
 
     # get the correlation model map
