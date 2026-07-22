@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from phd_project.scripts.WP1_ground_motion_set.cache_utils import (
+from phd_project.scripts.cache_utils import (
     StaleCacheError,
     fingerprint,
     load_manifest,
