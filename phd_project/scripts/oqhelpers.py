@@ -371,6 +371,12 @@ def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
     ``imtl``, then ``poe = mafe_to_poe(mafe, t)`` and ``rtp = poe_to_rtp(poe, t)``
     (hazrisk). ``t`` is the investigation time in years (default 1, i.e. annual
     PoE and ``rtp == 1/mafe``, matching the disagg runs' ``investigation_time``).
+
+    ``(site, imt, imtl)`` combinations with **zero hazard** (``mafe <= 0``) are
+    omitted: the IML is beyond the maximum ground motion permitted by the GMM's
+    epsilon truncation, so the return period is infinite and the disaggregation is
+    not a meaningful hazard scenario. Those IMLs stay in ``disagg_data`` and are
+    listed by :func:`get_excluded_imls`.
     """
     all_stats = []
     for site_id, imt_dict in disagg_data.items():
@@ -378,6 +384,8 @@ def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
             hc = np.asarray(hcurves[site_id][imt]["mean"])
             for imtl, df in iml_dict.items():
                 mafe = float(np.interp(imtl, hc[:, 0], hc[:, 1]))
+                if mafe <= 0:
+                    continue  # zero hazard (truncation); excluded from stats
                 poe = float(mafe_to_poe(mafe, t))
                 rtp = float(poe_to_rtp(poe, t))
                 row = {"site_id": site_id,
@@ -398,6 +406,27 @@ def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
         df = gpd.GeoDataFrame(
             df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326")
     return df
+
+
+def get_excluded_imls(disagg_data, hcurves):
+    """List the zero-hazard IMLs dropped from the stats by
+    :func:`get_iml_disagg_stats`.
+
+    Returns ``{site_id: [imls]}`` (imls sorted, in g) for every ``(site, imt,
+    iml)`` whose mean hazard curve gives ``mafe <= 0`` — i.e. an intensity level
+    beyond the epsilon-truncated maximum ground motion, with an infinite return
+    period. Sites with no excluded IMLs are omitted. These IMLs remain present in
+    ``disagg_data``; only the stats rows are dropped.
+    """
+    excluded = {}
+    for site_id, imt_dict in disagg_data.items():
+        for imt, iml_dict in imt_dict.items():
+            hc = np.asarray(hcurves[site_id][imt]["mean"])
+            for imtl in iml_dict:
+                mafe = float(np.interp(imtl, hc[:, 0], hc[:, 1]))
+                if mafe <= 0:
+                    excluded.setdefault(site_id, set()).add(imtl)
+    return {s: sorted(imls) for s, imls in excluded.items()}
 
 
 def assert_shared_provenance(disagg_manifest, psha_manifest, im, eps,
