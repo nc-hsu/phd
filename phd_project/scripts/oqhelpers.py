@@ -4,6 +4,8 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import ast
 
+from hazrisk.hazard import mafe_to_poe, poe_to_rtp
+
 def get_hcurve_from_dstore(dstore, site_idx, imt , stat, investigation_time,
                            mafe:bool=True):
     hc_metadata = get_hc_metadata(dstore)
@@ -354,26 +356,40 @@ def _disagg_summary_stats(df):
     return stats
 
 
-def get_iml_disagg_stats(disagg_data, site_metadata, geodf=False):
+def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
     """Flat disagg-stats DataFrame for one ``(IM, eps)`` pair, one row per
-    ``(site, imt, iml)``.
+    ``(site, imt, imtl)``.
 
-    Columns: ``site_id, lat, lon, seismicity, region, imt, iml, imtl`` (here
-    ``imtl == iml``, the target level in g) plus the per-TRT ``"<TRT> [%]"``
-    proportions and ``Mag_mean`` / ``Dist_mean`` from :func:`_disagg_summary_stats`.
+    Columns: ``site_id, lat, lon, seismicity, region, imt, imtl, poe, mafe, rtp``
+    plus the per-TRT ``"<TRT> [%]"`` proportions and ``Mag_mean`` / ``Dist_mean``
+    from :func:`_disagg_summary_stats`.
+
+    ``imtl`` is the target intensity level in g (the ``iml`` dict key). The hazard
+    level at that IML is read from ``hcurves`` — ``hcs[site_id][imt][stat] ->
+    (n_iml, 2)`` arrays of ``[IML, MAFE]`` (annual MAFE), the same curves used for
+    the occurrence slope — by interpolating the ``"mean"`` curve: ``mafe`` at
+    ``imtl``, then ``poe = mafe_to_poe(mafe, t)`` and ``rtp = poe_to_rtp(poe, t)``
+    (hazrisk). ``t`` is the investigation time in years (default 1, i.e. annual
+    PoE and ``rtp == 1/mafe``, matching the disagg runs' ``investigation_time``).
     """
     all_stats = []
     for site_id, imt_dict in disagg_data.items():
         for imt, iml_dict in imt_dict.items():
-            for iml, df in iml_dict.items():
+            hc = np.asarray(hcurves[site_id][imt]["mean"])
+            for imtl, df in iml_dict.items():
+                mafe = float(np.interp(imtl, hc[:, 0], hc[:, 1]))
+                poe = float(mafe_to_poe(mafe, t))
+                rtp = float(poe_to_rtp(poe, t))
                 row = {"site_id": site_id,
                        "lat": site_metadata.loc[site_id, "lat"],
                        "lon": site_metadata.loc[site_id, "lon"],
                        "seismicity": site_metadata.loc[site_id, "seismicity"],
                        "region": site_metadata.loc[site_id, "region"],
                        "imt": imt,
-                       "iml": iml,
-                       "imtl": iml}
+                       "imtl": imtl,
+                       "poe": poe,
+                       "mafe": mafe,
+                       "rtp": rtp}
                 all_stats.append(row | _disagg_summary_stats(df))
 
     df = pd.DataFrame.from_records(all_stats)

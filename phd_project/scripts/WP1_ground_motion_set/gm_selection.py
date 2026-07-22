@@ -47,7 +47,7 @@ from pickagm.corrmodels import (
     CORR_MODELS
 )
 
-from phd_project.scripts.WP1_ground_motion_set.cache_utils import (
+from phd_project.scripts.cache_utils import (
     fingerprint,
     load_or_compute,
     write_manifest,
