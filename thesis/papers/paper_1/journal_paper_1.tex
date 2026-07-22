@@ -1,0 +1,22 @@
+% !TEX root = ./paper1_journal.tex
+\documentclass[journal,10pt]{IEEEtran} % Or Elsevier / Springer class
+\usepackage{subfiles}
+
+% Map \chapter to \section for standalone journal compilation
+\cmd{\subfilehook}{
+  \let\chapter\section
+}
+
+\begin{document}
+
+\title{Earthquake Response Analysis}
+\author{Your Name}
+\maketitle
+
+% Pulls in the exact same body text
+\subfile{paper1_body.tex}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
