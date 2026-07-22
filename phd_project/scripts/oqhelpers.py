@@ -208,6 +208,217 @@ def get_imtl_from_hmap(dstore, site_idx, imt_idx, poe_idx, stat_idx=0):
     return dstore["hmaps-stats"][site_idx, stat_idx, imt_idx, poe_idx]
 
 
+# -----------------------------------------------------------------------------
+# IML-based disaggregation (iml_disagg runs)
+#
+# Notebook 020 disaggregates at a single target IML per calculation (OpenQuake's
+# ``iml_disagg``), so each datastore holds exactly one intensity level and no
+# ``poes_disagg`` / ``hmaps-stats``. The POE-based reader above therefore does
+# not apply; the helpers below read a single-IML datastore and collate a set of
+# them (one per target IML) into a flat, un-grouped dict keyed by site index.
+# -----------------------------------------------------------------------------
+
+def get_iml_disagg_targets(dstore):
+    """Return ``{imt: iml}``, the single target intensity level per IMT of an
+    ``iml_disagg`` run. Read from ``oqparam.imtls`` (which the engine populates
+    from ``iml_disagg``), falling back to ``oqparam.iml_disagg``.
+    """
+    oq = dstore["oqparam"]
+    imtls = getattr(oq, "imtls", None)
+    if imtls and all(len(np.atleast_1d(v)) >= 1 for v in imtls.values()):
+        return {imt: float(np.atleast_1d(levels)[0])
+                for imt, levels in imtls.items()}
+    iml_disagg = getattr(oq, "iml_disagg", None)
+    if iml_disagg:
+        return {imt: float(np.atleast_1d(v)[0]) for imt, v in iml_disagg.items()}
+    raise ValueError("could not determine the target IML(s) from the datastore")
+
+
+def _get_occurence_disagg_from_hc(df, hc, imtl, investigation_time, delta=0.001):
+    """Occurrence disaggregation ``P(m|X=x)`` using an externally supplied hazard
+    curve ``hc`` for the slope.
+
+    Mirrors :func:`_get_occurence_disagg` but takes ``hc`` (an ``(n_iml, 2)``
+    array of ``[IML, MAFE]``) directly instead of reading it from the datastore.
+    Needed for ``iml_disagg`` runs, whose own hazard curve has a single point and
+    so cannot supply the gradient ``d(lambda)/d(IML)``. ``hc`` must come from a
+    calculation with the *same* source model / logic tree as this disagg run
+    (see :func:`assert_shared_provenance`).
+    """
+    df = _get_traditional_disagg(df, investigation_time)
+    delta_imtl = delta * imtl
+    lambda_im1 = np.interp(imtl, hc[:, 0], hc[:, 1])              # lambda_im
+    lambda_im2 = np.interp(imtl + delta_imtl, hc[:, 0], hc[:, 1])  # lambda_(im+delta)
+    delta_lambda = lambda_im1 - lambda_im2
+    df["P(m|X=x)"] = (df["P(m|X>x)"] * lambda_im1
+                      - df["P(m|X>x)"] * lambda_im2) / delta_lambda
+    return df
+
+
+def get_disagg_from_iml_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
+                                  traditional=True, occurence=False, hcurves=None):
+    """Read a single-IML (``iml_disagg``) disaggregation datastore.
+
+    Returns ``dict[site_id][imt] -> pd.DataFrame`` for the one target IML of the
+    run. Reuses the POE-based building blocks (:func:`get_bins`,
+    :func:`_build_slice`, :func:`_disagg_array_to_df`,
+    :func:`_get_traditional_disagg`) but takes the poe axis at index 0 (there is a
+    single level) and reads the target IML from :func:`get_iml_disagg_targets`
+    rather than from a hazard map.
+
+    For ``occurence=True`` pass ``hcurves`` = ``hcs[site_id][imt][stat] ->
+    (n_iml, 2)`` full-resolution hazard curves (``[IML, MAFE]``) matching this
+    run's source model; the ``"mean"`` stat is used for the slope.
+    """
+    investigation_time = dstore["oqparam"].investigation_time
+    targets = get_iml_disagg_targets(dstore)
+    disagg_data = dstore["disagg-stats"][disagg_type]
+    shape_descr = disagg_data.attrs["shape_descr"]
+    disagg_bins = get_bins(dstore, disagg_type)
+
+    n_poe = disagg_data.shape[len(disagg_data.shape) - 2]
+    if n_poe != 1:
+        raise ValueError(
+            f"expected a single intensity level for an iml_disagg run, "
+            f"found {n_poe} on the poe axis")
+
+    site_disaggs = {}
+    for site_i in range(disagg_data.shape[0]):
+        imt_disagg = {}
+        for imt_i, imt in enumerate(disagg_bins["imt"]):
+            imtl = targets[imt]
+            disagg_slice = _build_slice(site_i, 0, imt_i, shape_descr)
+            df = _disagg_array_to_df(disagg_data[disagg_slice],
+                                     disagg_type, disagg_bins)
+            if occurence:
+                if hcurves is None:
+                    raise ValueError(
+                        "occurence=True requires `hcurves` for the hazard-curve "
+                        "slope (the iml_disagg datastore has a single level)")
+                hc = np.asarray(hcurves[site_i][imt]["mean"])
+                df = _get_occurence_disagg_from_hc(
+                    df, hc, imtl, investigation_time)
+            elif traditional:
+                df = _get_traditional_disagg(df, investigation_time)
+            imt_disagg[imt] = df
+        site_disaggs[site_i] = imt_disagg
+
+    return site_disaggs
+
+
+def collate_disagg_by_iml(calc_ids, imls, disagg_type="TRT_Mag_Dist_Eps",
+                          traditional=True, occurence=True, hcurves=None,
+                          reader=None):
+    """Collate the single-IML disaggregations of one ``(IM, eps)`` pair into a
+    flat, un-grouped dict keyed by site index.
+
+    ``return[site_id][imt][iml] -> pd.DataFrame``, where ``iml`` is the target
+    level in g keyed as ``float`` at 6 significant figures (stable across the
+    full-precision floats OpenQuake round-trips).
+
+    Parameters
+    ----------
+    calc_ids, imls : parallel ordered sequences of OpenQuake calc ids and their
+        target IMLs (one per level) for a single ``(IM, eps)`` pair.
+    hcurves : ``hcs[site_id][imt][stat]`` hazard curves matching the pair, passed
+        through for the occurrence slope when ``occurence=True``.
+    reader : datastore opener; defaults to
+        ``openquake.commonlib.datastore.read``.
+    """
+    if reader is None:
+        from openquake.commonlib.datastore import read as reader
+
+    out = {}
+    for calc_id, iml in zip(calc_ids, imls):
+        iml_key = float(f"{float(iml):.6g}")
+        dstore = reader(calc_id)
+        site_disagg = get_disagg_from_iml_datastore(
+            dstore, disagg_type, traditional, occurence, hcurves)
+        for site_i, imt_dict in site_disagg.items():
+            out.setdefault(site_i, {})
+            for imt, df in imt_dict.items():
+                out[site_i].setdefault(imt, {})[iml_key] = df
+    return out
+
+
+def _disagg_summary_stats(df):
+    """Per-DataFrame TRT proportions (``"<TRT> [%]"``) plus PoE-weighted
+    ``Mag_mean`` / ``Dist_mean``. Mirrors ``hazard._get_disagg_stats`` (kept here
+    to avoid a circular import, as ``hazard`` imports from ``oqhelpers``).
+    """
+    trt_proportions = df.groupby("TRT")["P(m|X>x)"].sum()
+    stats = {f"{i} [%]": np.round(trt_proportions.loc[i] * 100, 2)
+             for i in trt_proportions.index}
+    stats["Mag_mean"] = round((df["Mag"] * df["P(m|X>x)"]).sum(), 2)
+    stats["Dist_mean"] = round((df["Dist"] * df["P(m|X>x)"]).sum(), 2)
+    return stats
+
+
+def get_iml_disagg_stats(disagg_data, site_metadata, geodf=False):
+    """Flat disagg-stats DataFrame for one ``(IM, eps)`` pair, one row per
+    ``(site, imt, iml)``.
+
+    Columns: ``site_id, lat, lon, seismicity, region, imt, iml, imtl`` (here
+    ``imtl == iml``, the target level in g) plus the per-TRT ``"<TRT> [%]"``
+    proportions and ``Mag_mean`` / ``Dist_mean`` from :func:`_disagg_summary_stats`.
+    """
+    all_stats = []
+    for site_id, imt_dict in disagg_data.items():
+        for imt, iml_dict in imt_dict.items():
+            for iml, df in iml_dict.items():
+                row = {"site_id": site_id,
+                       "lat": site_metadata.loc[site_id, "lat"],
+                       "lon": site_metadata.loc[site_id, "lon"],
+                       "seismicity": site_metadata.loc[site_id, "seismicity"],
+                       "region": site_metadata.loc[site_id, "region"],
+                       "imt": imt,
+                       "iml": iml,
+                       "imtl": iml}
+                all_stats.append(row | _disagg_summary_stats(df))
+
+    df = pd.DataFrame.from_records(all_stats)
+    if geodf:
+        import geopandas as gpd
+        df = gpd.GeoDataFrame(
+            df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326")
+    return df
+
+
+def assert_shared_provenance(disagg_manifest, psha_manifest, im, eps,
+                             keys=("gmpe_lt", "ssc_lt", "site_model",
+                                   "source_models_digest")):
+    """Assert that the PSHA calculation supplying the hazard curves for
+    ``(im, eps)`` shares source-model provenance with the disagg runs.
+
+    The occurrence slope is taken from the PSHA hazard curves, so those curves
+    must come from the same source model / logic tree / site model as the disagg
+    calculations. Compares the input hashes of ``AvgSA_{im}_psha_eps{eps}``
+    against every ``AvgSA_{im}_disagg_eps{eps}_iml*`` entry and raises on any
+    mismatch. ``im`` is e.g. ``"03"``; ``eps`` is e.g. ``3``.
+    """
+    psha_name = f"AvgSA_{im}_psha_eps{eps}"
+    if psha_name not in psha_manifest:
+        raise KeyError(f"{psha_name} not in the PSHA manifest")
+    psha_inputs = psha_manifest[psha_name]["inputs"]
+
+    prefix = f"AvgSA_{im}_disagg_eps{eps}_iml"
+    disagg_names = [k for k in disagg_manifest if k.startswith(prefix)]
+    if not disagg_names:
+        raise KeyError(f"no disagg manifest entries matching {prefix}*")
+
+    for name in disagg_names:
+        di = disagg_manifest[name]["inputs"]
+        for key in keys:
+            dh = di.get(key, {}).get("hash")
+            ph = psha_inputs.get(key, {}).get("hash")
+            if dh != ph:
+                raise ValueError(
+                    f"provenance mismatch between {name} and {psha_name} on "
+                    f"'{key}': disagg [{dh}] != psha [{ph}]. The hazard curves "
+                    f"cannot supply the occurrence slope for this pair.")
+    return True
+
+
 def parse_value(val_str):
     """Converts string values to appropriate Python types."""
     val_str = val_str.strip()

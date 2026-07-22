@@ -58,13 +58,6 @@ def setup_AvgSA03_gcim_gm_selection(weight_rsd595=0.25):
     selection_imts: list[IMT] = nonSA_imts[1:] + SA_imts    # not AvgSA but the others (PGA and RSD595)
     nonSA_imt_strs: list[str] = [im.string for im in nonSA_imts] # strings match the correlation matrix
 
-    # weights of the IMs  -> assumed weights
-    # remaining_weight = 1 - (weight_rsd595)
-    # n_other_ims = len([imt for imt in selection_imts if imt.name not in ["RSD595"]])
-    # imt_weights = np.array([remaining_weight / n_other_ims if imt.name not in ["RSD595"] 
-    #                         else weight_rsd595 for imt in selection_imts])
-    # imt_weights /= imt_weights.sum()
-
     imt_weights = _im_weights(selection_imts, {"RSD595": weight_rsd595})
 
     return _set_up_selection(conditioning_imt, selection_imts, imt_weights, 
