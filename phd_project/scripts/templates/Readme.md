@@ -63,17 +63,41 @@ follow two rules (stated in each template's own docstring):
 
 These are not analyses on their own — they are the pieces the run/config pairs import.
 
-### `template_nlcbf_structural_model.py` → `structural_model.py`
-Builds a full (multi-storey) nonlinear concentrically-braced-frame model from a design
-`.json`. **Must** expose:
+### The full CBF model → `config_structural_model.py` + `initialise_model.py`
+A full (multi-storey) nonlinear concentrically-braced-frame model is described by **two**
+files in the model folder (split for single-source-of-truth; the old single-file
+`template_nlcbf_structural_model.py` is deprecated — see below):
 
-- `design_json: str` — the name of the design file (in the same folder), and
-- `model_init` — a no-argument callable that builds the model in OpenSees and returns
-  its recorders.
+- **`template_config_structural_model.py` → `config_structural_model.py`** — *what the model
+  is*. Exposes `design_json` (name of the design file in the folder), `structure_data`, the
+  OpenSees model config(s) `ops_model_config` (+ `ops_model_config_no_G`), `damping_config`,
+  `damping_model`, and a `build_model(structure_data, **model_config)` wrapper. No recorder
+  logic, no `model_init`.
+- **`template_initialise_model_nlcbf_nltha.py`** (full recorders) or
+  **`template_initialise_model_nlcbf_nlthareduced.py`** (reduced recorders) **→
+  `initialise_model.py`** — *how one analysis is initialised*. Holds all recorder handling
+  (`recorder_config`, `generate_recorders`, `add_limit_state_recorders`) and exposes a single
+  zero-argument `model_init` returning `(recorders, collapse_recorders)`.
 
-`functools.partial` is the usual way to build `model_init`. It may also expose
-`damping_config` / `damping_model` for analyses that need them (NLTHA with updating
-damping).
+`initialise_model.py` imports the model config **by path** via
+`config_structural_model_file_name` (so that file can be renamed/swapped), and pins **which**
+named model config it uses via `model_config_name` (e.g. set it to `"ops_model_config_no_G"`
+for a no-gravity run — this replaces the removed `model_init_no_g`). It re-exports
+`damping_config` / `damping_model` so the injection-function factory still finds them.
+
+The file the config imports (`model_file_name`) is `initialise_model.py`; the **contract** it
+must satisfy is: expose `model_init`, `damping_config`, `damping_model`.
+
+**Full vs reduced recorders** is chosen by *which `initialise_model` template you copy*. The
+reduced variant subtracts every recorder not needed for collapse detection or the drift EDP
+(keeping storey drifts, storey-line displacements + accelerations, gusset forces and all
+limit-state / element-removal recorders), cutting the recorder pickles by ~97% for IDA/MSA.
+Its `add_limit_state_recorders` body is shared verbatim with the full template — **edit both
+if you change the recorder-construction logic**.
+
+> One model per Python process: `initialise_model.py` and its sibling config are imported by
+> file path (keyed by file stem), so do not import two different model folders in a single
+> process.
 
 ### `template_model_cbf_sdof.py` → `structural_model.py`
 The single-degree-of-freedom equivalent model — same `model_init` contract, but the
@@ -108,6 +132,14 @@ The IDA config selects its IM **by filename** through its `config_im_file` varia
 several `config_im_*.py` files can sit in one folder and each IDA config can point at a
 different one without editing import statements. Because the config passes `model_init` in,
 these files do not import `structural_model` themselves.
+
+### `deprecated/`
+Holds the superseded monolithic model templates — `template_nlcbf_structural_model.py` (full
+model + recorders in one file) and `template_nlcbf_structural_model_reduced_recorders.py` (its
+reduced-recorder copy). They are kept only for older notebooks that still call
+`copy_structural_model`; **for the full CBF model use the two-file
+`config_structural_model.py` + `initialise_model.py` set above** (via `copy_nlcbf_model`), not
+these.
 
 ---
 
@@ -451,18 +483,30 @@ copy_file(templates["run_ida_htf_per_record"], folder / "run_ida_htf_per_record.
 copy_file(templates["config_im_SA"],           folder / "config_im_SA.py")
 ```
 
-### `copy_structural_model(src, dst, design_json=None, ops_updates=None, recorder_updates=None, damping_updates=None)`
-Copies a `structural_model.py` and rewrites the `design_json` filename and any values in
-its `ops_model_config` / `recorder_config` / `damping_config` dicts. Supports in-place
-editing (src == dst).
+### `copy_nlcbf_model(templates, dst_folder, design_json, ops_updates=None, recorder_updates=None, damping_updates=None, reduced=True, model_config_name=None)`
+The current helper for the full CBF model. Writes **both** files into `dst_folder`:
+`config_structural_model.py` (edited with `design_json` + `ops_updates` + `damping_updates`)
+and `initialise_model.py` (from the full or reduced initialise_model template per `reduced`,
+edited with `recorder_updates`, e.g. `{"drift_limit": ...}`). Pass `model_config_name` to pin
+which model config initialise_model uses (e.g. `"ops_model_config_no_G"`). `templates` is the
+resolved `cfg["templates"]` dict (needs keys `config_structural_model`,
+`initialise_model_nltha`, `initialise_model_nltha_reduced`).
 
 ```python
-copy_structural_model(
-    templates["structural_model"], folder / "structural_model.py",
+copy_nlcbf_model(
+    cfg["templates"], folder,
     design_json="3s_cbf_dc2_10_out.json",
-    ops_updates={"mass": 205.3},
+    damping_updates={"n_modes": 1, "damping_ratio": 0.05},
+    recorder_updates={"drift_limit": 0.2},
+    reduced=True,
 )
 ```
+
+### `copy_structural_model(src, dst, design_json=None, ops_updates=None, recorder_updates=None, damping_updates=None)`
+Retained only for the **deprecated** single-file `structural_model.py` (see `deprecated/`).
+Copies one file and rewrites the `design_json` filename and any values in its
+`ops_model_config` / `recorder_config` / `damping_config` dicts. `copy_nlcbf_model` uses it
+internally to edit each of the two split files.
 
 ### `copy_analysis_config(src, dst, results_folder_name=None, update_config=None, **kwargs)`
 The workhorse for config files. It:

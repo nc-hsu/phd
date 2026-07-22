@@ -82,7 +82,9 @@ models:
 
 templates:
   root: "phd_project/scripts/templates"
-  structural_model: "phd_project/scripts/templates/template_nlcbf_structural_model.py"
+  config_structural_model: "phd_project/scripts/templates/template_config_structural_model.py"
+  initialise_model_nltha: "phd_project/scripts/templates/template_initialise_model_nlcbf_nltha.py"
+  initialise_model_nltha_reduced: "phd_project/scripts/templates/template_initialise_model_nlcbf_nlthareduced.py"
   run_pushover: "phd_project/scripts/templates/template_run_pushover.py"
   config_pushover: "phd_project/scripts/templates/template_config_pushover.py"
   run_cyclic_pushover: "phd_project/scripts/templates/template_run_cyclic_pushover.py"

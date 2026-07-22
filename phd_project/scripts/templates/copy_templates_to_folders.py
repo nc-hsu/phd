@@ -88,6 +88,65 @@ def copy_structural_model(
     dst_path.write_text(content, encoding='utf-8')
 
 
+def copy_nlcbf_model(
+    templates: Dict[str, Any],
+    dst_folder: str | Path,
+    design_json: str,
+    ops_updates: Dict[str, Any] | None = None,
+    recorder_updates: Dict[str, Any] | None = None,
+    damping_updates: Dict[str, Any] | None = None,
+    reduced: bool = True,
+    model_config_name: str | None = None,
+) -> None:
+    """Write the two-file nlcbf model into ``dst_folder``:
+
+    - ``config_structural_model.py`` (design file, ops config, damping), and
+    - ``initialise_model.py`` (recorder handling + ``model_init``), sourced from the
+      full or reduced initialise_model template depending on ``reduced``.
+
+    ``ops_updates`` / ``damping_updates`` / ``design_json`` are applied to
+    ``config_structural_model.py``; ``recorder_updates`` (e.g. ``{"drift_limit": ...}``)
+    are applied to ``initialise_model.py`` where ``recorder_config`` now lives. Set
+    ``model_config_name`` to pin which named model config initialise_model uses (e.g.
+    ``"ops_model_config_no_G"``); leave it None to keep the template default.
+
+    ``templates`` is the resolved ``cfg["templates"]`` dict and must contain the keys
+    ``config_structural_model``, ``initialise_model_nltha`` and
+    ``initialise_model_nltha_reduced``.
+    """
+    dst_folder = Path(dst_folder)
+    dst_folder.mkdir(parents=True, exist_ok=True)
+
+    # 1. structural-model config: design file + ops config + damping config
+    copy_structural_model(
+        templates["config_structural_model"],
+        dst_folder / "config_structural_model.py",
+        design_json=design_json,
+        ops_updates=ops_updates,
+        damping_updates=damping_updates,
+    )
+
+    # 2. initialise_model: recorder handling + model_init (full or reduced recorders)
+    init_key = "initialise_model_nltha_reduced" if reduced else "initialise_model_nltha"
+    init_dst = dst_folder / "initialise_model.py"
+    copy_structural_model(
+        templates[init_key],
+        init_dst,
+        recorder_updates=recorder_updates,
+    )
+
+    # optionally pin which named model config initialise_model uses
+    if model_config_name is not None:
+        content = init_dst.read_text(encoding="utf-8")
+        content = re.sub(
+            r'(^model_config_name\s*=\s*)(.*?)(?=\n)',
+            lambda m: f'{m.group(1)}"{model_config_name}"',
+            content,
+            flags=re.MULTILINE,
+        )
+        init_dst.write_text(content, encoding="utf-8")
+
+
 # def copy_pushover_config(
 #     src: str | Path,
 #     dst: str | Path,
