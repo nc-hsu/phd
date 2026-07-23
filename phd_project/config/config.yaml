@@ -39,14 +39,19 @@ proc_data:
   gcim_dists: "data_processed/05_gcim_distributions"
   gm_selection: "data_processed/06_gm_selection"
   gm_records: "data_processed/07_gm_records"
+  # Building Datasets
   dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
   dc2_scA_reference_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_scA_reference_cbfs.pickle"
   site_specific_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_site_specific_cbfs.pickle"
+  # Fragility Curves
+  ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
+  dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
+  # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
   sdof_optimisation: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/optimisation_results" 
   sdof_fragility_curves: data_processed/09_sdof_fitting/fragility_curves
-  reference_structure_fragility_curves: data_processed/09_reference_structure_fragility_curves
+  
   approx_sdof_systems: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/approx_sdof_systems"
   site_specific_sdofs: "data_processed/10_site_specific_sdofs"
   site_specific_3s_mdof_mechanisms: "data_processed/10_site_specific_sdofs/3s_mdof_mechanisms.json"
