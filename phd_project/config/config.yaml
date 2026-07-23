@@ -20,6 +20,14 @@ proc_data:
   root: "data_processed"
   site_selection: "data_processed/01_site_selection"
   site_hazard: "data_processed/03_site_hazard"
+  # Site hazard curves written by nb 004 (flat: hcs[site_id]["AvgSA"][stat] -> (n_iml, 2),
+  # col 0 = IML [g], col 1 = MAFE). One file per (IM, truncation level).
+  AvgSA_03_hazard_curves_3sig: "data_processed/03_site_hazard/AvgSA_03_hazard_curves_60sites_3sig.pickle"
+  AvgSA_03_hazard_curves_4sig: "data_processed/03_site_hazard/AvgSA_03_hazard_curves_60sites_4sig.pickle"
+  AvgSA_03_hazard_curves_5sig: "data_processed/03_site_hazard/AvgSA_03_hazard_curves_60sites_5sig.pickle"
+  AvgSA_06_hazard_curves_3sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_3sig.pickle"
+  AvgSA_06_hazard_curves_4sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_4sig.pickle"
+  AvgSA_06_hazard_curves_5sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_5sig.pickle"
   # Target IMLs for the iml-based disaggregation, chosen in notebook 017.
   # The AvgSA 0-6 file does not exist yet; notebook 020 skips any IM whose file
   # is missing rather than failing.
@@ -92,7 +100,9 @@ models:
   casestudy_designs_ec8_gen2: "casestudy_structures/concentrically_braced_frames/ec8_gen2"
   casestudy_designs_dc2_scA_reference: "casestudy_structures/concentrically_braced_frames/ec8_gen2_scA_reference"
   casestudy_designs_site_specific: "casestudy_structures/concentrically_braced_frames/ec8_gen2_site_specific_designs"
-  
+  # Per-site design summary CSV written by nb 011 (cols: tag, Vb_coeff, ...; site_id derived from tag)
+  site_specific_designs_summary: "casestudy_structures/concentrically_braced_frames/ec8_gen2_site_specific_designs/site_designs_summary.csv"
+
   examples: "calculation_examples"
 
 templates:

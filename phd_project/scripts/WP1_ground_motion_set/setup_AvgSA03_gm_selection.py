@@ -122,6 +122,8 @@ def _set_up_selection(
             continue  # site not listed in the subset JSON -> skip
         iml_keys = list(disagg_data[site][imt].keys())
         for iml in wanted:
+            if iml is None:
+                continue  # upper-stripe placeholder (iml above the hazard ceiling) -> skip
             poe = get_poe_from_disaggstats(disagg_stats, site, imt, iml)
             key = next((k for k in iml_keys if np.isclose(k, iml)), None)
             if poe is None or key is None:
