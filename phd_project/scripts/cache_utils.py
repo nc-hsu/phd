@@ -163,8 +163,8 @@ def load_or_compute(
     - artifact present but **no manifest** → unmanaged/legacy artifact whose
       provenance cannot be verified → compute and adopt it (writes a manifest).
     - artifact + manifest present and inputs **match** → load and return.
-    - artifact + manifest present and inputs **differ** → raise
-      :class:`StaleCacheError` naming every changed input.
+    - artifact + manifest present and inputs **differ** → print the artifact
+      name and location, then recompute and overwrite it.
     """
     artifact_fp = Path(artifact_fp)
     manifest_fp = _manifest_path(artifact_fp)
@@ -195,11 +195,10 @@ def load_or_compute(
 
     changes = _diff_inputs(cached_inputs, fp_dict)
     if changes:
-        raise StaleCacheError(
-            f"Cached artifact '{artifact_fp.name}' is stale - inputs changed since it "
-            f"was written:\n" + "\n".join(changes)
-            + f"\n\nRe-run with force_recompute=True to overwrite '{artifact_fp.name}'."
-        )
+        # Inputs changed since the cache was written. Rather than refusing to
+        # proceed, recompute automatically and overwrite the stale artifact.
+        print(f"{artifact_fp.name} ({artifact_fp.parent})")
+        return _compute_and_save()
 
     print(f"[cache] '{artifact_fp.name}' loaded (inputs match).")
     with open(artifact_fp, "rb") as f:

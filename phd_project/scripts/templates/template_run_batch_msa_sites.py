@@ -1,3 +1,4 @@
+import argparse
 import sys
 import subprocess
 import time
@@ -31,6 +32,7 @@ sites_root = Path(r"E:/msa_sites")
 # listed.
 site_names: list[str] = []
 max_coordinators = 10          # how many site coordinators / windows at once
+window_name_index = 0         # the number of folder to go up in directory to get to unique folder name. e.g. 0 = the site folder itself, 1 = its parent
 site_script_name = "run_msa_site.py"
 site_config_name = "config_msa.py"
 # --------------------------------------------------------------------------
@@ -75,14 +77,14 @@ def resolve_sites(root: Path, names: list[str]) -> list[Path]:
     return sites
 
 
-def launch_site(site_folder: Path):
+def launch_site(site_folder: Path, window_name_index: int):
     """Launch a site's MSA coordinator in its own minimised console window."""
     SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
 
     script_path = site_folder / site_script_name
     config_path = site_folder / site_config_name
-    window_title = site_folder.name
+    window_title = config_path.parents[window_name_index].name
 
     py_code = (
         f"import importlib.util; "
@@ -111,7 +113,8 @@ def launch_site(site_folder: Path):
     return proc, window_title
 
 
-def main():
+def main(max_coordinators: int = max_coordinators,
+         window_name_index: int = window_name_index):
     sites = resolve_sites(sites_root, site_names)
     if not sites:
         raise FileNotFoundError(
@@ -142,7 +145,7 @@ def main():
             reap()
             time.sleep(0.5)
 
-        proc, title = launch_site(site_folder)
+        proc, title = launch_site(site_folder, window_name_index)
         running.append({"proc": proc, "title": title,
                         "start_time": datetime.now()})
         pbar.write(f"launched site: {title} PID={proc.pid}")
@@ -156,4 +159,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Run MSA for several sites at once, sharing one machine-global core cap.")
+    parser.add_argument("--max-coordinators", type=int, default=max_coordinators,
+                        help="how many site coordinators (windows) to run at once")
+    parser.add_argument("--window-name-index", type=int, default=window_name_index,
+                            help="the index of the folder in config.parents to be used as coordinator window title. 0 corresponds to the site folder itself")
+    args = parser.parse_args()
+
+    main(max_coordinators=args.max_coordinators,
+         window_name_index=args.window_name_index)
