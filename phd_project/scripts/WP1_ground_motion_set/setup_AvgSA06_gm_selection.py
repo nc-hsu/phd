@@ -151,7 +151,7 @@ def _set_up_selection(
             print(f"    site {site}: iml {iml}")
 
     # load the site file
-    site_model = pd.read_csv(cfg["hazard_models"]["eshm20_AvgSA_site_model_all"])
+    site_model = pd.read_csv(cfg["hazard_models"]["eshm20_wp1_site_model"])
 
     # load the flatfiles
     flatfile_folder = cfg["proc_data"]["corr_model"] / "reverse" / "flatfiles"
