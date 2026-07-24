@@ -246,7 +246,7 @@ def test_preliminary_slice_matches_golden():
             "gcim_file": cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle",
             "disagg_data_file": cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
             "disagg_stats_file": cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"],
-            "site_model_file": cfg["hazard_models"]["eshm20_AvgSA_site_model_all"],
+            "site_model_file": cfg["hazard_models"]["eshm20_wp1_site_model"],
             "rng_seed": 1,
         }
         fp = fingerprint(**base, stage="preliminary", only=tuple(sorted(keys)),

@@ -301,7 +301,7 @@ def main(argv=None):
     gm_selection_dir = args.gm_selection_dir or cfg["proc_data"]["gm_selection"]
     ngasub_folder = args.ngasub_folder or cfg["raw_data"]["ngasub_folder"]
     esm_folder = args.esm_folder or cfg["raw_data"]["esm_hdf5_folder"]
-    site_model = args.site_model or cfg["hazard_models"]["eshm20_AvgSA_site_model_all"]
+    site_model = args.site_model or cfg["hazard_models"]["eshm20_wp1_site_model"]
     out_dir = args.out_dir or gm_selection_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
