@@ -80,12 +80,11 @@ hazard_models:
   eshm20: "hazard_models/eshm20"
   eshm20_site_model: "hazard_models/eshm20/original/eshm20_site_model_v06d.csv"
   eshm20_AvgSA: "hazard_models/eshm20/regional_AvgSA/"
-  eshm20_AvgSA_site_model_all: "hazard_models/eshm20/regional_AvgSA/site_model_casestudy_sites.csv"
   eshm20_AvgSA_03_jobfile: "hazard_models/eshm20/regional_AvgSA/config_eshm20_AvgSA_0to3.ini"
   eshm20_AvgSA_03_median_lt: "hazard_models/eshm20/regional_AvgSA/gmpe_logic_tree_AvgSA_0to3_median_branch.xml"
   eshm20_AvgSA_06_median_lt: "hazard_models/eshm20/regional_AvgSA/gmpe_logic_tree_AvgSA_0to6_median_branch.xml"
   eshm20_wp1: "hazard_models/eshm20/wp1"
-  eshm20_wp1_site_model: "hazard_models/eshm20/wp1/site_model_all_sites.csv"
+  eshm20_wp1_site_model: "hazard_models/eshm20/wp1/site_model_casestudy_sites.csv"
   eshm20_wp1_psha_manifest: "hazard_models/eshm20/wp1/psha_manifest.json"
   eshm20_wp1_disagg_manifest: "hazard_models/eshm20/wp1/disagg_manifest.json"
 
