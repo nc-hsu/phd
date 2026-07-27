@@ -54,6 +54,9 @@ proc_data:
   # Fragility Curves
   ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
   dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
+  # Site case-study converted fragilities (nb 014)
+  wp1_casestudy_sites_fragility_curves: data_processed/09_structure_fragility_curves/wp1_casestudy_sites
+  wp1_casestudy_sites_collapse_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_specific_collapsefragility_summary.csv
   # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
