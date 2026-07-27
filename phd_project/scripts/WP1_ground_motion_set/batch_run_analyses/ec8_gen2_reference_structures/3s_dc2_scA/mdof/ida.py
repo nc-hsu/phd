@@ -87,6 +87,7 @@ def launch_building(runner: Path, config: Path, show_windows: bool, window_name_
     SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
     window_title = config.parents[window_name_index].name
+
     py_code = (
         f"import importlib.util; "
         f"path = r'''{runner}'''; "
