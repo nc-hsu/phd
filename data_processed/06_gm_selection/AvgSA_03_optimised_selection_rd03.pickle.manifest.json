@@ -5,16 +5,16 @@
       "summary": "file ESM-NGAsub_combined.csv (119815913 bytes)"
     },
     "gcim_file": {
-      "hash": "29ce52c52d13e98e7349d0359c4c7558833a45029f0f3f0508a61a57c80ac746",
-      "summary": "file gcim_dist_AvgSA_06.pickle (47201891 bytes)"
+      "hash": "06fe3436988d5f9b1bcda3f636efc7f74175d6a6f4cd7c18de4bf3f7470c3c20",
+      "summary": "file gcim_dist_AvgSA_03.pickle (49367083 bytes)"
     },
     "disagg_data_file": {
-      "hash": "7a2f2ca15453898ad1b4f16ac61ac0fa4e11d3b27189f266612d0a93bc50c582",
-      "summary": "file AvgSA_06_disagg_data_wp1sites_eps4.pickle (1952295285 bytes)"
+      "hash": "eca32a936eaadc335d941369ea97cb14bd3fc317e8a9267df93ff20544322e5b",
+      "summary": "file AvgSA_03_disagg_data_wp1sites_eps4.pickle (1952295285 bytes)"
     },
     "disagg_stats_file": {
-      "hash": "62a29e05ae065d60bc071bd51db2214bcee727826d45fea4f9d2910eb91b3bc6",
-      "summary": "file AvgSA_06_disagg_stats_wp1sites_eps4.pickle (77085 bytes)"
+      "hash": "a76f32ce3fd0a160987414cc71ee4d6c77c590f7d21e0968f45748883ccbdfd5",
+      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (84741 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -25,11 +25,11 @@
       "summary": "int=1"
     },
     "stage": {
-      "hash": "c96fda6241021135ef10e807e91b7396e4ad11bc5724c79ef3296cf589bfd81f",
-      "summary": "str 'optimise_r2'"
+      "hash": "a8be4ccb633b2d7dc4c7eface90d57cb1ef10744d3ffdda16ad47ba527660003",
+      "summary": "str 'optimise_r3'"
     },
     "only": {
-      "hash": "d9023b0758a6a76da093a88e69e64fa41239c3ee5b4fa4cb96f5114c3076ea5b",
+      "hash": "76a41cae6557e13869a0cf41cd22711a581a80388c0747f8db637cbb5f9339c5",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -45,16 +45,16 @@
       "summary": "float=0.05"
     },
     "usable_T": {
-      "hash": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683",
-      "summary": "int=6"
+      "hash": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+      "summary": "int=3"
     },
     "max_n_recs": {
       "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
       "summary": "int=5"
     },
     "m_bound_model": {
-      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
-      "summary": "str 'tarbali_and_bradley_2016'"
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
     },
     "d_bound_model": {
       "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
@@ -69,11 +69,11 @@
       "summary": "bool=True"
     },
     "conditioning_imt": {
-      "hash": "932074d0c24108d1d7235efa9e47875c99cd8e268795e60b12138c6eb82279d4",
-      "summary": "str 'AvgSA([0, 6])'"
+      "hash": "99676dde8afa92b2f25dc1bfcdbd66d5f0d70177c48f99d1e10c96ae6e25b145",
+      "summary": "str 'AvgSA([0, 3])'"
     },
     "selection_imts": {
-      "hash": "8331aa6471953981eee32c7b6c6456ea697a5548652f052fc743a2e45a22c345",
+      "hash": "9cab810de361eb48368b3ec6774475ff25f1c818f862a48fd915a2d411fdc5a6",
       "summary": "tuple"
     },
     "imt_weights": {
@@ -81,8 +81,8 @@
       "summary": "ndarray shape=(22,) dtype=float64"
     },
     "force_optimisation": {
-      "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
-      "summary": "bool=True"
+      "hash": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe",
+      "summary": "bool=False"
     },
     "pickagm_version": {
       "hash": "0.1.0",
@@ -90,8 +90,8 @@
     }
   },
   "_meta": {
-    "artifact": "AvgSA_06_optimised_selection_rd02.pickle",
+    "artifact": "AvgSA_03_optimised_selection_rd03.pickle",
     "git_commit": "f8fdd9f",
-    "written_at": "2026-07-24T13:13:23.573162+00:00"
+    "written_at": "2026-07-24T10:48:55.270671+00:00"
   }
 }
