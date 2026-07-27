@@ -25,27 +25,11 @@
       "summary": "int=1"
     },
     "stage": {
-      "hash": "2ffbf163994c7169259cea52b450412a0c80b78642c5ed6de3dc03d7a9b5523e",
-      "summary": "str 'final_ensembles'"
+      "hash": "0fc4d743edf39efe3d364129da1cd47b03bafe17dc1299b00f0deab0b7706692",
+      "summary": "str 'optimise_r4'"
     },
-    "round_unbounded": {
-      "hash": "68c2b73a4f82882179e228eb5b2a12203050cd51d17335fa2116e345d4e421b0",
-      "summary": "tuple"
-    },
-    "force_optimisation": {
-      "hash": "c9442b5089d7c46d36c338beff4bd19918951f448fec18b442aa5334a8eeffc2",
-      "summary": "tuple"
-    },
-    "shuffle": {
-      "hash": "ffb7f5bc635d80837292088a868cd3232dd6da440ef0a958439409c5f153e912",
-      "summary": "tuple"
-    },
-    "n_shuffles": {
-      "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
-      "summary": "int=5"
-    },
-    "shuffle_rng_seeds": {
-      "hash": "362517922af3f1799a085c924ff34b085caab059f43634b7bde76bca5c2a2169",
+    "only": {
+      "hash": "2b95a5ea516e17df183517e7feef182abe1738bbc37d3fa8ce563018fe6a5f2d",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -69,16 +53,16 @@
       "summary": "int=5"
     },
     "m_bound_model": {
-      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
-      "summary": "str 'tarbali_and_bradley_2016'"
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
     },
     "d_bound_model": {
-      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
-      "summary": "str 'tarbali_and_bradley_2016'"
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
     },
     "vs30_bound_model": {
-      "hash": "fec8c9672a8ffc23e726ea732577fd1a4cff66c1785b00c54fb85737760b9b25",
-      "summary": "str 'tarbali_and_bradley_2016'"
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
     },
     "occurence": {
       "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
@@ -96,14 +80,30 @@
       "hash": "d95377687d4e61c9a39b4da98251c9da973ebf960282959ed4a3fd76f35fce0f",
       "summary": "ndarray shape=(22,) dtype=float64"
     },
+    "force_optimisation": {
+      "hash": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe",
+      "summary": "bool=False"
+    },
+    "shuffle": {
+      "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
+      "summary": "bool=True"
+    },
+    "n_shuffles": {
+      "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "summary": "int=5"
+    },
+    "rng_seeds": {
+      "hash": "362517922af3f1799a085c924ff34b085caab059f43634b7bde76bca5c2a2169",
+      "summary": "tuple"
+    },
     "pickagm_version": {
       "hash": "0.1.0",
       "summary": "pickagm version"
     }
   },
   "_meta": {
-    "artifact": "AvgSA_06_final_ensembles.pickle",
+    "artifact": "AvgSA_06_optimised_selection_rd04.pickle",
     "git_commit": "c952334",
-    "written_at": "2026-07-27T11:55:16.197344+00:00"
+    "written_at": "2026-07-27T11:55:12.852181+00:00"
   }
 }
