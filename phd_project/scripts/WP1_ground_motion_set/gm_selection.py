@@ -457,32 +457,15 @@ def optimise_ground_motion_ensembles_for_sites(
             optimised_ensembles[(site, poe)] = None
             continue
 
-        cond_iml = disagg_stats[(disagg_stats["site_id"] == site) &
-                                (disagg_stats["poe"] == poe)].values[0]
         disagg_dist = site_poe_disaggs[(site, poe)]
         target_cdfs = gcim_dists[(site, poe)]["cdfs"]
-        ks_bounds = ensemble_ks_bounds(
-            target_cdfs, 
-            basic_selection_ctx["n_samples"],
-            basic_selection_ctx["p_value"])
-        
+
         site_params = site_model.loc[site,:].to_dict()
         site_selection_ctx = basic_selection_ctx.copy()
         site_selection_ctx["site_params"] = site_params
-        
-        im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
 
-        obj_func_kwargs = {
-            "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]]) 
-                                    for k, ksb in ks_bounds.items() if k in im_strings],
-            "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]]) 
-                                    for k, ksb in ks_bounds.items() if k in im_strings],
-            "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]]) 
-                                    for k, ksb in ks_bounds.items() if k in im_strings],
-            "n_recs": basic_selection_ctx["n_samples"],
-            "im_weights": basic_selection_ctx["imt_weights"],
-            "penalty_constant": penalty_constant
-        }
+        obj_func_kwargs = _optimise_obj_kwargs(
+            site, poe, gcim_dists, basic_selection_ctx, penalty_constant)
 
         # do the optimisation
         cond_iml = disagg_stats[(disagg_stats["site_id"] == site) &
@@ -1667,7 +1650,8 @@ def preliminary_record_selection(
         penalty_constant: float=10,
         input_fingerprint: dict|None=None,
         force_recompute: bool=False,
-        desc: str|None=None):
+        desc: str|None=None,
+        quiet: bool=False):
 
     """
     performs the preliminary record selection step of the workflow.
@@ -1772,13 +1756,14 @@ def preliminary_record_selection(
         elif not ensemble["ks_passed"]:
             prelim_ensembles_not_passing.append((site, poe))
 
-    if len(prelim_ensembles_not_passing) == 0:
-        print(f"OK! - Preliminary ensembles pass for all combinations of site and poe")
-    else:
-        print(f"Sub-Optimal! - Preliminary ensembles do not pass for {len(prelim_ensembles_not_passing)} combinations of site and poe")
+    if not quiet:
+        if len(prelim_ensembles_not_passing) == 0:
+            print(f"OK! - Preliminary ensembles pass for all combinations of site and poe")
+        else:
+            print(f"Sub-Optimal! - Preliminary ensembles do not pass for {len(prelim_ensembles_not_passing)} combinations of site and poe")
 
-    if no_preliminary_ensembles:
-        print(f"No preliminary ensembles found for {len(no_preliminary_ensembles)} combinations of site and poe")
+        if no_preliminary_ensembles:
+            print(f"No preliminary ensembles found for {len(no_preliminary_ensembles)} combinations of site and poe")
 
     return preliminary_ensembles, prelim_ensembles_not_passing, no_preliminary_ensembles, candidate_ensembles
 
@@ -1799,15 +1784,27 @@ def optimise_record_selection(
         load_rs_if_exists: bool=False,
         penalty_constant: float=10,
         input_fingerprint: dict|None=None,
-        force_recompute: bool=False):
+        force_recompute: bool=False,
+        n_shuffles: int=1,
+        rng_seeds: list[int]|None=None,
+        quiet: bool=False):
 
     def _compute_optimised():
         # do the ensemble optimisation
-        optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites(
-            preliminary_ensembles, site_poe_disaggs, disagg_stats,
-            gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise,
-            penalty_constant=penalty_constant, shuffle=shuffle,
-            rng_seed=rng_seed, descr=description)
+        if shuffle and n_shuffles > 1:
+            # re-optimise over several shuffled DB orderings and keep the
+            # best-scoring ensemble per (site, poe) (used by the round-4 retry).
+            seeds = rng_seeds if rng_seeds is not None else list(range(1, n_shuffles + 1))
+            optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites_with_shuffles(
+                n_shuffles, seeds, preliminary_ensembles, site_poe_disaggs,
+                disagg_stats, gcim_dists, gm_db, basic_selection_ctx, site_model,
+                only_optimise)
+        else:
+            optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites(
+                preliminary_ensembles, site_poe_disaggs, disagg_stats,
+                gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise,
+                penalty_constant=penalty_constant, shuffle=shuffle,
+                rng_seed=rng_seed, descr=description)
         return optimised_ensembles
 
     if input_fingerprint is not None and optimised_selection_fp is not None:
@@ -1844,10 +1841,11 @@ def optimise_record_selection(
         elif not ensemble["ks_passed"]:
             optim_ensembles_not_passing.append((site, poe))
 
-    if len(optim_ensembles_not_passing) == 0:
-        print(f"OK! - Optimised ensembles pass for all combinations of site and poe")
-    else:
-        print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and poe")
+    if not quiet:
+        if len(optim_ensembles_not_passing) == 0:
+            print(f"OK! - Optimised ensembles pass for all combinations of site and poe")
+        else:
+            print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and poe")
 
     return optimised_ensembles, optim_ensembles_not_passing
 
@@ -1909,6 +1907,51 @@ def _selection_ctx_fingerprint_inputs(ctx: dict) -> dict:
     }
 
 
+def _optimise_obj_kwargs(site, poe, gcim_dists, basic_selection_ctx,
+                         penalty_constant: float = 10) -> dict:
+    """Build the ``weighted_ks_statistic_and_L2norm_penalty`` kwargs for one
+    ``(site, poe)``.
+
+    Shared by :func:`optimise_ground_motion_ensembles_for_sites` and the engine's
+    keep-best scoring (:func:`_score_ensemble`) so both evaluate an *identical*
+    objective — otherwise the round-4 keep/replace comparison would be meaningless.
+    """
+    target_cdfs = gcim_dists[(site, poe)]["cdfs"]
+    ks_bounds = ensemble_ks_bounds(
+        target_cdfs,
+        basic_selection_ctx["n_samples"],
+        basic_selection_ctx["p_value"])
+    im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
+    return {
+        "target_cdfs_list": [np.column_stack([np.log(ksb[1:, 0]), ksb[1:, 2]])
+                             for k, ksb in ks_bounds.items() if k in im_strings],
+        "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:, 0]), ksb[1:, 3]])
+                                 for k, ksb in ks_bounds.items() if k in im_strings],
+        "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:, 0]), ksb[1:, 1]])
+                                 for k, ksb in ks_bounds.items() if k in im_strings],
+        "n_recs": basic_selection_ctx["n_samples"],
+        "im_weights": basic_selection_ctx["imt_weights"],
+        "penalty_constant": penalty_constant,
+    }
+
+
+def _score_ensemble(ensemble, site, poe, gcim_dists, basic_selection_ctx) -> float:
+    """Objective score for an ensemble (lower is better); ``np.inf`` if missing.
+
+    Uses the same objective as the greedy optimiser so scores are directly
+    comparable across rounds for a given ``(site, poe)`` (the target CDFs, and
+    hence the objective, depend only on ``(site, poe)`` — not on the round's
+    causal-parameter bounds). Used to keep the better of the incumbent and the
+    shuffled round-4 result.
+    """
+    if ensemble is None:
+        return np.inf
+    kwargs = _optimise_obj_kwargs(site, poe, gcim_dists, basic_selection_ctx)
+    cond = basic_selection_ctx["conditioning_imt"].string
+    ims = np.log(ensemble["recs"]["ims_scaled"].drop(columns=cond).to_numpy())
+    return weighted_ks_statistic_and_L2norm_penalty(ims, **kwargs)
+
+
 def build_final_ensembles(
         site_poe_disaggs: dict,
         disagg_stats: dict,
@@ -1922,6 +1965,9 @@ def build_final_ensembles(
         output_fp: Path,
         round_unbounded: list[list[str]] = ([], ["d"], ["m", "d", "vs30"]),
         force_optimisation: list[bool] | None = None,
+        shuffle: list[bool] | None = None,
+        n_shuffles: int = 5,
+        shuffle_rng_seeds: list[int] | None = None,
         rng_seed: int = 1,
         force_recompute: bool = False):
     """Run a configurable N-round selection + optimisation pipeline.
@@ -1959,6 +2005,19 @@ def build_final_ensembles(
         after that round's selection (a site reselected into a passing state is
         left alone); ``True`` optimises the whole round work-set (passing +
         failing). ``None`` is treated as all ``False``.
+    shuffle : list[bool] | None
+        One bool per round (same length as ``round_unbounded``). ``True`` re-runs
+        that round's optimisation over ``n_shuffles`` shuffled database orderings
+        (via :func:`optimise_ground_motion_ensembles_for_sites_with_shuffles`)
+        and, per ``(site, poe)``, keeps the best of {the shuffled result, the
+        incumbent from earlier rounds} — replacing the incumbent only if the new
+        ensemble passes or scores strictly better. This is the round-4 retry that
+        tries to escape a bad greedy local optimum for the last stubborn sets.
+        ``None`` is treated as all ``False`` (legacy behaviour, unshuffled).
+    n_shuffles : int
+        Number of shuffled orderings tried per shuffled round (best-of).
+    shuffle_rng_seeds : list[int] | None
+        Seeds for the shuffles; defaults to ``list(range(1, n_shuffles + 1))``.
     force_recompute : bool
         Recompute and overwrite every stage + the final artifact, ignoring any
         existing cache (bypasses the staleness guard).
@@ -1972,6 +2031,15 @@ def build_final_ensembles(
     if len(force_optimisation) != n_rounds:
         raise ValueError(f"force_optimisation must have one bool per round "
                          f"({n_rounds}); got {len(force_optimisation)}")
+
+    if shuffle is None:
+        shuffle = [False] * n_rounds
+    shuffle = list(shuffle)
+    if len(shuffle) != n_rounds:
+        raise ValueError(f"shuffle must have one bool per round "
+                         f"({n_rounds}); got {len(shuffle)}")
+    shuffle_seeds = (shuffle_rng_seeds if shuffle_rng_seeds is not None
+                     else list(range(1, n_shuffles + 1)))
 
     all_keys = list(site_poe_disaggs.keys())
 
@@ -1997,38 +2065,72 @@ def build_final_ensembles(
         )
 
     def bounds_label(unbounded: list[str]) -> str:
-        return "all bounds" if not unbounded else "free: " + ",".join(unbounded)
+        # Report the full m/d/vs30 universe split into which bounds are enforced
+        # (bounded) and which are dropped (unbounded) this round.
+        universe = ["m", "d", "vs30"]
+        bounded = [b for b in universe if b not in unbounded]
+        b = ", ".join(bounded) if bounded else "none"
+        u = ", ".join(unbounded) if unbounded else "none"
+        return f"bounded: {b} | unbounded: {u}"
+
+    def _count(keys, dct):
+        """(#passing, #failing-with-a-set, #no-set) over ``keys`` in ``dct``."""
+        passing = failing = no_set = 0
+        for k in keys:
+            e = dct.get(k)
+            if e is None:
+                no_set += 1
+            elif e["ks_passed"]:
+                passing += 1
+            else:
+                failing += 1
+        return passing, failing, no_set
 
     # Two layers, matching the legacy notebook: ``base`` holds the *selection*
     # results only (preliminary + reselections) and is what every optimise round
     # starts from; ``ensembles`` is the running best (base overwritten by each
-    # round's optimised output, latest round wins) and drives the work-set / final
-    # result. Optimise rounds are NOT chained — each re-optimises the selection
-    # base with its own bounds, so a later round never optimises an earlier
-    # round's optimised ensemble.
+    # round's optimised output) and drives the work-set / final result. Optimise
+    # rounds are NOT chained — each re-optimises the selection base with its own
+    # bounds, so a later round never optimises an earlier round's optimised
+    # ensemble. For non-shuffled rounds the latest round's optimised output wins;
+    # a shuffled round instead keeps whichever of {new, incumbent} scores better.
     base: dict = {}
     ensembles: dict = {}
     work_set = list(all_keys)
+    sel_key_set = set()  # keys (re)selected in the current round (for reporting)
 
     for r, (sel_unbounded, opt_unbounded) in enumerate(round_specs):
         select_ctx = _ctx_with_unbounded(basic_selection_ctx, sel_unbounded)
         optimise_ctx = _ctx_with_unbounded(basic_selection_ctx, opt_unbounded)
         force = force_optimisation[r]
+        shuf = shuffle[r]
 
-        # SELECTION: round 0 selects everything; later rounds re-select only the
-        # work-set sites that still have no record set (None selection result).
+        # ---- round header ------------------------------------------------------
+        hdr = f"Round {r + 1}/{n_rounds}"
+        if shuf:
+            hdr += f"  (shuffled DB, best of {n_shuffles})"
+        print(f"\n================ {hdr} ================")
+        if sel_unbounded == opt_unbounded:
+            print(f"Bounds  [{bounds_label(sel_unbounded)}]")
+        else:
+            print(f"Bounds  select [{bounds_label(sel_unbounded)}]  "
+                  f"optimise [{bounds_label(opt_unbounded)}]")
+
+        # ---- SELECTION phase ---------------------------------------------------
+        # Round 0 selects everything; later rounds re-select only the work-set
+        # sites that still have no record set at all (None selection result).
         if r == 0:
             sel_keys = list(work_set)
+            print(f"Selection phase — all {len(sel_keys)} (site, poe) [first round]")
         else:
             sel_keys = [k for k in work_set if base.get(k) is None]
-
-        if sel_unbounded == opt_unbounded:
-            bounds_txt = f"bounds {bounds_label(sel_unbounded)}"
-        else:
-            bounds_txt = (f"select {bounds_label(sel_unbounded)} / "
-                          f"optimise {bounds_label(opt_unbounded)}")
-        print(f"-- Round {r + 1}/{n_rounds} -- {bounds_txt} | "
-              f"select: {len(sel_keys)} sites" + ("" if not force else " | force-optimise all"))
+            if sel_keys:
+                print(f"Selection phase — reselecting {len(sel_keys)} (site, poe) "
+                      f"that had no record set after round {r}")
+            else:
+                print("Selection phase — none need reselection (every failing "
+                      "(site, poe) already has a record set)")
+        sel_key_set = set(sel_keys)
 
         if sel_keys:
             sel = preliminary_record_selection(
@@ -2037,40 +2139,97 @@ def build_final_ensembles(
                 preliminary_selection_fp=stage_fps["select"][r],
                 only_select=sel_keys,
                 input_fingerprint=stage_fingerprint(select_ctx, f"select_r{r + 1}", sel_keys),
-                desc=f"R{r + 1}/{n_rounds} select [{bounds_label(sel_unbounded)}] ({len(sel_keys)} sites)",
-                force_recompute=force_recompute)[0]
+                desc=f"R{r + 1}/{n_rounds} select ({len(sel_keys)} sites)",
+                force_recompute=force_recompute, quiet=True)[0]
             for k in sel_keys:
                 base[k] = sel[k]
                 ensembles[k] = sel[k]
+            p, f_, n0 = _count(sel_keys, ensembles)
+            note = f"  (of which {n0} could not form a record set at all)" if n0 else ""
+            print(f"    -> {p} pass, {f_ + n0} fail KS{note}")
 
-        # OPTIMISATION work-set, computed AFTER selection so reselected sites are
-        # included: whole round work-set if forced, else only sites still failing.
-        # (None entries are skipped inside optimise.)
+        # ---- OPTIMISATION phase ------------------------------------------------
+        # Work-set computed AFTER selection so reselected sites are included:
+        # whole round work-set if forced, else only sites still failing. (None
+        # entries are skipped inside the optimiser.)
         if force:
             opt_keys = [k for k in work_set if ensembles.get(k) is not None]
+            scope = "force: all still-failing sets that have a record set"
         else:
             opt_keys = [k for k in work_set if not _ensemble_passes(ensembles.get(k))]
+            scope = "only sites still failing"
+        print(f"Optimisation phase — {len(opt_keys)} (site, poe)  [{scope}]")
 
         if opt_keys:
+            # Describe what the work-set is made of (helps read the counts).
+            if r > 0:
+                n_resel = sum(1 for k in opt_keys if k in sel_key_set)
+                n_carried = len(opt_keys) - n_resel
+                parts = []
+                if n_carried:
+                    parts.append(f"{n_carried} still failing from earlier rounds")
+                if n_resel:
+                    parts.append(f"{n_resel} just reselected this round")
+                if parts:
+                    print("    work-set = " + " + ".join(parts))
+            n_noset = sum(1 for k in opt_keys if ensembles.get(k) is None)
+            if n_noset:
+                print(f"    ({n_noset} of these still have no record set -> skipped "
+                      f"by the optimiser)")
+
             # Start from the selection ``base`` (NOT the running best), matching the
             # legacy behaviour where each optimise round re-optimises the prelim /
-            # reselected ensemble.
+            # reselected ensemble. Shuffle fields enter the fingerprint only for a
+            # shuffled round, so unshuffled rounds keep their existing caches.
+            opt_extra = {"force_optimisation": force}
+            if shuf:
+                opt_extra.update(shuffle=True, n_shuffles=n_shuffles,
+                                 rng_seeds=tuple(shuffle_seeds))
             opt, _ = optimise_record_selection(
                 site_poe_disaggs, disagg_stats, gcim_dists, gm_db,
                 optimise_ctx, site_model, base,
                 optimised_selection_fp=stage_fps["optimise"][r],
-                only_optimise=opt_keys, shuffle=False, rng_seed=rng_seed,
-                input_fingerprint=stage_fingerprint(optimise_ctx, f"optimise_r{r + 1}", opt_keys,
-                                                    force_optimisation=force),
-                description=f"R{r + 1}/{n_rounds} optimise [{bounds_label(opt_unbounded)}] ({len(opt_keys)} sites)",
-                force_recompute=force_recompute)
+                only_optimise=opt_keys, shuffle=shuf, rng_seed=rng_seed,
+                n_shuffles=(n_shuffles if shuf else 1),
+                rng_seeds=(shuffle_seeds if shuf else None),
+                input_fingerprint=stage_fingerprint(optimise_ctx, f"optimise_r{r + 1}",
+                                                    opt_keys, **opt_extra),
+                description=f"R{r + 1}/{n_rounds} optimise ({len(opt_keys)} sites)",
+                force_recompute=force_recompute, quiet=True)
+
+            replaced = kept = 0
             for k in opt_keys:
-                ensembles[k] = opt[k]
+                cand = opt[k]
+                if not shuf:
+                    ensembles[k] = cand  # latest round wins
+                    continue
+                # keep-best: only adopt the shuffled result if it passes, there is
+                # no incumbent, or it scores strictly better than the incumbent.
+                incumbent = ensembles.get(k)
+                if _ensemble_passes(cand) or incumbent is None:
+                    ensembles[k] = cand
+                    replaced += 1
+                elif (_score_ensemble(cand, *k, gcim_dists, basic_selection_ctx)
+                      < _score_ensemble(incumbent, *k, gcim_dists, basic_selection_ctx)):
+                    ensembles[k] = cand
+                    replaced += 1
+                else:
+                    kept += 1
+
+            p, f_, n0 = _count(opt_keys, ensembles)
+            print(f"    -> {p} now pass, {f_ + n0} still fail")
+            if shuf:
+                print(f"      (keep-best: replaced {replaced}, kept incumbent for {kept})")
 
         # carry the sites that still don't have a passing record set
         work_set = [k for k in all_keys if not _ensemble_passes(ensembles.get(k))]
+        if work_set:
+            print(f"-> {len(work_set)} (site, poe) carried into the next round")
+        else:
+            print("-> all (site, poe) now pass")
 
     final_ensembles = ensembles
+    print()
 
     if work_set:
         print(f"Sub-Optimal! - {len(work_set)} (site, poe) still without a passing "
@@ -2086,6 +2245,9 @@ def build_final_ensembles(
         **base_inputs, stage="final_ensembles",
         round_unbounded=tuple((tuple(s), tuple(o)) for s, o in round_specs),
         force_optimisation=tuple(force_optimisation),
+        shuffle=tuple(shuffle),
+        n_shuffles=n_shuffles,
+        shuffle_rng_seeds=tuple(shuffle_seeds),
         **_selection_ctx_fingerprint_inputs(basic_selection_ctx))
     write_manifest(output_fp, final_fp)
 

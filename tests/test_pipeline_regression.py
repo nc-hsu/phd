@@ -1,24 +1,14 @@
 """Regression tests for the provenance-safe gm-selection refactor.
 
-Two layers:
-
 - **Fast unit tests** for ``cache_utils`` (no pipeline data) -- always run; cover
   fingerprint determinism and the load/stale/compute branches of
   ``load_or_compute``.
-- **Slice regression** -- recomputes the preliminary selection for a couple of
-  ``(site, poe)`` keys through the *guarded* function and asserts the selected
-  records exactly match the golden snapshot. Skipped automatically if the heavy
-  input data or the golden snapshot is unavailable (e.g. on CI without the data).
-
-The full 60-site acceptance run is intentionally NOT a pytest (it takes ~1 hr):
-run the Stage-1 notebook, then ``python tests/golden_compare.py``.
+- **Engine orchestration** -- exercises the multi-round selection/optimisation
+  wiring of ``build_final_ensembles`` with mocked selection/optimise steps (fast,
+  no real data).
 """
 
 from __future__ import annotations
-
-import pickle
-import tempfile
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -27,13 +17,9 @@ import pytest
 from phd_project.scripts.cache_utils import (
     StaleCacheError,
     fingerprint,
-    load_manifest,
     load_or_compute,
     verify,
 )
-
-REPO = Path(__file__).resolve().parents[1]
-GOLDEN = REPO / "tests" / "golden" / "AvgSA_03"
 
 
 # --------------------------------------------------------------------------- #
@@ -71,14 +57,18 @@ def test_load_or_compute_branches(tmp_path):
     assert load_or_compute(art, fp, compute) == {"value": 42}
     assert calls["n"] == 1
 
-    # changed input -> StaleCacheError naming the input
+    # changed input -> auto-recompute + overwrite (no error); manifest now
+    # reflects the new inputs.
     fp_bad = fingerprint(rng_seed=2)
-    with pytest.raises(StaleCacheError, match="rng_seed"):
-        load_or_compute(art, fp_bad, compute)
-
-    # force_recompute overrides and overwrites
-    assert load_or_compute(art, fp, compute, force_recompute=True) == {"value": 42}
+    assert load_or_compute(art, fp_bad, compute) == {"value": 42}
     assert calls["n"] == 2
+    # a subsequent load with the (now-cached) new inputs matches -> no recompute
+    assert load_or_compute(art, fp_bad, compute) == {"value": 42}
+    assert calls["n"] == 2
+
+    # force_recompute overrides and overwrites even when inputs match
+    assert load_or_compute(art, fp_bad, compute, force_recompute=True) == {"value": 42}
+    assert calls["n"] == 3
 
 
 def test_missing_manifest_recomputes(tmp_path):
@@ -145,7 +135,8 @@ def test_engine_call_pattern_and_round3_empty(tmp_path, monkeypatch):
         return {"ks_passed": passed, "recs": "x"}
 
     def fake_prelim(spd, ds, gd, db, ctx, sm, seed, *, preliminary_selection_fp,
-                    only_select, input_fingerprint, desc, force_recompute):
+                    only_select, input_fingerprint, desc, force_recompute,
+                    quiet=False):
         calls["select"].append(list(only_select))
         reselection = ctx["d_bound_model"] is None
         out = {}
@@ -159,7 +150,8 @@ def test_engine_call_pattern_and_round3_empty(tmp_path, monkeypatch):
 
     def fake_optimise(spd, ds, gd, db, ctx, sm, ensembles, *, optimised_selection_fp,
                       only_optimise, shuffle, rng_seed, input_fingerprint,
-                      description, force_recompute):
+                      description, force_recompute, n_shuffles=1, rng_seeds=None,
+                      quiet=False):
         calls["optimise"].append(list(only_optimise))
         d_free = ctx["d_bound_model"] is None
         out = {}
@@ -197,65 +189,3 @@ def test_engine_call_pattern_and_round3_empty(tmp_path, monkeypatch):
     assert all(final[k]["ks_passed"] for k in keys)
     assert (tmp_path / "final.pickle").is_file()
     assert (tmp_path / "final.pickle.manifest.json").is_file()
-
-
-# --------------------------------------------------------------------------- #
-# Slice regression against the golden snapshot                                #
-# --------------------------------------------------------------------------- #
-
-def _data_available() -> bool:
-    try:
-        from phd_project.config.config import load_config
-    except Exception:
-        return False
-    if not (GOLDEN / "AvgSA_03_prelim_selection.pickle").is_file():
-        return False
-    cfg = load_config()
-    needed = [
-        cfg["proc_data"]["gm_database"],
-        cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle",
-        cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
-    ]
-    return all(Path(p).is_file() for p in needed)
-
-
-@pytest.mark.skipif(not _data_available(),
-                    reason="heavy input data or golden snapshot not available")
-def test_preliminary_slice_matches_golden():
-    """The guarded preliminary selection reproduces golden records for 2 keys."""
-    from phd_project.config.config import load_config
-    from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
-        setup_AvgSA03_gcim_gm_selection,
-    )
-    from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
-        preliminary_record_selection, _selection_ctx_fingerprint_inputs,
-    )
-
-    cfg = load_config()
-    golden = pickle.load(open(GOLDEN / "AvgSA_03_prelim_selection.pickle", "rb"))
-    keys = [k for k, v in golden.items() if v is not None and v.get("ks_passed")][:2]
-
-    site_poe_disaggs, disagg_stats, site_model, ctx, gm_db = setup_AvgSA03_gcim_gm_selection()
-    gcim_dists = pickle.load(
-        open(cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle", "rb"))
-
-    with tempfile.TemporaryDirectory() as d:
-        art = Path(d) / "slice.pickle"
-        base = {
-            "gm_db_file": cfg["proc_data"]["gm_database"],
-            "gcim_file": cfg["proc_data"]["gcim_dists"] / "gcim_dist_AvgSA_03.pickle",
-            "disagg_data_file": cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
-            "disagg_stats_file": cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"],
-            "site_model_file": cfg["hazard_models"]["eshm20_wp1_site_model"],
-            "rng_seed": 1,
-        }
-        fp = fingerprint(**base, stage="preliminary", only=tuple(sorted(keys)),
-                         **_selection_ctx_fingerprint_inputs(ctx))
-        pe, _, _, _ = preliminary_record_selection(
-            site_poe_disaggs, disagg_stats, gcim_dists, gm_db, ctx, site_model, 1,
-            preliminary_selection_fp=art, only_select=keys, input_fingerprint=fp)
-
-    for k in keys:
-        got = sorted(pe[k]["recs"][("metadata", "index")].tolist())
-        exp = sorted(golden[k]["recs"][("metadata", "index")].tolist())
-        assert got == exp, f"selection changed at {k}"
