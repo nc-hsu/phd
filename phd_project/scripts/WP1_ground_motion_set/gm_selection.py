@@ -1682,7 +1682,7 @@ def preliminary_record_selection(
             desc=desc if desc is not None else "Selecting GM Ensembles")
 
         # get the best of the candidate ensembles for each site and poe
-        obj_func = total_ks_statistic_and_failing_im_penalty
+        obj_func = weighted_ks_statistic_and_L2norm_penalty
 
         preliminary_ensembles = {}
 
@@ -1693,24 +1693,8 @@ def preliminary_record_selection(
                 preliminary_ensembles[(site, poe)] = None
                 continue
 
-            target_cdfs = gcim_dists[(site, poe)]["cdfs"]
-            ks_bounds = ensemble_ks_bounds(
-                target_cdfs,
-                basic_selection_ctx["n_samples"],
-                basic_selection_ctx["p_value"])
-
-            im_strings = [im.string for im in basic_selection_ctx["selection_imts"]]
-
-            obj_func_kwargs = {
-                "target_cdfs_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,2]])
-                                    for k, ksb in ks_bounds.items() if k in im_strings],
-                "upper_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,3]])
-                                        for k, ksb in ks_bounds.items() if k in im_strings],
-                "lower_ks_bounds_list": [np.column_stack([np.log(ksb[1:,0]), ksb[1:,1]])
-                                        for k, ksb in ks_bounds.items() if k in im_strings],
-                "n_recs": basic_selection_ctx["n_samples"],
-                "penalty_constant": penalty_constant
-            }
+            obj_func_kwargs = _optimise_obj_kwargs(
+                        site, poe, gcim_dists, basic_selection_ctx, penalty_constant)
 
             e = get_best_ensemble_in_list(
                 ensembles, basic_selection_ctx["conditioning_imt"].string,
