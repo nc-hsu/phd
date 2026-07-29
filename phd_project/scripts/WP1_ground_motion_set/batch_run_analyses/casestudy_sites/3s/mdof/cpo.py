@@ -12,304 +12,304 @@ running_processes = []  # List of dicts: {proc, script, config, start_time}
 # Paths to your scripts and the configurations
 scripts_and_configs = [
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_0/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_0/mdof/config_cyclic_pushover.py')],
-        "name": ['site_0_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_0/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_0/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site0_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_1/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_1/mdof/config_cyclic_pushover.py')],
-        "name": ['site_1_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_1/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_1/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site1_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_2/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_2/mdof/config_cyclic_pushover.py')],
-        "name": ['site_2_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_2/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_2/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site2_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_3/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_3/mdof/config_cyclic_pushover.py')],
-        "name": ['site_3_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_3/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_3/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site3_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_4/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_4/mdof/config_cyclic_pushover.py')],
-        "name": ['site_4_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_4/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_4/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site4_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_5/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_5/mdof/config_cyclic_pushover.py')],
-        "name": ['site_5_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_5/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_5/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site5_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_6/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_6/mdof/config_cyclic_pushover.py')],
-        "name": ['site_6_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_6/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_6/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site6_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_7/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_7/mdof/config_cyclic_pushover.py')],
-        "name": ['site_7_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_7/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_7/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site7_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_8/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_8/mdof/config_cyclic_pushover.py')],
-        "name": ['site_8_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_8/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_8/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site8_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_9/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_9/mdof/config_cyclic_pushover.py')],
-        "name": ['site_9_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_9/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_9/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site9_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_10/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_10/mdof/config_cyclic_pushover.py')],
-        "name": ['site_10_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_10/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_10/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site10_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_11/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_11/mdof/config_cyclic_pushover.py')],
-        "name": ['site_11_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_11/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_11/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site11_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_12/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_12/mdof/config_cyclic_pushover.py')],
-        "name": ['site_12_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_12/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_12/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site12_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_13/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_13/mdof/config_cyclic_pushover.py')],
-        "name": ['site_13_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_13/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_13/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site13_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_14/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_14/mdof/config_cyclic_pushover.py')],
-        "name": ['site_14_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_14/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_14/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site14_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_15/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_15/mdof/config_cyclic_pushover.py')],
-        "name": ['site_15_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_15/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_15/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site15_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_16/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_16/mdof/config_cyclic_pushover.py')],
-        "name": ['site_16_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_16/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_16/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site16_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_17/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_17/mdof/config_cyclic_pushover.py')],
-        "name": ['site_17_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_17/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_17/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site17_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_18/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_18/mdof/config_cyclic_pushover.py')],
-        "name": ['site_18_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_18/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_18/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site18_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_19/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_19/mdof/config_cyclic_pushover.py')],
-        "name": ['site_19_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_19/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_19/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site19_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_20/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_20/mdof/config_cyclic_pushover.py')],
-        "name": ['site_20_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_20/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_20/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site20_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_21/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_21/mdof/config_cyclic_pushover.py')],
-        "name": ['site_21_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_21/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_21/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site21_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_22/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_22/mdof/config_cyclic_pushover.py')],
-        "name": ['site_22_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_22/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_22/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site22_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_23/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_23/mdof/config_cyclic_pushover.py')],
-        "name": ['site_23_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_23/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_23/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site23_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_24/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_24/mdof/config_cyclic_pushover.py')],
-        "name": ['site_24_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_24/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_24/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site24_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_25/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_25/mdof/config_cyclic_pushover.py')],
-        "name": ['site_25_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_25/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_25/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site25_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_26/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_26/mdof/config_cyclic_pushover.py')],
-        "name": ['site_26_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_26/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_26/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site26_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_27/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_27/mdof/config_cyclic_pushover.py')],
-        "name": ['site_27_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_27/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_27/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site27_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_28/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_28/mdof/config_cyclic_pushover.py')],
-        "name": ['site_28_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_28/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_28/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site28_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_29/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_29/mdof/config_cyclic_pushover.py')],
-        "name": ['site_29_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_29/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_29/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site29_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_30/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_30/mdof/config_cyclic_pushover.py')],
-        "name": ['site_30_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_30/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_30/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site30_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_31/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_31/mdof/config_cyclic_pushover.py')],
-        "name": ['site_31_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_31/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_31/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site31_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_32/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_32/mdof/config_cyclic_pushover.py')],
-        "name": ['site_32_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_32/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_32/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site32_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_33/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_33/mdof/config_cyclic_pushover.py')],
-        "name": ['site_33_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_33/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_33/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site33_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_34/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_34/mdof/config_cyclic_pushover.py')],
-        "name": ['site_34_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_34/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_34/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site34_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_35/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_35/mdof/config_cyclic_pushover.py')],
-        "name": ['site_35_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_35/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_35/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site35_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_36/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_36/mdof/config_cyclic_pushover.py')],
-        "name": ['site_36_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_36/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_36/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site36_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_37/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_37/mdof/config_cyclic_pushover.py')],
-        "name": ['site_37_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_37/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_37/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site37_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_38/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_38/mdof/config_cyclic_pushover.py')],
-        "name": ['site_38_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_38/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_38/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site38_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_39/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_39/mdof/config_cyclic_pushover.py')],
-        "name": ['site_39_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_39/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_39/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site39_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_40/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_40/mdof/config_cyclic_pushover.py')],
-        "name": ['site_40_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_40/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_40/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site40_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_41/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_41/mdof/config_cyclic_pushover.py')],
-        "name": ['site_41_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_41/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_41/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site41_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_42/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_42/mdof/config_cyclic_pushover.py')],
-        "name": ['site_42_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_42/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_42/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site42_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_43/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_43/mdof/config_cyclic_pushover.py')],
-        "name": ['site_43_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_43/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_43/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site43_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_44/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_44/mdof/config_cyclic_pushover.py')],
-        "name": ['site_44_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_44/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_44/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site44_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_45/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_45/mdof/config_cyclic_pushover.py')],
-        "name": ['site_45_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_45/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_45/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site45_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_46/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_46/mdof/config_cyclic_pushover.py')],
-        "name": ['site_46_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_46/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_46/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site46_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_47/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_47/mdof/config_cyclic_pushover.py')],
-        "name": ['site_47_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_47/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_47/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site47_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_48/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_48/mdof/config_cyclic_pushover.py')],
-        "name": ['site_48_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_48/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_48/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site48_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_49/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_49/mdof/config_cyclic_pushover.py')],
-        "name": ['site_49_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_49/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_49/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site49_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_50/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_50/mdof/config_cyclic_pushover.py')],
-        "name": ['site_50_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_50/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_50/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site50_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_51/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_51/mdof/config_cyclic_pushover.py')],
-        "name": ['site_51_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_51/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_51/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site51_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_52/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_52/mdof/config_cyclic_pushover.py')],
-        "name": ['site_52_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_52/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_52/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site52_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_53/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_53/mdof/config_cyclic_pushover.py')],
-        "name": ['site_53_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_53/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_53/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site53_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_54/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_54/mdof/config_cyclic_pushover.py')],
-        "name": ['site_54_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_54/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_54/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site54_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_55/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_55/mdof/config_cyclic_pushover.py')],
-        "name": ['site_55_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_55/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_55/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site55_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_56/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_56/mdof/config_cyclic_pushover.py')],
-        "name": ['site_56_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_56/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_56/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site56_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_57/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_57/mdof/config_cyclic_pushover.py')],
-        "name": ['site_57_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_57/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_57/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site57_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_58/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_58/mdof/config_cyclic_pushover.py')],
-        "name": ['site_58_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_58/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_58/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site58_cpo']
     },
     {
-        "script": Path("D:/07_wp1_casestudy_sites/site_59/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/07_wp1_casestudy_sites/site_59/mdof/config_cyclic_pushover.py')],
-        "name": ['site_59_cpo']
+        "script": Path("D:/07_wp1_casestudy_sites/site_59/3s/mdof/run_cyclic_pushover.py"),
+        "config": [Path('D:/07_wp1_casestudy_sites/site_59/3s/mdof/config_cyclic_pushover.py')],
+        "name": ['3s_cbf_dc2_site59_cpo']
     }
 ]
 

@@ -1,0 +1,2240 @@
+{
+    "nonseismic_design_outputs": {
+        "GQWSI_LC1": {
+            "storey_wind_forces_windward": [
+                5711.336722224705,
+                5711.336722224705,
+                5711.336722224705,
+                5711.336722224705,
+                2855.6683611123526
+            ],
+            "storey_wind_forces_leeward": [
+                3776.653359829875,
+                3776.653359829875,
+                3776.653359829875,
+                3776.653359829875,
+                1888.3266799149376
+            ],
+            "uls_wind_base_shear": 38426.359832321046,
+            "uls_storey_wind_forces_windward": [
+                5140.203050002235,
+                5140.203050002235,
+                5140.203050002235,
+                5140.203050002235,
+                2570.1015250011174
+            ],
+            "uls_storey_wind_forces_leeward": [
+                3398.9880238468872,
+                3398.9880238468872,
+                3398.9880238468872,
+                3398.9880238468872,
+                1699.4940119234436
+            ],
+            "storey_masses": [
+                187844.0366972477,
+                187844.0366972477,
+                187844.0366972477,
+                187844.0366972477,
+                136596.33027522935
+            ],
+            "period": 0.8028600364132777,
+            "drifts": [
+                0.20934622375219203,
+                0.245082460706749,
+                0.2031097636102523,
+                0.1653586649226026,
+                0.11630887436834805
+            ]
+        },
+        "GQWSI_LC2": {
+            "storey_wind_forces_windward": [
+                5691.081361206484,
+                5691.081361206484,
+                5691.081361206484,
+                5691.081361206484,
+                2845.540680603242
+            ],
+            "storey_wind_forces_leeward": [
+                3763.2593890373014,
+                3763.2593890373014,
+                3763.2593890373014,
+                3763.2593890373014,
+                1881.6296945186507
+            ],
+            "uls_wind_base_shear": 63816.80006414556,
+            "uls_storey_wind_forces_windward": [
+                8536.622041809725,
+                8536.622041809725,
+                8536.622041809725,
+                8536.622041809725,
+                4268.311020904863
+            ],
+            "uls_storey_wind_forces_leeward": [
+                5644.889083555952,
+                5644.889083555952,
+                5644.889083555952,
+                5644.889083555952,
+                2822.444541777976
+            ],
+            "storey_masses": [
+                170504.58715596332,
+                170504.58715596332,
+                170504.58715596332,
+                170504.58715596332,
+                136596.33027522935
+            ],
+            "period": 0.7789801837786738,
+            "drifts": [
+                0.3466733320577404,
+                0.4058599979671236,
+                0.3363546950575862,
+                0.273843764383488,
+                0.19259353051409095
+            ]
+        },
+        "GQWSI_LC3": {
+            "storey_wind_forces_windward": [
+                5697.509851227864,
+                5697.509851227864,
+                5697.509851227864,
+                5697.509851227864,
+                2848.754925613932
+            ],
+            "storey_wind_forces_leeward": [
+                3767.510264028335,
+                3767.510264028335,
+                3767.510264028335,
+                3767.510264028335,
+                1883.7551320141674
+            ],
+            "uls_wind_base_shear": 38333.3314667876,
+            "uls_storey_wind_forces_windward": [
+                5127.758866105077,
+                5127.758866105077,
+                5127.758866105077,
+                5127.758866105077,
+                2563.8794330525384
+            ],
+            "uls_storey_wind_forces_leeward": [
+                3390.759237625501,
+                3390.759237625501,
+                3390.759237625501,
+                3390.759237625501,
+                1695.3796188127506
+            ],
+            "storey_masses": [
+                170504.58715596332,
+                170504.58715596332,
+                170504.58715596332,
+                170504.58715596332,
+                143146.78899082568
+            ],
+            "period": 0.7862552008690535,
+            "drifts": [
+                0.20874937451043124,
+                0.24439361815637228,
+                0.2025509835230526,
+                0.16492383068672148,
+                0.11603459914387554
+            ]
+        }
+    },
+    "seismic_design_outputs": {
+        "gravity_frame_elastic_baseshear": 2269794.303833879,
+        "gravity_design_brace_etas_E": [
+            3.475661245348518,
+            8.248409994671869,
+            3.2217226902199045,
+            7.645765154367432,
+            3.301206948509948,
+            10.18471790958254,
+            2.4566002668902054,
+            7.578979786824622,
+            1.5044761118451577,
+            5.507302183115876
+        ],
+        "gravity_design_brace_etas_G": [
+            0.17707486296672462,
+            0.17818327964444994,
+            0.17603128531269463,
+            0.17691323493590716,
+            0.26278918582876987,
+            0.26381305208591554,
+            0.310741288741936,
+            0.3114079690151056,
+            0.3510484852750576,
+            0.3514720663197486
+        ],
+        "gravity_design_equivalent_seismic_baseshear": 164068.65224613075,
+        "seismic_mass": 527889.9082568806,
+        "storey_masses": [
+            107889.9082568807,
+            107889.9082568807,
+            107889.9082568807,
+            107889.9082568807,
+            96330.2752293578
+        ],
+        "ductility_class": 2,
+        "seismic_action_class": "high",
+        "vertical_regularity": false,
+        "q_design": 2.04,
+        "q_D": 1.36,
+        "q_R": 1.0,
+        "q_S": 1.5,
+        "q_max": 2.5,
+        "design_period": 0.6334353526097958,
+        "design_spectral_acceleration": 0.3502714100239436,
+        "design_baseshear": 1541828.1953574948,
+        "lambda": 0.85,
+        "storey_forces": [
+            106595.52955557988,
+            213191.05911115976,
+            319786.58866673964,
+            426382.1182223195,
+            475872.89980169595
+        ],
+        "spectrum_parameters": {
+            "S_alpha_RP": 1.1315589,
+            "S_beta_RP": 0.45262356,
+            "S_alpha": 1.1315589,
+            "S_beta": 0.45262356,
+            "T_beta": 1.0,
+            "T_A": 0.02,
+            "T_B": 0.1,
+            "T_C": 0.4,
+            "T_D": 5.4402371236,
+            "F_alpha": 1.0,
+            "F_beta": 1.0,
+            "F_T": 1.0,
+            "site_category": "A",
+            "F_A": 2.5,
+            "S_delta": 1.1315589,
+            "delta": 1.0,
+            "seismic_action_class": "high"
+        }
+    },
+    "structure": {
+        "loading": {
+            "tw_vertical_loads": 3000,
+            "tw_lateral_loads": 6000,
+            "g_floors": [
+                0.0075,
+                0.0075,
+                0.0075,
+                0.0075,
+                0.0075
+            ],
+            "q_floors": [
+                0.003,
+                0.003,
+                0.003,
+                0.003,
+                0
+            ],
+            "q_floor_types": [
+                "QB",
+                "QB",
+                "QB",
+                "QB",
+                "QH"
+            ],
+            "seismic_mass": 527889.9082568806,
+            "storey_masses": [
+                107889.9082568807,
+                107889.9082568807,
+                107889.9082568807,
+                107889.9082568807,
+                96330.2752293578
+            ]
+        },
+        "material": {
+            "E": 210000,
+            "G": 77000,
+            "unit_weight": 7.7008e-05,
+            "fy": 235
+        },
+        "grid_coordinates": [
+            0,
+            7000,
+            14000,
+            21000
+        ],
+        "level_coordinates": [
+            0,
+            3500,
+            7000,
+            10500,
+            14000,
+            17500
+        ],
+        "columns": [
+            {
+                "grid": 1,
+                "level": 1,
+                "section": "HEB320",
+                "gusset_offset_i": 622.0806039683137,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 0.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 2,
+                "level": 1,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 622.0806039683137,
+                "beam_offset_i": 0.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 3,
+                "level": 1,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 622.0806039683137,
+                "beam_offset_i": 0.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 4,
+                "level": 1,
+                "section": "HEB320",
+                "gusset_offset_i": 622.0806039683137,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 0.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 1,
+                "level": 2,
+                "section": "HEB320",
+                "gusset_offset_i": 627.0252766876952,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 2,
+                "level": 2,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 627.0252766876952,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 3,
+                "level": 2,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 627.0252766876952,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 4,
+                "level": 2,
+                "section": "HEB320",
+                "gusset_offset_i": 627.0252766876952,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 1,
+                "level": 3,
+                "section": "HEB320",
+                "gusset_offset_i": 627.0252766876952,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 2,
+                "level": 3,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 627.0252766876952,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 3,
+                "level": 3,
+                "section": "HEB320",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 627.0252766876952,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 4,
+                "level": 3,
+                "section": "HEB320",
+                "gusset_offset_i": 627.0252766876952,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 180.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 1,
+                "level": 4,
+                "section": "HEB180",
+                "gusset_offset_i": 532.3604900238979,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 2,
+                "level": 4,
+                "section": "HEB180",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 532.3604900238979,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 3,
+                "level": 4,
+                "section": "HEB180",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 532.3604900238979,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 4,
+                "level": 4,
+                "section": "HEB180",
+                "gusset_offset_i": 532.3604900238979,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 180.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 1,
+                "level": 5,
+                "section": "HEB180",
+                "gusset_offset_i": 463.2941942955025,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 150.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 2,
+                "level": 5,
+                "section": "HEB180",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 463.2941942955025,
+                "beam_offset_i": 150.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 3,
+                "level": 5,
+                "section": "HEB180",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 463.2941942955025,
+                "beam_offset_i": 150.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            },
+            {
+                "grid": 4,
+                "level": 5,
+                "section": "HEB180",
+                "gusset_offset_i": 463.2941942955025,
+                "gusset_offset_j": 0.0,
+                "beam_offset_i": 150.0,
+                "beam_offset_j": 150.0,
+                "hinge_i": false,
+                "hinge_j": false
+            }
+        ],
+        "beams": [
+            {
+                "bay": 1,
+                "level": 2,
+                "section": "IPE360",
+                "gusset_offset_i": 1454.05055337539,
+                "gusset_offset_j": 1444.1612079366275,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 2,
+                "level": 2,
+                "section": "IPE360",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            },
+            {
+                "bay": 3,
+                "level": 2,
+                "section": "IPE360",
+                "gusset_offset_i": 1444.1612079366275,
+                "gusset_offset_j": 1454.05055337539,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 1,
+                "level": 3,
+                "section": "IPE360",
+                "gusset_offset_i": 1454.05055337539,
+                "gusset_offset_j": 1454.05055337539,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 2,
+                "level": 3,
+                "section": "IPE360",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            },
+            {
+                "bay": 3,
+                "level": 3,
+                "section": "IPE360",
+                "gusset_offset_i": 1454.05055337539,
+                "gusset_offset_j": 1454.05055337539,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 1,
+                "level": 4,
+                "section": "IPE360",
+                "gusset_offset_i": 1334.7209800477958,
+                "gusset_offset_j": 1454.05055337539,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 2,
+                "level": 4,
+                "section": "IPE360",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            },
+            {
+                "bay": 3,
+                "level": 4,
+                "section": "IPE360",
+                "gusset_offset_i": 1454.05055337539,
+                "gusset_offset_j": 1334.7209800477958,
+                "column_offset_i": 160.0,
+                "column_offset_j": 160.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 1,
+                "level": 5,
+                "section": "IPE300",
+                "gusset_offset_i": 1136.588388591005,
+                "gusset_offset_j": 1274.7209800477958,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 2,
+                "level": 5,
+                "section": "IPE300",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            },
+            {
+                "bay": 3,
+                "level": 5,
+                "section": "IPE300",
+                "gusset_offset_i": 1274.7209800477958,
+                "gusset_offset_j": 1136.588388591005,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 1,
+                "level": 6,
+                "section": "IPE300",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 1136.588388591005,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": null,
+                "beam_splice_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                }
+            },
+            {
+                "bay": 2,
+                "level": 6,
+                "section": "IPE300",
+                "gusset_offset_i": 0.0,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_i": null,
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            },
+            {
+                "bay": 3,
+                "level": 6,
+                "section": "IPE300",
+                "gusset_offset_i": 1136.588388591005,
+                "gusset_offset_j": 0.0,
+                "column_offset_i": 90.0,
+                "column_offset_j": 90.0,
+                "column_connection_i": null,
+                "beam_splice_i": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "column_connection_j": {
+                    "connection_geometry": null,
+                    "M_j_Rd": 1,
+                    "S_j_ini": 1,
+                    "theta_u": 0.04
+                },
+                "beam_splice_j": null
+            }
+        ],
+        "braces": [
+            {
+                "bay": 1,
+                "level": 1,
+                "section": "CHS323.9x6",
+                "orientation": "positive",
+                "gusset_offset_ix": 947.8274135392943,
+                "gusset_offset_iy": 473.91370676964715,
+                "gusset_offset_jx": 1307.8274135392944,
+                "gusset_offset_jy": 653.9137067696472
+            },
+            {
+                "bay": 3,
+                "level": 1,
+                "section": "CHS323.9x6",
+                "orientation": "negative",
+                "gusset_offset_ix": 1307.8274135392944,
+                "gusset_offset_iy": 653.9137067696472,
+                "gusset_offset_jx": 947.8274135392943,
+                "gusset_offset_jy": 473.91370676964715
+            },
+            {
+                "bay": 1,
+                "level": 2,
+                "section": "CHS323.9x5",
+                "orientation": "positive",
+                "gusset_offset_ix": 1310.372326744305,
+                "gusset_offset_iy": 655.1861633721525,
+                "gusset_offset_jx": 1310.372326744305,
+                "gusset_offset_jy": 655.1861633721525
+            },
+            {
+                "bay": 3,
+                "level": 2,
+                "section": "CHS323.9x5",
+                "orientation": "negative",
+                "gusset_offset_ix": 1310.372326744305,
+                "gusset_offset_iy": 655.1861633721525,
+                "gusset_offset_jx": 1310.372326744305,
+                "gusset_offset_jy": 655.1861633721525
+            },
+            {
+                "bay": 1,
+                "level": 3,
+                "section": "CHS323.9x5",
+                "orientation": "positive",
+                "gusset_offset_ix": 1310.372326744305,
+                "gusset_offset_iy": 655.1861633721525,
+                "gusset_offset_jx": 1310.372326744305,
+                "gusset_offset_jy": 655.1861633721525
+            },
+            {
+                "bay": 3,
+                "level": 3,
+                "section": "CHS323.9x5",
+                "orientation": "negative",
+                "gusset_offset_ix": 1310.372326744305,
+                "gusset_offset_iy": 655.1861633721525,
+                "gusset_offset_jx": 1310.372326744305,
+                "gusset_offset_jy": 655.1861633721525
+            },
+            {
+                "bay": 1,
+                "level": 4,
+                "section": "CHS273x5",
+                "orientation": "positive",
+                "gusset_offset_ix": 1198.808978644231,
+                "gusset_offset_iy": 599.4044893221155,
+                "gusset_offset_jx": 1138.808978644231,
+                "gusset_offset_jy": 569.4044893221155
+            },
+            {
+                "bay": 3,
+                "level": 4,
+                "section": "CHS273x5",
+                "orientation": "negative",
+                "gusset_offset_ix": 1138.808978644231,
+                "gusset_offset_iy": 569.4044893221155,
+                "gusset_offset_jx": 1198.808978644231,
+                "gusset_offset_jy": 599.4044893221155
+            },
+            {
+                "bay": 1,
+                "level": 5,
+                "section": "CHS219.1x4",
+                "orientation": "positive",
+                "gusset_offset_ix": 1028.3029054787985,
+                "gusset_offset_iy": 514.1514527393992,
+                "gusset_offset_jx": 1028.3029054787985,
+                "gusset_offset_jy": 514.1514527393992
+            },
+            {
+                "bay": 3,
+                "level": 5,
+                "section": "CHS219.1x4",
+                "orientation": "negative",
+                "gusset_offset_ix": 1028.3029054787985,
+                "gusset_offset_iy": 514.1514527393992,
+                "gusset_offset_jx": 1028.3029054787985,
+                "gusset_offset_jy": 514.1514527393992
+            }
+        ],
+        "gussets": [
+            {
+                "grid": 1,
+                "level": 1,
+                "q_point": 2,
+                "thickness": 30,
+                "effective_width": 357.1281292110204,
+                "effective_length": 931.2713972345805,
+                "length_column": 622.0806039683137,
+                "length_beam": 1084.1612079366273,
+                "length_brace_x": 947.8274135392943,
+                "length_brace_z": 473.91370676964715,
+                "shape": [
+                    [
+                        160.0,
+                        0.0
+                    ],
+                    [
+                        160.0,
+                        622.0806039683137
+                    ],
+                    [
+                        650.4967247619763,
+                        867.3289663493018
+                    ],
+                    [
+                        1215.283504328044,
+                        833.4287161920633
+                    ],
+                    [
+                        1395.9130755504773,
+                        472.1695737471973
+                    ],
+                    [
+                        1084.1612079366273,
+                        0.0
+                    ],
+                    [
+                        1084.1612079366273,
+                        0.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        80
+                    ],
+                    "spacing_y": [
+                        80,
+                        80,
+                        80
+                    ],
+                    "category": "A",
+                    "e_z_neg": 136.95,
+                    "e_z_pos": 136.95,
+                    "e_y_neg": 80,
+                    "e_y_pos": 80,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 2,
+                "level": 2,
+                "q_point": 6,
+                "thickness": 30,
+                "effective_width": 357.1281292110204,
+                "effective_length": 1229.4137942345524,
+                "length_column": 622.0806039683137,
+                "length_beam": 1444.1612079366275,
+                "length_brace_x": 1307.8274135392944,
+                "length_brace_z": 653.9137067696472,
+                "shape": [
+                    [
+                        160.0,
+                        180.00000000000006
+                    ],
+                    [
+                        160.0,
+                        622.0806039683137
+                    ],
+                    [
+                        1010.4967247619765,
+                        1047.328966349302
+                    ],
+                    [
+                        1575.283504328044,
+                        1013.4287161920633
+                    ],
+                    [
+                        1755.9130755504773,
+                        652.1695737471973
+                    ],
+                    [
+                        1444.1612079366275,
+                        180.00000000000006
+                    ],
+                    [
+                        1444.1612079366275,
+                        180.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        80
+                    ],
+                    "spacing_y": [
+                        80,
+                        80,
+                        80
+                    ],
+                    "category": "A",
+                    "e_z_neg": 136.95,
+                    "e_z_pos": 136.95,
+                    "e_y_neg": 80,
+                    "e_y_pos": 80,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 3,
+                "level": 2,
+                "q_point": 4,
+                "thickness": 30,
+                "effective_width": 357.1281292110204,
+                "effective_length": 1229.4137942345524,
+                "length_column": 622.0806039683137,
+                "length_beam": 1444.1612079366275,
+                "length_brace_x": 1307.8274135392944,
+                "length_brace_z": 653.9137067696472,
+                "shape": [
+                    [
+                        160.0,
+                        180.00000000000006
+                    ],
+                    [
+                        160.0,
+                        622.0806039683137
+                    ],
+                    [
+                        1010.4967247619765,
+                        1047.328966349302
+                    ],
+                    [
+                        1575.283504328044,
+                        1013.4287161920633
+                    ],
+                    [
+                        1755.9130755504773,
+                        652.1695737471973
+                    ],
+                    [
+                        1444.1612079366275,
+                        180.00000000000006
+                    ],
+                    [
+                        1444.1612079366275,
+                        180.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        80
+                    ],
+                    "spacing_y": [
+                        80,
+                        80,
+                        80
+                    ],
+                    "category": "A",
+                    "e_z_neg": 136.95,
+                    "e_z_pos": 136.95,
+                    "e_y_neg": 80,
+                    "e_y_pos": 80,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 4,
+                "level": 1,
+                "q_point": 8,
+                "thickness": 30,
+                "effective_width": 357.1281292110204,
+                "effective_length": 931.2713972345805,
+                "length_column": 622.0806039683137,
+                "length_beam": 1084.1612079366273,
+                "length_brace_x": 947.8274135392943,
+                "length_brace_z": 473.91370676964715,
+                "shape": [
+                    [
+                        160.0,
+                        0.0
+                    ],
+                    [
+                        160.0,
+                        622.0806039683137
+                    ],
+                    [
+                        650.4967247619763,
+                        867.3289663493018
+                    ],
+                    [
+                        1215.283504328044,
+                        833.4287161920633
+                    ],
+                    [
+                        1395.9130755504773,
+                        472.1695737471973
+                    ],
+                    [
+                        1084.1612079366273,
+                        0.0
+                    ],
+                    [
+                        1084.1612079366273,
+                        0.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        80
+                    ],
+                    "spacing_y": [
+                        80,
+                        80,
+                        80
+                    ],
+                    "category": "A",
+                    "e_z_neg": 136.95,
+                    "e_z_pos": 136.95,
+                    "e_y_neg": 80,
+                    "e_y_pos": 80,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 1,
+                "level": 2,
+                "q_point": 2,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 2,
+                "level": 3,
+                "q_point": 6,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 3,
+                "level": 3,
+                "q_point": 4,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 4,
+                "level": 2,
+                "q_point": 8,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 1,
+                "level": 3,
+                "q_point": 2,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 2,
+                "level": 4,
+                "q_point": 6,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 3,
+                "level": 4,
+                "q_point": 4,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 4,
+                "level": 3,
+                "q_point": 8,
+                "thickness": 28,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1217.9588819979692,
+                "length_column": 627.0252766876952,
+                "length_beam": 1454.05055337539,
+                "length_brace_x": 1310.372326744305,
+                "length_brace_z": 655.1861633721525,
+                "shape": [
+                    [
+                        160.0,
+                        179.99999999999994
+                    ],
+                    [
+                        160.0,
+                        627.0252766876952
+                    ],
+                    [
+                        1016.430332025234,
+                        1055.240442700312
+                    ],
+                    [
+                        1580.0644855105545,
+                        1021.409376727068
+                    ],
+                    [
+                        1765.1661926879872,
+                        651.2059623722029
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ],
+                    [
+                        1454.05055337539,
+                        179.99999999999994
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 139.45,
+                    "e_z_pos": 139.45,
+                    "e_y_neg": 75,
+                    "e_y_pos": 75,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 1,
+                "level": 4,
+                "q_point": 2,
+                "thickness": 22,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1101.2709967920994,
+                "length_column": 532.3604900238979,
+                "length_beam": 1334.7209800477958,
+                "length_brace_x": 1198.808978644231,
+                "length_brace_z": 599.4044893221155,
+                "shape": [
+                    [
+                        90.0,
+                        180.00000000000006
+                    ],
+                    [
+                        90.0,
+                        532.3604900238979
+                    ],
+                    [
+                        944.8325880286775,
+                        959.7767840382367
+                    ],
+                    [
+                        1476.1932112530799,
+                        927.8828752168347
+                    ],
+                    [
+                        1628.0222269253159,
+                        624.2248438723632
+                    ],
+                    [
+                        1334.7209800477958,
+                        180.00000000000006
+                    ],
+                    [
+                        1334.7209800477958,
+                        180.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 102.25,
+                    "e_z_pos": 102.25,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 2,
+                "level": 5,
+                "q_point": 6,
+                "thickness": 22,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1056.5496372421037,
+                "length_column": 532.3604900238979,
+                "length_beam": 1274.7209800477958,
+                "length_brace_x": 1138.808978644231,
+                "length_brace_z": 569.4044893221155,
+                "shape": [
+                    [
+                        90.0,
+                        150.00000000000006
+                    ],
+                    [
+                        90.0,
+                        532.3604900238979
+                    ],
+                    [
+                        884.8325880286775,
+                        929.7767840382367
+                    ],
+                    [
+                        1416.1932112530799,
+                        897.8828752168347
+                    ],
+                    [
+                        1568.0222269253159,
+                        594.2248438723632
+                    ],
+                    [
+                        1274.7209800477958,
+                        150.00000000000006
+                    ],
+                    [
+                        1274.7209800477958,
+                        150.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 102.25,
+                    "e_z_pos": 102.25,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 3,
+                "level": 5,
+                "q_point": 4,
+                "thickness": 22,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1056.5496372421037,
+                "length_column": 532.3604900238979,
+                "length_beam": 1274.7209800477958,
+                "length_brace_x": 1138.808978644231,
+                "length_brace_z": 569.4044893221155,
+                "shape": [
+                    [
+                        90.0,
+                        150.00000000000006
+                    ],
+                    [
+                        90.0,
+                        532.3604900238979
+                    ],
+                    [
+                        884.8325880286775,
+                        929.7767840382367
+                    ],
+                    [
+                        1416.1932112530799,
+                        897.8828752168347
+                    ],
+                    [
+                        1568.0222269253159,
+                        594.2248438723632
+                    ],
+                    [
+                        1274.7209800477958,
+                        150.00000000000006
+                    ],
+                    [
+                        1274.7209800477958,
+                        150.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 102.25,
+                    "e_z_pos": 102.25,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 4,
+                "level": 4,
+                "q_point": 8,
+                "thickness": 22,
+                "effective_width": 379.4486372867092,
+                "effective_length": 1101.2709967920994,
+                "length_column": 532.3604900238979,
+                "length_beam": 1334.7209800477958,
+                "length_brace_x": 1198.808978644231,
+                "length_brace_z": 599.4044893221155,
+                "shape": [
+                    [
+                        90.0,
+                        180.00000000000006
+                    ],
+                    [
+                        90.0,
+                        532.3604900238979
+                    ],
+                    [
+                        944.8325880286775,
+                        959.7767840382367
+                    ],
+                    [
+                        1476.1932112530799,
+                        927.8828752168347
+                    ],
+                    [
+                        1628.0222269253159,
+                        624.2248438723632
+                    ],
+                    [
+                        1334.7209800477958,
+                        180.00000000000006
+                    ],
+                    [
+                        1334.7209800477958,
+                        180.00000000000006
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 102.25,
+                    "e_z_pos": 102.25,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 4,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 1,
+                "level": 5,
+                "q_point": 2,
+                "thickness": 22,
+                "effective_width": 281.29909152447283,
+                "effective_length": 973.8957355474657,
+                "length_column": 463.2941942955025,
+                "length_beam": 1136.588388591005,
+                "length_brace_x": 1028.3029054787985,
+                "length_brace_z": 514.1514527393992,
+                "shape": [
+                    [
+                        90.0,
+                        150.0
+                    ],
+                    [
+                        90.0,
+                        463.2941942955025
+                    ],
+                    [
+                        801.953033154603,
+                        819.270710872804
+                    ],
+                    [
+                        1235.340439515504,
+                        793.2574576909229
+                    ],
+                    [
+                        1375.8102298620406,
+                        512.3178769978493
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 89.55000000000001,
+                    "e_z_pos": 89.55000000000001,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 3,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 2,
+                "level": 6,
+                "q_point": 6,
+                "thickness": 22,
+                "effective_width": 281.29909152447283,
+                "effective_length": 973.8957355474657,
+                "length_column": 463.2941942955025,
+                "length_beam": 1136.588388591005,
+                "length_brace_x": 1028.3029054787985,
+                "length_brace_z": 514.1514527393992,
+                "shape": [
+                    [
+                        90.0,
+                        150.0
+                    ],
+                    [
+                        90.0,
+                        463.2941942955025
+                    ],
+                    [
+                        801.953033154603,
+                        819.270710872804
+                    ],
+                    [
+                        1235.340439515504,
+                        793.2574576909229
+                    ],
+                    [
+                        1375.8102298620406,
+                        512.3178769978493
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 89.55000000000001,
+                    "e_z_pos": 89.55000000000001,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 3,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 3,
+                "level": 6,
+                "q_point": 4,
+                "thickness": 22,
+                "effective_width": 281.29909152447283,
+                "effective_length": 973.8957355474657,
+                "length_column": 463.2941942955025,
+                "length_beam": 1136.588388591005,
+                "length_brace_x": 1028.3029054787985,
+                "length_brace_z": 514.1514527393992,
+                "shape": [
+                    [
+                        90.0,
+                        150.0
+                    ],
+                    [
+                        90.0,
+                        463.2941942955025
+                    ],
+                    [
+                        801.953033154603,
+                        819.270710872804
+                    ],
+                    [
+                        1235.340439515504,
+                        793.2574576909229
+                    ],
+                    [
+                        1375.8102298620406,
+                        512.3178769978493
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 89.55000000000001,
+                    "e_z_pos": 89.55000000000001,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 3,
+                    "n_rows_z": 2
+                }
+            },
+            {
+                "grid": 4,
+                "level": 5,
+                "q_point": 8,
+                "thickness": 22,
+                "effective_width": 281.29909152447283,
+                "effective_length": 973.8957355474657,
+                "length_column": 463.2941942955025,
+                "length_beam": 1136.588388591005,
+                "length_brace_x": 1028.3029054787985,
+                "length_brace_z": 514.1514527393992,
+                "shape": [
+                    [
+                        90.0,
+                        150.0
+                    ],
+                    [
+                        90.0,
+                        463.2941942955025
+                    ],
+                    [
+                        801.953033154603,
+                        819.270710872804
+                    ],
+                    [
+                        1235.340439515504,
+                        793.2574576909229
+                    ],
+                    [
+                        1375.8102298620406,
+                        512.3178769978493
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ],
+                    [
+                        1136.588388591005,
+                        150.0
+                    ]
+                ],
+                "brace_connection": {
+                    "type": "bolted",
+                    "pattern": "grid",
+                    "bolt_size": "M24",
+                    "strength_class": "10.9",
+                    "thread_in_shear": false,
+                    "shear_planes": 2,
+                    "spacing_z": [
+                        85
+                    ],
+                    "spacing_y": [
+                        85,
+                        85
+                    ],
+                    "category": "A",
+                    "e_z_neg": 89.55000000000001,
+                    "e_z_pos": 89.55000000000001,
+                    "e_y_neg": 70,
+                    "e_y_pos": 70,
+                    "n_rows_y": 3,
+                    "n_rows_z": 2
+                }
+            }
+        ]
+    }
+}
