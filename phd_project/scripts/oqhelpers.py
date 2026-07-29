@@ -438,7 +438,7 @@ def assert_shared_provenance(disagg_manifest, psha_manifest, im, eps,
     The occurrence slope is taken from the PSHA hazard curves, so those curves
     must come from the same source model / logic tree / site model as the disagg
     calculations. Compares the input hashes of ``AvgSA_{im}_psha_eps{eps}``
-    against every ``AvgSA_{im}_disagg_eps{eps}_iml*`` entry and raises on any
+    against every ``AvgSA_{im}_disagg_eps{eps}_*`` entry and raises on any
     mismatch. ``im`` is e.g. ``"03"``; ``eps`` is e.g. ``3``.
     """
     psha_name = f"AvgSA_{im}_psha_eps{eps}"
@@ -446,7 +446,7 @@ def assert_shared_provenance(disagg_manifest, psha_manifest, im, eps,
         raise KeyError(f"{psha_name} not in the PSHA manifest")
     psha_inputs = psha_manifest[psha_name]["inputs"]
 
-    prefix = f"AvgSA_{im}_disagg_eps{eps}_iml"
+    prefix = f"AvgSA_{im}_disagg_eps{eps}_"
     disagg_names = [k for k in disagg_manifest if k.startswith(prefix)]
     if not disagg_names:
         raise KeyError(f"no disagg manifest entries matching {prefix}*")

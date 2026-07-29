@@ -242,21 +242,26 @@ def _iml_str(iml: float) -> str:
     return f"{float(iml):.6g}"
 
 
-def disagg_analysis_name(im: str, eps: int, i: int) -> str:
-    """Manifest key for a disagg analysis, e.g. ``AvgSA_03_disagg_eps4_iml01``.
+def _iml_fname_token(iml: float) -> str:
+    """IML as a name-safe token, e.g. 0.285 -> ``'0pt285'`` (3 dp, 'pt' for '.')."""
+    return f"{float(iml):.3f}".replace(".", "pt")
 
-    ``i`` is the 1-based index of the IML in the target IML file, so the name is
-    stable against the float formatting of the level itself.
+
+def disagg_analysis_name(im: str, eps: int, iml: float) -> str:
+    """Manifest key for a disagg analysis, e.g. ``AvgSA_03_disagg_eps4_0pt285``.
+
+    The IML is encoded directly (3 dp, 'pt' for the decimal point) so the name is
+    self-describing rather than a positional index into the target IML file.
     """
-    return f"AvgSA_{im}_disagg_eps{eps}_iml{i:02d}"
+    return f"AvgSA_{im}_disagg_eps{eps}_{_iml_fname_token(iml)}"
 
 
-def disagg_config_name(im: str, eps: int, i: int) -> str:
-    """Config filename, e.g. ``config_AvgSA_03_disagg_eps4_iml01.ini``."""
-    return f"config_{disagg_analysis_name(im, eps, i)}.ini"
+def disagg_config_name(im: str, eps: int, iml: float) -> str:
+    """Config filename, e.g. ``config_AvgSA_03_disagg_eps4_0pt285.ini``."""
+    return f"config_{disagg_analysis_name(im, eps, iml)}.ini"
 
 
-def disagg_description(im: str, eps: int, i: int, iml: float) -> str:
+def disagg_description(im: str, eps: int, iml: float) -> str:
     """Engine description for a disagg analysis.
 
     The fields that make an analysis unique (im / eps / iml) are deliberately
@@ -264,8 +269,7 @@ def disagg_description(im: str, eps: int, i: int, iml: float) -> str:
     *truncated* description column and refuses to guess when the visible text
     cannot tell two analyses apart.
     """
-    return (f"[disagg AvgSA{im} eps{eps} iml{i:02d} {_iml_str(iml)}g "
-            f"- ESHM20 all sites]")
+    return f"[disagg AvgSA{im} eps{eps} iml {_iml_str(iml)}g - ESHM20 all sites]"
 
 
 def write_disagg_config(

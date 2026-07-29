@@ -105,8 +105,9 @@ def _set_up_selection(
     with open(fp, "rb") as f:
         disagg_stats = pickle.load(f)
 
-    # Only build ensembles for a per-site subset of IMLs (one MSA stripe each),
-    # listed in the imls_for_selection JSON: {site_id_str: [iml, ...]}.
+    # Only build ensembles for a per-site subset of IMLs (one MSA stripe each), listed in the
+    # imls_for_selection JSON: {site_id_str: {structure_tag: [iml, ...], ..., "union": [iml, ...]}}.
+    # We use the per-site "union" (all IMLs any structure at the site requests).
     with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
         imls_for_selection = json.load(f)
 
@@ -117,7 +118,8 @@ def _set_up_selection(
     site_poe_disaggs = {}
     invalid = []  # (site, iml) requested in the JSON but not usable (no stats row / no disagg df)
     for site in sorted(disagg_data.keys()):
-        wanted = imls_for_selection.get(str(site))
+        site_entry = imls_for_selection.get(str(site))
+        wanted = site_entry.get("union") if site_entry else None
         if wanted is None:
             continue  # site not listed in the subset JSON -> skip
         iml_keys = list(disagg_data[site][imt].keys())
