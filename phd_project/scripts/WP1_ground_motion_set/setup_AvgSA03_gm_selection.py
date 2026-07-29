@@ -111,11 +111,11 @@ def _set_up_selection(
     with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
         imls_for_selection = json.load(f)
 
-    # organise the disagg data, keyed by (site, poe). poe is looked up from the
-    # stats for each requested iml so the rest of the pipeline can keep the
-    # (site, poe) scheme unchanged.
+    # organise the disagg data, keyed by (site, iml). iml is the native key of the
+    # disagg data (disagg_data[site][imt][iml]); poe is derived downstream only
+    # where it is needed as metadata (see get_poe_from_disaggstats).
     imt = conditioning_imt.name  # "AvgSA" (only works for AvgSA; see disagg_imt comment below)
-    site_poe_disaggs = {}
+    site_iml_disaggs = {}
     invalid = []  # (site, iml) requested in the JSON but not usable (no stats row / no disagg df)
     for site in sorted(disagg_data.keys()):
         site_entry = imls_for_selection.get(str(site))
@@ -126,6 +126,7 @@ def _set_up_selection(
         for iml in wanted:
             if iml is None:
                 continue  # upper-stripe placeholder (iml above the hazard ceiling) -> skip
+            # validity probe: a zero-hazard / excluded iml has no stats row (poe is None)
             poe = get_poe_from_disaggstats(disagg_stats, site, imt, iml)
             key = next((k for k in iml_keys if np.isclose(k, iml)), None)
             if poe is None or key is None:
@@ -133,12 +134,14 @@ def _set_up_selection(
                 # an iml that was never disaggregated -> skip gracefully.
                 invalid.append((site, iml))
                 continue
-            site_poe_disaggs[(site, poe)] = disagg_data[site][imt][key]
-    site_poes = sorted(list(site_poe_disaggs.keys()), key=lambda x: x[0])
-    site_poe_disaggs = {k: site_poe_disaggs[k] for k in site_poes}
+            # Key by the exact disagg_data iml float (the native key); poe is 1:1 with
+            # iml per site and is derived downstream where it is needed as metadata.
+            site_iml_disaggs[(site, key)] = disagg_data[site][imt][key]
+    site_imls = sorted(list(site_iml_disaggs.keys()), key=lambda x: x[0])
+    site_iml_disaggs = {k: site_iml_disaggs[k] for k in site_imls}
 
-    print(f"Built {len(site_poe_disaggs)} (site, poe) disaggregations "
-          f"across {len({s for s, _ in site_poe_disaggs})} sites.")
+    print(f"Built {len(site_iml_disaggs)} (site, iml) disaggregations "
+          f"across {len({s for s, _ in site_iml_disaggs})} sites.")
     if invalid:
         print(f"WARNING: {len(invalid)} (site, iml) requested in imls_for_selection are not "
               f"present in disagg_stats/disagg_data and were skipped:")
@@ -232,4 +235,4 @@ def _set_up_selection(
         "occurence": occurence ,
     }
 
-    return site_poe_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db
+    return site_iml_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db

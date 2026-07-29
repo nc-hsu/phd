@@ -44,6 +44,11 @@ fp_gmm_logic_tree = cfg["hazard_models"]["eshm20_AvgSA_03_median_lt"]
 # output file paths
 preliminary_selection_fp = cfg["proc_data"]["gm_selection"] / f"AvgSA_03_prelim_selection_rake-90.pickle"
 
+# NOTE: standalone debug script. It loads its own legacy (site, poe)-keyed gcim
+# pickle (gcim_dist_AvgSA_03_rake-90.pickle) and looks up the iml from the disagg
+# stats, so it is deliberately kept on the (site, poe) scheme and is unaffected by
+# the main pipeline's (site, iml) re-keying.
+
 # Site and PoE:
 site_id = 30
 poe =  0.0001

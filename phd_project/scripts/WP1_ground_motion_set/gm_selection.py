@@ -335,7 +335,7 @@ def select_ensembles(
 
     
 def get_ground_motion_ensembles_for_sites(
-        site_poe_disaggs: dict, 
+        site_iml_disaggs: dict,
         disagg_stats: pd.DataFrame,
         gcim_dists: dict,
         ground_motion_database: pd.DataFrame,
@@ -345,16 +345,16 @@ def get_ground_motion_ensembles_for_sites(
         only: list[tuple[int, float]]=[],
         desc: str="Selecting GM Ensembles"
         ) -> dict:
-    """ 
-    site_poe_disaggs is a dictionary with the following levels
-    - (site_id: int, poe: float)    -> tuple
+    """
+    site_iml_disaggs is a dictionary with the following levels
+    - (site_id: int, iml: float)    -> tuple
        -> pd.DataFrame: exceedence probability of the disaggregations
 
     disagg_stats is pd.DataFrame containing with columns:
     - ["site_id", "seismicity", "region", "imt", "poe"]
     
     gcim_dists is a dictionary with the following levels
-    - (site_id: int, poe: float)    -> tuple
+    - (site_id: int, iml: float)    -> tuple
         -> dict: statistics and distributions of the GCIMs
     
     selection_ctx is a dictionary with the following required keys:
@@ -382,39 +382,36 @@ def get_ground_motion_ensembles_for_sites(
     ctx_builder_params  : list[str]     : list of keys in this dict that should be passed to ctx_builder after site_params e.g. ["average_depths", "assumed_rake"]      
 
     returns a dictionary with tuple keys:
-    - (site_id: int, poe: float)
- 
+    - (site_id: int, iml: float)
+
     """
 
     imt_strings = [imt.string for imt in basic_selection_ctx["selection_imts"]]
-    assert all(item in ground_motion_database["ims"].columns 
+    assert all(item in ground_motion_database["ims"].columns
            for item in imt_strings) , "Not all selection imts are available in the ground motion database"
-    imt = basic_selection_ctx["disagg_imt"]
 
     selections = {}
 
     if only != []:
         keys = only
     else:
-        keys = list(site_poe_disaggs.keys())
-    
+        keys = list(site_iml_disaggs.keys())
+
     ii_loop = tqdm(range(len(keys)), desc=desc)
     for ii in ii_loop:
-        site, poe = keys[ii]
+        site, iml = keys[ii]
 
-        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
-        poe_disagg = site_poe_disaggs[(site, poe)]
+        ii_loop.set_postfix(site=site, iml=f"{iml:9.6f}")
+        iml_disagg = site_iml_disaggs[(site, iml)]
 
         site_params = site_model.loc[site,:].to_dict()
         site_selection_ctx = deepcopy(basic_selection_ctx)
         site_selection_ctx["site_params"] = site_params
 
-        gcim_cdfs = gcim_dists[(site, poe)]["cdfs"]
-        iml = get_imtl_from_disaggstats(
-            disagg_stats, site, imt, poe)
-        
-        selections[(site, poe)] = get_record_ensembles_for_single_poe_distribution(
-            poe_disagg, iml, site_selection_ctx, ground_motion_database, 
+        gcim_cdfs = gcim_dists[(site, iml)]["cdfs"]
+
+        selections[(site, iml)] = get_record_ensembles_for_single_poe_distribution(
+            iml_disagg, iml, site_selection_ctx, ground_motion_database,
             gcim_cdfs, rng_seed
             )
 
@@ -423,7 +420,7 @@ def get_ground_motion_ensembles_for_sites(
 
 def optimise_ground_motion_ensembles_for_sites(
         preliminary_ensembles: dict,
-        site_poe_disaggs: dict[tuple[int, float], pd.DataFrame],
+        site_iml_disaggs: dict[tuple[int, float], pd.DataFrame],
         disagg_stats: pd.DataFrame,
         gcim_dists: dict[tuple[int, float], dict],
         ground_motion_database: pd.DataFrame,
@@ -431,7 +428,7 @@ def optimise_ground_motion_ensembles_for_sites(
         site_model: pd.DataFrame,
         only: list[tuple[int, float]]=[],
         shuffle:bool = False,
-        rng_seed: float = 1.0, 
+        rng_seed: float = 1.0,
         descr: str = "Optimising GM Ensembles",
         penalty_constant: float = 10
         ):
@@ -448,41 +445,40 @@ def optimise_ground_motion_ensembles_for_sites(
 
     ii_loop = tqdm(range(len(keys)), desc=f"{descr}")
     for ii in ii_loop:
-        site, poe = keys[ii]
-        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
-        pr_ensemble = preliminary_ensembles[(site, poe)]
-    
+        site, iml = keys[ii]
+        ii_loop.set_postfix(site=site, iml=f"{iml:9.6f}")
+        pr_ensemble = preliminary_ensembles[(site, iml)]
+
         # if there is no preliminary ensemble it can't be optimised
         if pr_ensemble is None:
-            optimised_ensembles[(site, poe)] = None
+            optimised_ensembles[(site, iml)] = None
             continue
 
-        disagg_dist = site_poe_disaggs[(site, poe)]
-        target_cdfs = gcim_dists[(site, poe)]["cdfs"]
+        disagg_dist = site_iml_disaggs[(site, iml)]
+        target_cdfs = gcim_dists[(site, iml)]["cdfs"]
 
         site_params = site_model.loc[site,:].to_dict()
         site_selection_ctx = basic_selection_ctx.copy()
         site_selection_ctx["site_params"] = site_params
 
         obj_func_kwargs = _optimise_obj_kwargs(
-            site, poe, gcim_dists, basic_selection_ctx, penalty_constant)
+            site, iml, gcim_dists, basic_selection_ctx, penalty_constant)
 
-        # do the optimisation
-        cond_iml = disagg_stats[(disagg_stats["site_id"] == site) &
-                                (disagg_stats["poe"] == poe)]["imtl"].iloc[0]
-        
+        # do the optimisation (the key IS the conditioning iml)
+        cond_iml = iml
+
         new_recs, score = greedy_optimise_ensemble(
-            pr_ensemble, cond_iml, disagg_dist, ground_motion_database, 
+            pr_ensemble, cond_iml, disagg_dist, ground_motion_database,
             site_selection_ctx, obj_func, obj_func_kwargs, is_nested=True,
             shuffle=shuffle, rng_seed=rng_seed)
 
         new_ensemble = assemble_ensemble_dict(
-            new_recs, target_cdfs, site_selection_ctx, 
+            new_recs, target_cdfs, site_selection_ctx,
             basic_selection_ctx["conditioning_imt"].string, cond_iml)
-        
-        optimised_ensembles[(site, poe)] = new_ensemble
-        scores[(site, poe)] = score
-    
+
+        optimised_ensembles[(site, iml)] = new_ensemble
+        scores[(site, iml)] = score
+
     return optimised_ensembles, scores
 
 
@@ -490,7 +486,7 @@ def optimise_ground_motion_ensembles_for_sites_with_shuffles(
         n_shuffles: int,
         rng_seeds: list[int],
         preliminary_ensembles: dict,
-        site_poe_disaggs: dict[tuple[int, float], pd.DataFrame],
+        site_iml_disaggs: dict[tuple[int, float], pd.DataFrame],
         disagg_stats: pd.DataFrame,
         gcim_dists: dict[tuple[int, float], dict],
         ground_motion_database: pd.DataFrame,
@@ -498,32 +494,32 @@ def optimise_ground_motion_ensembles_for_sites_with_shuffles(
         site_model: pd.DataFrame,
         only: list[tuple[int, float]]=[],
     ):
-    
+
     assert len(rng_seeds) >= n_shuffles, "The number of seeds must be >= the number of shuffles"
 
     ensembles = []
     scores = []
     for ii, rng_seed in enumerate(rng_seeds):
         es, ss = optimise_ground_motion_ensembles_for_sites(
-            preliminary_ensembles, site_poe_disaggs, disagg_stats,
-            gcim_dists, ground_motion_database, basic_selection_ctx, site_model, only, 
+            preliminary_ensembles, site_iml_disaggs, disagg_stats,
+            gcim_dists, ground_motion_database, basic_selection_ctx, site_model, only,
             shuffle=True, rng_seed=rng_seed, descr=f"Shuffle {ii+1} - Optimising Ensemble")
         ensembles.append(es)
         scores.append(ss)
 
     score_tuples = {
-        key: tuple(d[key] for d in scores) 
+        key: tuple(d[key] for d in scores)
         for key in scores[0].keys()
         }
 
     best_ensembles = {}
     best_scores = {}
-    for site_poe, scores in score_tuples.items():
+    for site_iml, scores in score_tuples.items():
         best_score = min(scores)
         idx = scores.index(best_score)
-        best_ensemble = ensembles[idx][site_poe]
-        best_ensembles[site_poe] = best_ensemble
-        best_scores[site_poe] = best_score
+        best_ensemble = ensembles[idx][site_iml]
+        best_ensembles[site_iml] = best_ensemble
+        best_scores[site_iml] = best_score
 
     return best_ensembles, best_scores
 
@@ -584,11 +580,11 @@ def get_record_ensembles_for_single_poe_distribution(
 
 
 def calculate_gcim_distributions_for_sites(
-        site_poe_disaggs: dict, disagg_stats: pd.DataFrame, 
-        site_model: pd.DataFrame, basic_selection_ctx: dict, 
+        site_iml_disaggs: dict, disagg_stats: pd.DataFrame,
+        site_model: pd.DataFrame, basic_selection_ctx: dict,
         percentiles: list[int]) -> dict:
-    """ 
-    site_poe_disaggs is a dictionary with tuple keys (site_id: int, poe: float)
+    """
+    site_iml_disaggs is a dictionary with tuple keys (site_id: int, iml: float)
         -> exceedence probability of the disaggregations
 
     disagg_stats is pd.DataFrame containing with columns:
@@ -628,38 +624,38 @@ def calculate_gcim_distributions_for_sites(
                         : true if the dissagregation was done for "P(m|X=x)"
     
     returns a dictionary with the tuple keys:
-    - (site_id: int, poe: float) 
+    - (site_id: int, iml: float)
         -> dict: GCIM distribution statistics and distributions"""
-    
-    bsc = basic_selection_ctx 
+
+    bsc = basic_selection_ctx
 
     gcim_dists = {}
-    keys = list(site_poe_disaggs.keys())
+    keys = list(site_iml_disaggs.keys())
 
     ii_loop = tqdm(range(len(keys)), desc="Calculating GCIM Distributions")
     for ii in ii_loop:
-        site, poe = keys[ii]
-        ii_loop.set_postfix(site=site, poe=f"{poe:9.6f}")
-        
+        site, iml = keys[ii]
+        ii_loop.set_postfix(site=site, iml=f"{iml:9.6f}")
+
         # initialise the context builder
         site_params = site_model.loc[site,:].to_dict()
         site_selection_ctx = deepcopy(basic_selection_ctx)
         site_selection_ctx["site_params"] = site_params
         ctx_builder = _initialise_ctx_builder(site_selection_ctx)
-        
-        poe_disagg = site_poe_disaggs[(site, poe)]
 
-        imtl = get_imtl_from_disaggstats(
-            disagg_stats, site, bsc["conditioning_imt"].name, poe)
-            
+        iml_disagg = site_iml_disaggs[(site, iml)]
+
+        # the key IS the conditioning iml (imtl)
+        imtl = iml
+
         gcim_stats, gcim_pdfs, gcim_cdfs = gcim_distributions(
-            poe_disagg, imtl, bsc["gmm_map"], bsc["selection_imts"], 
-            bsc["conditioning_imt"], bsc["corr_map"], ctx_builder, 
+            iml_disagg, imtl, bsc["gmm_map"], bsc["selection_imts"],
+            bsc["conditioning_imt"], bsc["corr_map"], ctx_builder,
             bsc["occurence"], percentiles)
-            
-        gcim_dists[(site, poe)] = {
-            "stats": gcim_stats, 
-            "pdfs": gcim_pdfs, 
+
+        gcim_dists[(site, iml)] = {
+            "stats": gcim_stats,
+            "pdfs": gcim_pdfs,
             "cdfs": gcim_cdfs}
 
     return gcim_dists
@@ -755,6 +751,18 @@ def get_poe_from_disaggstats(disagg_stats, site_id, imt, imtl):
     if row.empty:
         return None
     return float(row["poe"].values[0])
+
+
+def iml_filename_tag(iml: float) -> str:
+    """Filename-safe token for an intensity level, e.g. ``0.27 -> "00pt270"``.
+
+    Fixed 3 decimals (covers the resolution of the selection IMLs) with the
+    integer part zero-padded to 2 digits and ``.`` encoded as ``pt``. Used in the
+    per-stripe selection pickle names ``site_{site}__stripe_iml_{tag}`` so the
+    stripe's intensity is visible in the filename; ``standes.find_stripe_pickles``
+    parses the value back to a float to order stripes numerically."""
+    intp, frac = f"{iml:.3f}".split(".")   # 0.27 -> "0","270"; 1.15 -> "1","150"
+    return f"{intp.zfill(2)}pt{frac}"        # -> "00pt270", "01pt150"
 
 
 def adjust_ensemble_distributions(
@@ -1637,7 +1645,7 @@ def assemble_ensemble_dict(new_recs, target_gcim_cdfs, site_selection_ctx,
 
 
 def preliminary_record_selection(
-        site_poe_disaggs: dict,
+        site_iml_disaggs: dict,
         disagg_stats: dict,
         gcim_dists: dict,
         gm_db: pd.DataFrame,
@@ -1655,8 +1663,8 @@ def preliminary_record_selection(
 
     """
     performs the preliminary record selection step of the workflow.
-    This involves selecting a set of candidate ensembles for each site and poe,
-    then selecting the best ensemble for each site and poe based on the
+    This involves selecting a set of candidate ensembles for each site and iml,
+    then selecting the best ensemble for each site and iml based on the
     weighted KS statistic and a penalty for failing IMs. The results are
     saved to a file if preliminary_selection_fp is provided.
 
@@ -1677,29 +1685,29 @@ def preliminary_record_selection(
         nonlocal candidate_ensembles
         # select multiple candidtate ensembles for all sites
         candidate_ensembles = get_ground_motion_ensembles_for_sites(
-            site_poe_disaggs, disagg_stats, gcim_dists,
+            site_iml_disaggs, disagg_stats, gcim_dists,
             gm_db, basic_selection_ctx, site_model, rng_seed, only_select,
             desc=desc if desc is not None else "Selecting GM Ensembles")
 
-        # get the best of the candidate ensembles for each site and poe
+        # get the best of the candidate ensembles for each site and iml
         obj_func = weighted_ks_statistic_and_L2norm_penalty
 
         preliminary_ensembles = {}
 
-        for (site, poe), ensembles in candidate_ensembles.items():
+        for (site, iml), ensembles in candidate_ensembles.items():
 
             if ensembles == []:
                 # no ensemble was found
-                preliminary_ensembles[(site, poe)] = None
+                preliminary_ensembles[(site, iml)] = None
                 continue
 
             obj_func_kwargs = _optimise_obj_kwargs(
-                        site, poe, gcim_dists, basic_selection_ctx, penalty_constant)
+                        site, iml, gcim_dists, basic_selection_ctx, penalty_constant)
 
             e = get_best_ensemble_in_list(
                 ensembles, basic_selection_ctx["conditioning_imt"].string,
                 obj_func, obj_func_kwargs)
-            preliminary_ensembles[(site, poe)] = e
+            preliminary_ensembles[(site, iml)] = e
 
         return preliminary_ensembles
 
@@ -1731,29 +1739,29 @@ def preliminary_record_selection(
     # Check if all the sites and poes found a set of suitable ground motions
     prelim_ensembles_not_passing = []
     no_preliminary_ensembles = []
-    for (site, poe), ensemble in preliminary_ensembles.items():
-        
+    for (site, iml), ensemble in preliminary_ensembles.items():
+
         if ensemble is None:
-            prelim_ensembles_not_passing.append((site, poe))
-            no_preliminary_ensembles.append((site, poe))
-        
+            prelim_ensembles_not_passing.append((site, iml))
+            no_preliminary_ensembles.append((site, iml))
+
         elif not ensemble["ks_passed"]:
-            prelim_ensembles_not_passing.append((site, poe))
+            prelim_ensembles_not_passing.append((site, iml))
 
     if not quiet:
         if len(prelim_ensembles_not_passing) == 0:
-            print(f"OK! - Preliminary ensembles pass for all combinations of site and poe")
+            print(f"OK! - Preliminary ensembles pass for all combinations of site and iml")
         else:
-            print(f"Sub-Optimal! - Preliminary ensembles do not pass for {len(prelim_ensembles_not_passing)} combinations of site and poe")
+            print(f"Sub-Optimal! - Preliminary ensembles do not pass for {len(prelim_ensembles_not_passing)} combinations of site and iml")
 
         if no_preliminary_ensembles:
-            print(f"No preliminary ensembles found for {len(no_preliminary_ensembles)} combinations of site and poe")
+            print(f"No preliminary ensembles found for {len(no_preliminary_ensembles)} combinations of site and iml")
 
     return preliminary_ensembles, prelim_ensembles_not_passing, no_preliminary_ensembles, candidate_ensembles
 
 
 def optimise_record_selection(
-        site_poe_disaggs: dict,
+        site_iml_disaggs: dict,
         disagg_stats: dict,
         gcim_dists: dict,
         gm_db: pd.DataFrame,
@@ -1777,15 +1785,15 @@ def optimise_record_selection(
         # do the ensemble optimisation
         if shuffle and n_shuffles > 1:
             # re-optimise over several shuffled DB orderings and keep the
-            # best-scoring ensemble per (site, poe) (used by the round-4 retry).
+            # best-scoring ensemble per (site, iml) (used by the round-4 retry).
             seeds = rng_seeds if rng_seeds is not None else list(range(1, n_shuffles + 1))
             optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites_with_shuffles(
-                n_shuffles, seeds, preliminary_ensembles, site_poe_disaggs,
+                n_shuffles, seeds, preliminary_ensembles, site_iml_disaggs,
                 disagg_stats, gcim_dists, gm_db, basic_selection_ctx, site_model,
                 only_optimise)
         else:
             optimised_ensembles, _ = optimise_ground_motion_ensembles_for_sites(
-                preliminary_ensembles, site_poe_disaggs, disagg_stats,
+                preliminary_ensembles, site_iml_disaggs, disagg_stats,
                 gcim_dists, gm_db, basic_selection_ctx, site_model, only_optimise,
                 penalty_constant=penalty_constant, shuffle=shuffle,
                 rng_seed=rng_seed, descr=description)
@@ -1817,19 +1825,19 @@ def optimise_record_selection(
 
     # Check if all the sites and poes found a set of suitable ground motions
     optim_ensembles_not_passing = []
-    for (site, poe), ensemble in optimised_ensembles.items():
+    for (site, iml), ensemble in optimised_ensembles.items():
 
         if ensemble is None:
-            optim_ensembles_not_passing.append((site, poe))
+            optim_ensembles_not_passing.append((site, iml))
 
         elif not ensemble["ks_passed"]:
-            optim_ensembles_not_passing.append((site, poe))
+            optim_ensembles_not_passing.append((site, iml))
 
     if not quiet:
         if len(optim_ensembles_not_passing) == 0:
-            print(f"OK! - Optimised ensembles pass for all combinations of site and poe")
+            print(f"OK! - Optimised ensembles pass for all combinations of site and iml")
         else:
-            print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and poe")
+            print(f"Sub-Optimal! - Optimised ensembles do not pass for {len(optim_ensembles_not_passing)} combinations of site and iml")
 
     return optimised_ensembles, optim_ensembles_not_passing
 
@@ -1891,16 +1899,16 @@ def _selection_ctx_fingerprint_inputs(ctx: dict) -> dict:
     }
 
 
-def _optimise_obj_kwargs(site, poe, gcim_dists, basic_selection_ctx,
+def _optimise_obj_kwargs(site, iml, gcim_dists, basic_selection_ctx,
                          penalty_constant: float = 10) -> dict:
     """Build the ``weighted_ks_statistic_and_L2norm_penalty`` kwargs for one
-    ``(site, poe)``.
+    ``(site, iml)``.
 
     Shared by :func:`optimise_ground_motion_ensembles_for_sites` and the engine's
     keep-best scoring (:func:`_score_ensemble`) so both evaluate an *identical*
     objective — otherwise the round-4 keep/replace comparison would be meaningless.
     """
-    target_cdfs = gcim_dists[(site, poe)]["cdfs"]
+    target_cdfs = gcim_dists[(site, iml)]["cdfs"]
     ks_bounds = ensemble_ks_bounds(
         target_cdfs,
         basic_selection_ctx["n_samples"],
@@ -1919,25 +1927,25 @@ def _optimise_obj_kwargs(site, poe, gcim_dists, basic_selection_ctx,
     }
 
 
-def _score_ensemble(ensemble, site, poe, gcim_dists, basic_selection_ctx) -> float:
+def _score_ensemble(ensemble, site, iml, gcim_dists, basic_selection_ctx) -> float:
     """Objective score for an ensemble (lower is better); ``np.inf`` if missing.
 
     Uses the same objective as the greedy optimiser so scores are directly
-    comparable across rounds for a given ``(site, poe)`` (the target CDFs, and
-    hence the objective, depend only on ``(site, poe)`` — not on the round's
+    comparable across rounds for a given ``(site, iml)`` (the target CDFs, and
+    hence the objective, depend only on ``(site, iml)`` — not on the round's
     causal-parameter bounds). Used to keep the better of the incumbent and the
     shuffled round-4 result.
     """
     if ensemble is None:
         return np.inf
-    kwargs = _optimise_obj_kwargs(site, poe, gcim_dists, basic_selection_ctx)
+    kwargs = _optimise_obj_kwargs(site, iml, gcim_dists, basic_selection_ctx)
     cond = basic_selection_ctx["conditioning_imt"].string
     ims = np.log(ensemble["recs"]["ims_scaled"].drop(columns=cond).to_numpy())
     return weighted_ks_statistic_and_L2norm_penalty(ims, **kwargs)
 
 
 def build_final_ensembles(
-        site_poe_disaggs: dict,
+        site_iml_disaggs: dict,
         disagg_stats: dict,
         gcim_dists: dict,
         gm_db: pd.DataFrame,
@@ -1993,7 +2001,7 @@ def build_final_ensembles(
         One bool per round (same length as ``round_unbounded``). ``True`` re-runs
         that round's optimisation over ``n_shuffles`` shuffled database orderings
         (via :func:`optimise_ground_motion_ensembles_for_sites_with_shuffles`)
-        and, per ``(site, poe)``, keeps the best of {the shuffled result, the
+        and, per ``(site, iml)``, keeps the best of {the shuffled result, the
         incumbent from earlier rounds} — replacing the incumbent only if the new
         ensemble passes or scores strictly better. This is the round-4 retry that
         tries to escape a bad greedy local optimum for the last stubborn sets.
@@ -2025,7 +2033,7 @@ def build_final_ensembles(
     shuffle_seeds = (shuffle_rng_seeds if shuffle_rng_seeds is not None
                      else list(range(1, n_shuffles + 1)))
 
-    all_keys = list(site_poe_disaggs.keys())
+    all_keys = list(site_iml_disaggs.keys())
 
     # Base inputs common to every stage. Source files are hashed by their bytes
     # (cheap and stable) rather than re-hashing the large in-memory objects.
@@ -2105,20 +2113,20 @@ def build_final_ensembles(
         # sites that still have no record set at all (None selection result).
         if r == 0:
             sel_keys = list(work_set)
-            print(f"Selection phase — all {len(sel_keys)} (site, poe) [first round]")
+            print(f"Selection phase — all {len(sel_keys)} (site, iml) [first round]")
         else:
             sel_keys = [k for k in work_set if base.get(k) is None]
             if sel_keys:
-                print(f"Selection phase — reselecting {len(sel_keys)} (site, poe) "
+                print(f"Selection phase — reselecting {len(sel_keys)} (site, iml) "
                       f"that had no record set after round {r}")
             else:
                 print("Selection phase — none need reselection (every failing "
-                      "(site, poe) already has a record set)")
+                      "(site, iml) already has a record set)")
         sel_key_set = set(sel_keys)
 
         if sel_keys:
             sel = preliminary_record_selection(
-                site_poe_disaggs, disagg_stats, gcim_dists, gm_db,
+                site_iml_disaggs, disagg_stats, gcim_dists, gm_db,
                 select_ctx, site_model, rng_seed,
                 preliminary_selection_fp=stage_fps["select"][r],
                 only_select=sel_keys,
@@ -2142,7 +2150,7 @@ def build_final_ensembles(
         else:
             opt_keys = [k for k in work_set if not _ensemble_passes(ensembles.get(k))]
             scope = "only sites still failing"
-        print(f"Optimisation phase — {len(opt_keys)} (site, poe)  [{scope}]")
+        print(f"Optimisation phase — {len(opt_keys)} (site, iml)  [{scope}]")
 
         if opt_keys:
             # Describe what the work-set is made of (helps read the counts).
@@ -2170,7 +2178,7 @@ def build_final_ensembles(
                 opt_extra.update(shuffle=True, n_shuffles=n_shuffles,
                                  rng_seeds=tuple(shuffle_seeds))
             opt, _ = optimise_record_selection(
-                site_poe_disaggs, disagg_stats, gcim_dists, gm_db,
+                site_iml_disaggs, disagg_stats, gcim_dists, gm_db,
                 optimise_ctx, site_model, base,
                 optimised_selection_fp=stage_fps["optimise"][r],
                 only_optimise=opt_keys, shuffle=shuf, rng_seed=rng_seed,
@@ -2208,18 +2216,18 @@ def build_final_ensembles(
         # carry the sites that still don't have a passing record set
         work_set = [k for k in all_keys if not _ensemble_passes(ensembles.get(k))]
         if work_set:
-            print(f"-> {len(work_set)} (site, poe) carried into the next round")
+            print(f"-> {len(work_set)} (site, iml) carried into the next round")
         else:
-            print("-> all (site, poe) now pass")
+            print("-> all (site, iml) now pass")
 
     final_ensembles = ensembles
     print()
 
     if work_set:
-        print(f"Sub-Optimal! - {len(work_set)} (site, poe) still without a passing "
+        print(f"Sub-Optimal! - {len(work_set)} (site, iml) still without a passing "
               f"ensemble after {n_rounds} rounds")
     else:
-        print(f"OK! - all (site, poe) have a passing ensemble after {n_rounds} rounds")
+        print(f"OK! - all (site, iml) have a passing ensemble after {n_rounds} rounds")
 
     # Save the canonical artifact + manifest.
     output_fp.parent.mkdir(parents=True, exist_ok=True)
@@ -2282,13 +2290,14 @@ if __name__ == "__main__":
     else:
         print("No existing GCIM distribution data found...")
     
-    only_select = [(6, 0.002103)]
+    # NOTE: keys are now (site, iml); pick an iml present in site_iml_disaggs for site 6.
+    only_select = [(6, 0.36)]
 
     # set up the record selection
-    site_poe_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db = setup_AvgSA03_gcim_gm_selection()
+    site_iml_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db = setup_AvgSA03_gcim_gm_selection()
 
     c1_ensembles, prelim_ensembles_not_passing, no_preliminary_ensembles, candidates = preliminary_record_selection(
-        site_poe_disaggs, disagg_stats, gcim_dists, gm_db, basic_selection_ctx, site_model, rng_seed, 
+        site_iml_disaggs, disagg_stats, gcim_dists, gm_db, basic_selection_ctx, site_model, rng_seed,
         preliminary_selection_fp=None, only_select=only_select, load_rs_if_exists=False)
     ...
     
