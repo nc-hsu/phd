@@ -214,6 +214,26 @@ def load_manifest(artifact_fp: Path) -> dict:
         return json.load(f)
 
 
+def manifest_matches(artifact_fp: Path, fp_dict: dict) -> bool:
+    """Return True iff ``artifact_fp`` has a manifest matching ``fp_dict``.
+
+    Non-raising sibling of :func:`verify`: the artifact is considered a valid
+    cache when its ``<artifact>.manifest.json`` sidecar exists and every key in
+    ``fp_dict`` has the same hash there. A missing sidecar (or any mismatch)
+    returns False rather than raising. Used by the per-stripe incremental cache
+    to decide whether a ``(site, iml)`` stripe still needs recomputing.
+    """
+    try:
+        cached = load_manifest(artifact_fp).get("inputs", {})
+    except StaleCacheError:
+        return False
+    # Subset semantics (like verify): only the keys in fp_dict must match.
+    return all(
+        cached.get(name, {}).get("hash") == cur.get("hash")
+        for name, cur in fp_dict.items()
+    )
+
+
 def verify(artifact_fp: Path, fp_dict: dict) -> None:
     """Assert a cached artifact's manifest still matches the given inputs.
 
