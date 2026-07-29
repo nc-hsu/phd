@@ -51,6 +51,7 @@ from phd_project.scripts.cache_utils import (
     fingerprint,
     load_or_compute,
     write_manifest,
+    manifest_matches,
     StaleCacheError,
 )
 
@@ -763,6 +764,70 @@ def iml_filename_tag(iml: float) -> str:
     parses the value back to a float to order stripes numerically."""
     intp, frac = f"{iml:.3f}".split(".")   # 0.27 -> "0","270"; 1.15 -> "1","150"
     return f"{intp.zfill(2)}pt{frac}"        # -> "00pt270", "01pt150"
+
+
+def stripe_pickle_path(result_folder, site, iml) -> Path:
+    """Canonical result path for one ``(site, iml)`` stripe pickle."""
+    return Path(result_folder) / f"site_{site}__stripe_iml_{iml_filename_tag(iml)}__gm_selection.pickle"
+
+
+def stripe_input_fingerprint(site, iml, source_fps: dict,
+                             basic_selection_ctx: dict, selection_config: dict) -> dict:
+    """Provenance fingerprint of everything that determines *one* stripe's result.
+
+    This is the single definition used across notebooks 031/032/033 to decide
+    whether a ``(site, iml)`` stripe is still valid. It hashes only the inputs
+    that *produce* that stripe — the upstream files (by bytes), the specific
+    site/iml, the gcim percentiles, the round configuration, and the selection
+    context — and **deliberately excludes the per-site IML subset JSON**. That is
+    what makes the cache incremental: adding IMLs to the ``union`` lists grows the
+    *set* of wanted stripes without changing any existing stripe's fingerprint.
+
+    ``source_fps`` must provide ``disagg_data_file``, ``disagg_stats_file``,
+    ``gm_db_file``, ``site_model_file`` and ``gmm_lt_file`` (paths). Because all
+    three notebooks must compute an identical fingerprint, ``selection_config``
+    (percentiles + round config) is centralised in the setup module — see
+    ``SELECTION_CONFIG``.
+    """
+    sc = selection_config
+    return fingerprint(
+        disagg_data_file=source_fps["disagg_data_file"],
+        disagg_stats_file=source_fps["disagg_stats_file"],
+        gm_db_file=source_fps["gm_db_file"],
+        site_model_file=source_fps["site_model_file"],
+        gmm_lt_file=source_fps["gmm_lt_file"],
+        site=int(site),
+        iml=float(iml),
+        percentiles=tuple(sc["percentiles"]),
+        # repr() gives a stable, deterministic key for the (possibly nested /
+        # dict-valued) round configuration without depending on pickle ordering.
+        round_config=repr((
+            sc["round_unbounded"], sc["force_optimisation"], sc["shuffle"],
+            sc["n_shuffles"], sc["shuffle_rng_seeds"], sc["rng_seed"],
+        )),
+        **_selection_ctx_fingerprint_inputs(basic_selection_ctx),
+    )
+
+
+def find_stale_stripes(wanted_keys, result_folder, fp_fn):
+    """Split ``wanted_keys`` into ``(to_compute, valid)`` against the result folder.
+
+    A ``(site, iml)`` is *valid* iff its stripe pickle exists and its
+    ``.manifest.json`` sidecar matches ``fp_fn(site, iml)`` (see
+    :func:`stripe_input_fingerprint`); otherwise it is *to_compute* (missing,
+    unmanaged, or stale). This is the "what has been selected and is still valid"
+    tracker: pass ``to_compute`` down the pipeline to (re)select only those
+    stripes, leaving every valid stripe on disk untouched.
+    """
+    result_folder = Path(result_folder)
+    to_compute, valid = [], []
+    for (site, iml) in wanted_keys:
+        stripe_fp = stripe_pickle_path(result_folder, site, iml)
+        if stripe_fp.is_file() and manifest_matches(stripe_fp, fp_fn(site, iml)):
+            valid.append((site, iml))
+        else:
+            to_compute.append((site, iml))
+    return to_compute, valid
 
 
 def adjust_ensemble_distributions(

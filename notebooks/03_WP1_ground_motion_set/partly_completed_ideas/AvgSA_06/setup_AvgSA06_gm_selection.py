@@ -19,6 +19,39 @@ import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 cfg = load_config()
 
 
+# Canonical selection configuration, shared by notebooks 034 (gcim percentiles),
+# 035 (round config) and 036 (per-stripe manifest). MUST be the single source for
+# these values: stripe_input_fingerprint hashes them, so any divergence between
+# notebooks would desynchronise the incremental stale check. Keep in sync with the
+# values passed to build_final_ensembles in nb 035.
+SELECTION_CONFIG = {
+    "percentiles": [0.05, 0.16, 0.33, 0.5, 0.67, 0.84, 0.95],
+    "round_unbounded": [[], ["d"], ["m", "d", "vs30"], ["m", "d", "vs30"]],
+    "force_optimisation": [False, False, False, False],
+    "shuffle": [False, False, False, True],
+    "n_shuffles": 5,
+    "shuffle_rng_seeds": [1, 2, 3, 4, 5],
+    "rng_seed": 1,
+}
+
+
+def stripe_source_fps() -> dict:
+    """Source-file paths that determine each AvgSA_06 stripe's result.
+
+    Consumed by ``gm_selection.stripe_input_fingerprint`` (via
+    ``find_stale_stripes``) in every notebook, so the incremental stale check is
+    computed identically throughout. Deliberately EXCLUDES the per-site IML
+    subset JSON (``AvgSA_06_imls_for_selection``).
+    """
+    return {
+        "disagg_data_file":  cfg["proc_data"]["AvgSA_06_disagg_data_gm_selection"],
+        "disagg_stats_file": cfg["proc_data"]["AvgSA_06_disagg_stats_gm_selection"],
+        "gm_db_file":        cfg["proc_data"]["gm_database"],
+        "site_model_file":   cfg["hazard_models"]["eshm20_wp1_site_model"],
+        "gmm_lt_file":       cfg["hazard_models"]["eshm20_AvgSA_06_median_lt"],
+    }
+
+
 def setup_AvgSA06_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125):
     ########### set some parameters for the selection ##########################
     t_lower = 0.025     # lower SA period considered in selection
