@@ -58,7 +58,7 @@ _RSN_FOLDER_RE = re.compile(r"NGASub_RSN_(\d+)", re.IGNORECASE)
 
 # PEER NGA-Sub portal limits: 30 RSNs per sub-batch, 200 RSNs per download session.
 BATCH_SIZE = 30
-SESSION_LIMIT = 50
+SESSION_LIMIT = 200
 
 
 def _as_code(value):
