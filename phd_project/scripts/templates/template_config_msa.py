@@ -28,6 +28,10 @@ injection_function_params (default {}) holds any extra keyword parameters passed
 - max_n_records caps how many records are run per stripe. None runs all records;
   an integer smaller than a stripe's record count runs only the first that many.
 
+- resume (default True) skips any (stripe, record) pair whose result log already
+  exists, so re-running the batch -- e.g. after dropping in an extra stripe pickle --
+  only analyses the missing pairs. Set to False to force a full re-run.
+
 """
 
 results_folder_name = "msa"
@@ -39,6 +43,7 @@ gm_selection_src_str = 'C:/Users/clemettn/Desktop/test_msa'
 record_src_str = 'C:/Users/clemettn/Documents/phd/data_processed/07_gm_records'
 stripe_order_ascending = True
 max_n_records = None
+resume = True
 gravity = 9810          # mm/s²
 excitation_dof = 1
 max_record_time = None
@@ -56,6 +61,7 @@ config = {
     "gm_selection_src": Path(gm_selection_src_str),
     "stripe_order_ascending": stripe_order_ascending,
     "max_n_records": max_n_records,
+    "resume": resume,
     "record_src": Path(record_src_str),
     "injection_functions": injection_functions,
     "post_process": True,

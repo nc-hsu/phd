@@ -302,39 +302,39 @@ each building subfolder is a complete "parallel, single building" layout:
 An MSA runs a model against **stripes** — sets of records selected for a given hazard
 level. Every mode shares the same config format (`template_config_msa.py`), which points
 at the stripe selection pickles and the record source. As with IDA, the modes differ only
-in execution strategy, and **all produce identical output**.
-
-There are three execution strategies plus two site-level wrappers:
+in execution strategy, and **all produce identical output**. The layout mirrors IDA:
+a single-building coordinator, plus a top-level multi-building launcher.
 
 | Template | Strategy | Notes |
 |----------|----------|-------|
 | `run_msa_serial` | **Serial.** Every stripe in turn, every record in turn, one process. | Simplest; debugging / small jobs. |
-| `run_batch_msa_per_stripe_record` **+** `run_msa_per_record` | **Parallel across (stripe, record) pairs.** All stripes and records are flattened and run concurrently. | Maximum parallelism; fills cores fastest for one building. |
-| `run_batch_msa_per_record` **+** `run_msa_per_record` | **Stripe by stripe, parallel within a stripe.** Finishes and collates one stripe before starting the next. | Parallel, but stripes complete in order — useful when you want early stripes done first. |
-| `run_msa_site` | Thin wrapper → `run_batch_msa_per_stripe_record` with the shared semaphore on and workers quiet. | The per-site entry point used by the multi-site launcher. |
-| `run_batch_msa_sites` | **Many sites at once.** One coordinator per site, sharing one core budget. | The MSA analogue of `run_batch_ida_buildings`. |
+| `run_batch_msa_per_record` **+** `run_msa_per_record` | **Parallel across (stripe, record) pairs.** All stripes and records are flattened and run concurrently for one building. | The MSA analogue of `run_batch_ida_per_record`; fills cores fastest for one building. |
+| `run_batch_msa_buildings` | **Many buildings at once.** One coordinator per building, sharing one core budget. | The MSA analogue of `run_batch_ida_buildings`. |
 
-### Key difference between the two parallel MSA modes
+The coordinator (`run_batch_msa_per_record`) and its worker (`run_msa_per_record`, tag =
+`"stripe_id:record"`) throw every (stripe, record) pair into one pool and run them all
+concurrently, so the machine fills as fast as possible. Stripes finish in no particular
+order; each stripe's log and the collated `msa_log.json` are assembled once all workers
+have finished.
 
-Both use the same worker (`run_msa_per_record`, tag = `"stripe:record"`); they differ in
-*how work is grouped*:
+### Resuming / adding a stripe later
 
-- **`per_stripe_record`** throws every (stripe, record) into one pool and runs them all
-  concurrently. Stripes finish in no particular order; best raw throughput.
-- **`per_record`** processes stripes sequentially, parallelising only the records within
-  the current stripe, and collates each stripe before moving on. Slightly less peak
-  parallelism, but stripes complete in order and results appear stripe-by-stripe.
+Runs are **resumable**. Each (stripe, record) pair writes a `record_<t>_log.json` last, so
+re-running the batch skips any pair whose log already exists. Because stripe result folders
+are keyed by the stripe's **intensity tag** (`stripe_<iml>`, e.g. `stripe_00pt360`) rather
+than a positional index, dropping an extra stripe pickle into `gm_selection_src` and
+re-running analyses *only the new stripe* — existing stripes keep their identity no matter
+where the new one falls in intensity order. Controlled by `resume` in `config_msa`
+(default `True`; set `False` to force a full re-run).
 
-Choose `per_stripe_record` (or the site wrappers) to fill the machine as fast as
-possible; choose `per_record` when ordered, incremental stripe results matter.
+### Multi-building — `run_batch_msa_buildings`
 
-### Multi-site — `run_batch_msa_sites`
-
-Set `sites_root` (and optionally an explicit `site_names` list) at the top of the file.
-Each immediate subfolder that contains `config_msa.py` + `run_msa_site.py` is treated as a
-site. The launcher runs up to `max_coordinators` site coordinators at once; each
-coordinator draws its NLTHA workers from the shared semaphore, so total live workers stay
-capped machine-wide.
+Populate the `buildings` list at the top of the file (each entry a `{folder, config}` pair,
+where `folder` contains `run_batch_msa_per_record.py` + the named config), by hand or with
+`copy_batch_ida_buildings`. The launcher runs up to `max_coordinators` building coordinators
+at once; each coordinator draws its NLTHA workers from the shared semaphore, so total live
+workers stay capped machine-wide. Pass `--max-workers` / `--no-semaphore` to run each
+building with a fixed worker count instead of the shared semaphore.
 
 ### Folder layout per MSA mode
 
@@ -356,15 +356,15 @@ after a run.
 ├─ config_msa.py                     ← the MSA config (points at the stripe pickles)
 ├─ run_msa_serial.py
 └─ msa/                              ← created by the run (named by results_folder_name)
-   ├─ stripe_1/  …  stripe_n/        ← per-record pickles + record_<t>_log.json + msa_log_stripe_<n>.json
+   ├─ stripe_00pt310/  …  stripe_00pt500/  ← per-stripe folders keyed by intensity tag;
+   │                                          per-record pickles + record_<t>_log.json + msa_log_stripe_<iml>.json
    ├─ msa_log.json
    ├─ msa_summary.json
    └─ collapse_fragility.json
 ```
 
-**Parallel — flattened** (`run_batch_msa_per_stripe_record`) and **stripe-by-stripe**
-(`run_batch_msa_per_record`) — both add the same worker; only the coordinator differs.
-`worker_logs/` appears inside the results folder only under `--quiet`:
+**Parallel** (`run_batch_msa_per_record` **+** `run_msa_per_record`) — the coordinator plus
+its worker. `worker_logs/` appears inside the results folder only under `--quiet`:
 
 ```
 3s_cbf_dc2_41_ss/
@@ -373,33 +373,32 @@ after a run.
 ├─ injection_functions.py
 ├─ msa_process_recorders.py
 ├─ config_msa.py
-├─ run_batch_msa_per_stripe_record.py   ← coordinator  ← or run_batch_msa_per_record.py
+├─ run_batch_msa_per_record.py          ← coordinator
 ├─ run_msa_per_record.py                ← worker (sibling of exactly this name — required)
 └─ msa/                                 ← created by the run
-   ├─ stripe_1/  …  stripe_n/
+   ├─ stripe_00pt310/  …  stripe_00pt500/
    ├─ msa_log.json
    ├─ msa_summary.json
    ├─ collapse_fragility.json
    └─ worker_logs/                      ← only with --quiet
-      ├─ worker_record_1_0.log          (tag "stripe:record", with ":" → "_")
+      ├─ worker_record_00pt360_0.log    (tag "stripe_id:record", with ":" → "_")
       └─ …
 ```
 
-**Many sites** (`run_batch_msa_sites`) — one launch script in a parent folder; each site
-subfolder adds the thin `run_msa_site.py` wrapper on top of the flattened layout:
+**Many buildings** (`run_batch_msa_buildings`) — one launch script in a parent folder,
+listing the building folders; each building folder is a normal parallel MSA folder:
 
 ```
-msa_sites/
-├─ run_batch_msa_sites.py            the single launch script (set sites_root / site_names)
-├─ site_bucharest/
-│  ├─ … structural_model.py, msa_process_recorders.py, config_msa.py, …
-│  ├─ run_msa_site.py                per-site entry point (semaphore on, workers quiet)
-│  ├─ run_batch_msa_per_stripe_record.py   coordinator it calls
+casestudy_sites/3s/mdof/
+├─ msa_AvgSA03.py                    the single launch script (its `buildings` list names the folders below)
+├─ …/site_2/3s/mdof/
+│  ├─ … structural_model.py, msa_process_recorders.py, config_msa_AvgSA_03.py, …
+│  ├─ run_batch_msa_per_record.py    coordinator (called directly — no wrapper)
 │  ├─ run_msa_per_record.py          worker
-│  └─ msa/                           ← created
-├─ site_iasi/
+│  └─ msa_AvgSA_03/                  ← created
+├─ …/site_3/3s/mdof/
 │  └─ … same layout
-└─ site_focsani/
+└─ …/site_4/3s/mdof/
    └─ … same layout
 ```
 
@@ -431,13 +430,13 @@ The multi-building / multi-site launchers make a deliberate distinction:
 - A **coordinator** is a bookkeeping loop that launches workers and waits — sleep-bound,
   and it **does not** take a worker slot.
 
-That is why the top-level launchers (`run_batch_ida_buildings`, `run_batch_msa_sites`)
+That is why the top-level launchers (`run_batch_ida_buildings`, `run_batch_msa_buildings`)
 cap coordinators with a *separate local* limit (`--max-coordinators`) and let only the
 workers use the semaphore. If coordinators consumed worker slots they could starve the
 very workers they are waiting on.
 
-**Rule of thumb:** running one building/site → local `max_workers` is fine. Running
-several at once → use the top-level launcher, which turns the semaphore on for you.
+**Rule of thumb:** running one building → local `max_workers` is fine. Running several at
+once → use the top-level launcher, which turns the semaphore on for you.
 
 ---
 
@@ -549,7 +548,7 @@ throttled by the shared semaphore. Populate its `scripts_and_configs` list by ha
 Use it for "run this heterogeneous set of one-shot analyses". It is **not** the right tool
 for running several parallel IDA/MSA coordinators together — those are sleep-bound
 coordinators, and this launcher would make them consume worker semaphore slots. For that
-case use `run_batch_ida_buildings` / `run_batch_msa_sites` (§4, §5), which handle
+case use `run_batch_ida_buildings` / `run_batch_msa_buildings` (§4, §5), which handle
 coordinators correctly.
 
 ---
@@ -570,7 +569,7 @@ list-of-jobs pattern.
 - **One model, one analysis** → the matching `run_*` + `config_*` pair (§3).
 - **One building IDA, all records fast** → `run_batch_ida_per_record` + `run_ida_htf_per_record` (§4).
 - **Several buildings' IDAs on a big machine** → `run_batch_ida_buildings` (§4, §6).
-- **One building MSA** → `run_batch_msa_per_stripe_record` + `run_msa_per_record` (§5).
-- **Many MSA sites** → `run_batch_msa_sites` (§5, §6).
+- **One building MSA** → `run_batch_msa_per_record` + `run_msa_per_record` (§5).
+- **Several buildings' MSAs** → `run_batch_msa_buildings` (§5, §6).
 - **A mixed bag of one-shot analyses** → `run_batch_scripts` (§9).
 - **Generate the folders for any of the above** → the helpers in `copy_templates_to_folders.py` (§8).
