@@ -4,10 +4,45 @@
 
 \begin{document}
 
+% --- 1. Include the Abstract ---
+\begin{abstract}
+\input{chapters/abstract}
+\end{abstract}
+
+\newpage % Optional: Moves the executive summary to the next page
+
+% --- 2. Include the Executive Summary ---
+% Temporarily rename the abstract environment to "Executive Summary"
+\renewcommand{\abstractname}{Executive Summary} 
+\begin{abstract}
+\input{chapters/exec_summary}
+\end{abstract}
+
+
 \tableofcontents
 
+\include{chapters/introduction}
+
+
+\chapter{Paper 1: ...}
+\section{Summary of key findings}
+\section{Overview}
+\section{The actual paper}
+
+\chapter{Paper 2: ...}
+\section{Summary of key findings}
+\section{Overview}
+\section{The actual paper}
+
+\chapter{Paper 3: ...}
+\section{Summary of key findings}
+\section{Overview}
+\section{The actual paper}
+
+\chapter{References}
 % Import the shared body directly as a chapter
-\subfile{papers/paper_1/p1_main_body}
-\subfile{papers/paper_2/p2_main_body}
+% \subfile{papers/paper_1/p1_main_body}
+% \subfile{papers/paper_2/p2_main_body}
+
 
 \end{document}
