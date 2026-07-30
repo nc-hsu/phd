@@ -31,6 +31,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+from tqdm.auto import tqdm
 
 from standes.groundmotion import record_json_filename, parse_esm_record_identifier
 
@@ -126,10 +127,6 @@ def resolve_hdf5_path(src, event_id, station_code, location_code):
     matches = sorted(src.glob(f"{event_id}__{station_code}__*.h5"))
     if len(matches) == 1:
         return matches[0]
-    if len(matches) > 1:
-        print(f"⚠️  {event_id}/{station_code}: {len(matches)} location matches "
-              f"{[m.name for m in matches]} — skipped.")
-        return None
     return None
 
 
@@ -161,18 +158,13 @@ def convert_record(record_identifier, component, src, dst):
     try:
         event_id, station_code, location_code = parse_esm_record_identifier(record_identifier)
     except ValueError:
-        print(f"⚠️  record_identifier '{record_identifier}' does not have the "
-              f"form event_id_station_code_location_code — skipped.")
         return "bad record_identifier"
 
     if component not in _COMPONENT_INDEX:
-        print(f"⚠️  {record_identifier}: unknown component '{component}' "
-              f"(expected U/V/W) — skipped.")
         return "unknown component"
 
     h5_path = resolve_hdf5_path(src, event_id, station_code, location_code)
     if h5_path is None:
-        print(f"⚠️  {record_identifier} {component}: HDF5 file not found — skipped.")
         return "HDF5 file not found"
 
     try:
@@ -182,18 +174,14 @@ def convert_record(record_identifier, component, src, dst):
                         if isinstance(stgrp[k], h5py.Dataset)]
             idx = _COMPONENT_INDEX[component]
             if idx >= len(datasets):
-                print(f"⚠️  {h5_path.name}: only {len(datasets)} datasets, "
-                      f"need index {idx} for {component} — skipped.")
                 return "too few datasets"
             ds = datasets[idx]
             sr = ds.attrs.get("sampling_rate", None)
             if sr is None:
-                print(f"⚠️  {h5_path.name}: sampling_rate missing — skipped.")
                 return "sampling_rate missing"
             dt = 1.0 / float(sr)
             record = _to_g(np.array(ds[()], dtype=float).ravel(), "cm/s^2").tolist()
     except (KeyError, OSError, ValueError) as e:
-        print(f"⚠️  {h5_path.name}: {e} — skipped.")
         return str(e)
 
     record_dict = {
@@ -214,7 +202,6 @@ def convert_record(record_identifier, component, src, dst):
     with open(out_path, "w") as f:
         json.dump(record_dict, f, indent=4)
 
-    print(f"✅ {h5_path.name} [{component}] -> {out_path.name}")
     return None
 
 
@@ -250,7 +237,8 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=Fal
             futures.append((record_identifier, component,
                             executor.submit(convert_record, record_identifier,
                                             component, src, dst)))
-        for record_identifier, component, future in futures:
+        for record_identifier, component, future in tqdm(
+                futures, total=len(futures), desc="Converting ESM records"):
             reason = future.result()
             if reason is None:
                 converted += 1

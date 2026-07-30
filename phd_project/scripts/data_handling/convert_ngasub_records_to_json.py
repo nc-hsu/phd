@@ -26,6 +26,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tqdm.auto import tqdm
+
 from standes.groundmotion import record_json_filename, ngasub_record_identifier
 
 # Console messages use emoji; make sure they survive a non-UTF-8 stdout (e.g.
@@ -169,28 +171,22 @@ def convert_record(rsn, component, src, filename_map, metadata, dst):
     """
     fm = filename_map.get(rsn)
     if fm is None:
-        print(f"⚠️  RSN {rsn}: not in filename map — skipped.")
         return "not in filename map"
 
     basename = fm.get(component)
     if not basename:
-        print(f"⚠️  RSN {rsn}: no {component} filename in map — skipped.")
         return f"no {component} filename in map"
 
     at2_path = resolve_at2_path(src, rsn, basename)
     if at2_path is None:
-        print(f"⚠️  RSN {rsn} {component}: AT2 file for '{basename}' not found — skipped.")
         return "AT2 file not found"
 
     try:
         dt, record = parse_at2(at2_path)
     except ValueError as e:
-        print(f"⚠️  {at2_path.name}: {e} — skipped.")
         return str(e)
 
     meta = metadata.get(rsn) if metadata is not None else None
-    if metadata is not None and meta is None:
-        print(f"⚠️  RSN {rsn}: not in metadata flatfile — event_id/station_code left empty.")
     event_id = meta["event_id"] if meta else ""
     station_code = meta["station_code"] if meta else ""
 
@@ -212,7 +208,6 @@ def convert_record(rsn, component, src, filename_map, metadata, dst):
     with open(out_path, "w") as f:
         json.dump(record_dict, f, indent=4)
 
-    print(f"✅ {at2_path.name} -> {out_path.name}")
     return None
 
 
@@ -277,7 +272,6 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
         futures = []
         for rsn, component in read_selection(selection_csv):
             if component not in ("H1", "H2"):
-                print(f"⚠️  RSN {rsn}: unexpected component '{component}' — skipped.")
                 skipped_records.append({
                     "record_identifier": rsn, "component": component,
                     "reason": "unexpected component",
@@ -290,7 +284,8 @@ def convert_ngasub_records(src, selection_csv, dst, filename_map, metadata=None,
             futures.append((rsn, component,
                             executor.submit(convert_record, rsn, component,
                                             src, fmap, meta, dst)))
-        for rsn, component, future in futures:
+        for rsn, component, future in tqdm(
+                futures, total=len(futures), desc="Converting NGA-Sub records"):
             reason = future.result()
             if reason is None:
                 converted += 1
