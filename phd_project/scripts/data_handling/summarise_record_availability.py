@@ -4,7 +4,7 @@ For the site-specific Multiple-Stripe Analysis (MSA), ground motions were
 selected per conditioning IM -- ``AvgSA([0, 3])`` and ``AvgSA([0, 6])`` -- for
 60 sites x 6 stripes, giving 30 records per (site, IM, stripe). Those selections
 live in ``<gm_selection>/AvgSA_{03,06}_final_ensembles.pickle`` as a dict keyed
-by ``(site_index, stripe_poe)`` whose ``['recs']`` value is a DataFrame of the
+by ``(site_index, stripe_iml)`` whose ``['recs']`` value is a DataFrame of the
 selected records (ESM and NGA-Sub mixed).
 
 Only some of the required NGA-Sub time histories have been downloaded, so MSA can
@@ -51,14 +51,14 @@ except (AttributeError, ValueError):
 # The two conditioning-IM selection campaigns and their final-ensemble pickles.
 _IMS = {
     "AvgSA_03": "AvgSA_03_final_ensembles.pickle",
-    "AvgSA_06": "AvgSA_06_final_ensembles.pickle",
+    # "AvgSA_06": "AvgSA_06_final_ensembles.pickle",
 }
 
 _RSN_FOLDER_RE = re.compile(r"NGASub_RSN_(\d+)", re.IGNORECASE)
 
 # PEER NGA-Sub portal limits: 30 RSNs per sub-batch, 200 RSNs per download session.
 BATCH_SIZE = 30
-SESSION_LIMIT = 200
+SESSION_LIMIT = 50
 
 
 def _as_code(value):
@@ -145,7 +145,7 @@ def collect_requirements(im, pickle_path, available_ngasub, available_esm):
             {
                 "im": im,
                 "site": int(site),
-                "stripe_poe": float(level),
+                "stripe_iml": float(level),
                 "n_required_ngasub": len(req_ngasub),
                 "n_required_esm": len(req_esm),
                 "n_missing_ngasub": len(missing_ngasub),
@@ -221,12 +221,12 @@ def completion_curve(ordered, unit_missing):
 def write_summary(path, rows, site_region, site_im_complete):
     """Write the per (IM, site, stripe) availability summary CSV."""
     fieldnames = [
-        "im", "site", "region", "stripe_poe", "stripe_return_period",
+        "im", "site", "region", "stripe_iml", "stripe_return_period",
         "n_required", "n_required_ngasub", "n_required_esm",
         "n_available", "n_missing", "n_missing_ngasub", "n_missing_esm",
         "stripe_complete", "site_im_complete",
     ]
-    ordered_rows = sorted(rows, key=lambda r: (r["im"], r["site"], -r["stripe_poe"]))
+    ordered_rows = sorted(rows, key=lambda r: (r["im"], r["site"], -r["stripe_iml"]))
     with open(path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -238,8 +238,7 @@ def write_summary(path, rows, site_region, site_im_complete):
                     "im": r["im"],
                     "site": r["site"],
                     "region": site_region.get(r["site"], ""),
-                    "stripe_poe": r["stripe_poe"],
-                    "stripe_return_period": round(1.0 / r["stripe_poe"]),
+                    "stripe_iml": r["stripe_iml"],
                     "n_required": n_required,
                     "n_required_ngasub": r["n_required_ngasub"],
                     "n_required_esm": r["n_required_esm"],
