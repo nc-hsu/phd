@@ -17,10 +17,14 @@ from tqdm import tqdm
 ## starve (and deadlock) the very workers they are waiting on.
 ##
 ## Each coordinator (run_msa_site.py -> run_batch_msa_per_stripe_record.py) draws
-## its NLTHA workers from the shared, machine-global process_semaphore, so across
-## ALL active sites at most `physical_cores - 3` NLTHA runs are live at once. As a
-## site finishes its 6 x ~30 analyses, its coordinator retires and the launcher
-## starts the next site in its place.
+## its NLTHA workers from the shared, machine-global process_semaphore by default,
+## so across ALL active sites at most `physical_cores - 3` NLTHA runs are live at
+## once. As a site finishes its 6 x ~30 analyses, its coordinator retires and the
+## launcher starts the next site in its place.
+##
+## The semaphore can be swapped for a fixed per-site worker count (--max-workers /
+## --no-semaphore), and each site's per-worker console windows show by default --
+## pass --quiet to hide them and stream worker output to worker_logs/ instead.
 
 # --- configure here -------------------------------------------------------
 # parent folder whose immediate subfolders are the per-site analysis folders
@@ -35,6 +39,14 @@ max_coordinators = 10          # how many site coordinators / windows at once
 window_name_index = 0         # the number of folder to go up in directory to get to unique folder name. e.g. 0 = the site folder itself, 1 = its parent
 site_script_name = "run_msa_site.py"
 site_config_name = "config_msa.py"
+# Show a console window per record worker (default). Set to False (or pass
+# --quiet) to hide them and stream each worker's output to worker_logs/ instead.
+show_worker_windows = True
+# Draw workers from the shared machine-global semaphore (default). Set to False
+# (or pass --no-semaphore / --max-workers) to run each site with a fixed worker
+# count instead.
+use_semaphore = True
+max_workers = None            # fixed worker count per site when use_semaphore is False
 # --------------------------------------------------------------------------
 
 
@@ -77,8 +89,16 @@ def resolve_sites(root: Path, names: list[str]) -> list[Path]:
     return sites
 
 
-def launch_site(site_folder: Path, window_name_index: int):
-    """Launch a site's MSA coordinator in its own minimised console window."""
+def launch_site(site_folder: Path, window_name_index: int,
+                show_worker_windows: bool = show_worker_windows,
+                use_semaphore: bool = use_semaphore,
+                max_workers: int | None = max_workers):
+    """Launch a site's MSA coordinator in its own minimised console window.
+
+    The coordinator's workers draw from the shared semaphore unless use_semaphore
+    is False, in which case each site runs with its own max_workers cap; per-worker
+    windows show unless show_worker_windows is False (then they stream to worker_logs/).
+    """
     SW_SHOWMINNOACTIVE = 7
     venv_python = Path(sys.executable)
 
@@ -92,7 +112,8 @@ def launch_site(site_folder: Path, window_name_index: int):
         f"spec = importlib.util.spec_from_file_location('mod', path); "
         f"mod = importlib.util.module_from_spec(spec); "
         f"spec.loader.exec_module(mod); "
-        f"mod.run(r'''{config_path}''')"
+        f"mod.run(r'''{config_path}''', use_semaphore={use_semaphore}, "
+        f"max_workers={max_workers}, show_worker_windows={show_worker_windows})"
     )
 
     ps_command = (
@@ -114,15 +135,22 @@ def launch_site(site_folder: Path, window_name_index: int):
 
 
 def main(max_coordinators: int = max_coordinators,
-         window_name_index: int = window_name_index):
+         window_name_index: int = window_name_index,
+         show_worker_windows: bool = show_worker_windows,
+         use_semaphore: bool = use_semaphore,
+         max_workers: int | None = max_workers):
     sites = resolve_sites(sites_root, site_names)
     if not sites:
         raise FileNotFoundError(
             f"No site folders (with {site_config_name} + {site_script_name}) "
             f"found under {sites_root}")
 
+    workers_desc = ("shared semaphore" if use_semaphore
+                    else f"{max_workers if max_workers is not None else 'cores - 3'} workers/site")
     print(f"Launch Time: {datetime.now()} | {len(sites)} site(s), "
-          f"up to {max_coordinators} coordinator(s) at once")
+          f"up to {max_coordinators} coordinator(s) at once, "
+          f"workers: {workers_desc}, "
+          f"worker windows: {'on' if show_worker_windows else 'off (logging to worker_logs/)'}")
 
     running = []  # {proc, title, start_time}
     pbar = tqdm(total=len(sites), desc="Sites complete", unit="site")
@@ -145,7 +173,10 @@ def main(max_coordinators: int = max_coordinators,
             reap()
             time.sleep(0.5)
 
-        proc, title = launch_site(site_folder, window_name_index)
+        proc, title = launch_site(site_folder, window_name_index,
+                                  show_worker_windows=show_worker_windows,
+                                  use_semaphore=use_semaphore,
+                                  max_workers=max_workers)
         running.append({"proc": proc, "title": title,
                         "start_time": datetime.now()})
         pbar.write(f"launched site: {title} PID={proc.pid}")
@@ -159,13 +190,29 @@ def main(max_coordinators: int = max_coordinators,
 
 
 if __name__ == "__main__":
+    # launch from the terminal, e.g.
+    #   python run_batch_msa_sites.py
+    #   python run_batch_msa_sites.py --quiet --max-coordinators 5
+    #   python run_batch_msa_sites.py --max-workers 4
     parser = argparse.ArgumentParser(
         description="Run MSA for several sites at once, sharing one machine-global core cap.")
     parser.add_argument("--max-coordinators", type=int, default=max_coordinators,
                         help="how many site coordinators (windows) to run at once")
     parser.add_argument("--window-name-index", type=int, default=window_name_index,
                             help="the index of the folder in config.parents to be used as coordinator window title. 0 corresponds to the site folder itself")
+    parser.add_argument("--quiet", action="store_true",
+                        help="hide per-record worker windows; stream them to worker_logs/ instead")
+    parser.add_argument("--max-workers", type=int, default=None,
+                        help="run each site with this fixed worker count instead of the "
+                             "shared semaphore (implies --no-semaphore)")
+    parser.add_argument("--no-semaphore", action="store_true",
+                        help="do not use the machine-global process_semaphore (each site "
+                             "runs with a fixed worker count from --max-workers, or cores - 3)")
     args = parser.parse_args()
 
+    use_semaphore = not args.no_semaphore and args.max_workers is None
     main(max_coordinators=args.max_coordinators,
-         window_name_index=args.window_name_index)
+         window_name_index=args.window_name_index,
+         show_worker_windows=not args.quiet,
+         use_semaphore=use_semaphore,
+         max_workers=args.max_workers)

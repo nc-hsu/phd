@@ -17,7 +17,7 @@ from standes.utils import import_from_path
 ## msa_log.json is written and (optionally) post-processed into a collapse fragility.
 def run(config_data: str | Path,
         max_workers: int | None = None,
-        use_semaphore: bool = False,
+        use_semaphore: bool = True,
         worker_script: str | Path | None = None,
         show_worker_windows: bool = True):
 

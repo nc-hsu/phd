@@ -10,8 +10,9 @@ from standes.utils import import_from_path
 ## worker: run the NLTHA for a SINGLE (stripe, record) of the config. Dispatched
 ## one-per-process by the batch launchers so records can be analysed concurrently
 ## (one CPU core per record). The unit of work is selected by `tag`, formatted as
-## "{stripe}:{record}" (e.g. "3:0"), so no per-record config file is needed.
-##
+## "{stripe}:{record}" (e.g. "3:1"), so no per-record config file is needed.
+## stripes and records are 1-indexed
+
 ## The per-stripe and collated logs are assembled by the launcher (via
 ## standes.analysis.msa.collate_stripe / collate_msa_results) once every worker
 ## for a stripe has finished.
