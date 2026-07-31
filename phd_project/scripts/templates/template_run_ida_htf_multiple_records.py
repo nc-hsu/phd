@@ -5,10 +5,11 @@ import pickle
 from pathlib import Path
 
 from standes.analysis.ida import (
-    ida_htf_multiple_records, 
+    ida_htf_multiple_records,
     process_ida_results,
     )
 
+from standes.groundmotion import load_ground_motion_from_json
 from standes.utils import import_from_path
 
 ## model to run a nonlinear time history analysis:
@@ -69,16 +70,27 @@ def run(config_data: str|Path|dict):
 
     print(f"Time elapsed: {elapsed_time}")
 
-    ## POST PROCESSING 
+    ## POST PROCESSING
     if config["post_process"]:
+        # only load records when collapse-IM conversions are requested (else skip I/O)
+        convert_collapse_to_ims = config.get("convert_collapse_to_ims")
+        gm_records = None
+        if convert_collapse_to_ims:
+            gm_records = {tag: load_ground_motion_from_json(path)
+                          for tag, path in gm_record_files.items()}
+
         process_ida_results(
-            ida_results.values(), 
-            output_folder, 
+            ida_results.values(),
+            output_folder,
             edp_idxs=config["edp_idxs"],
             edp_tags=config["edp_tags"],
-            ida_fractiles=config["ida_fractiles"],          
+            ida_fractiles=config["ida_fractiles"],
             collapse_fragility=config["calculate_collapse_fragility"],
-            record_ids=ida_results.keys())
+            record_ids=ida_results.keys(),
+            intensity_measure=config["ida_parameters"]["intensity_measure"],
+            gm_records=gm_records,
+            convert_collapse_to_ims=convert_collapse_to_ims,
+            gravity_factor=config["ida_parameters"]["gravity_factor"])
         
 
 if __name__ == "__main__":

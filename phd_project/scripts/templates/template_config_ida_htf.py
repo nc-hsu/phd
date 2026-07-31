@@ -1,5 +1,6 @@
 from pathlib import Path
 from standes.analysis.nltha import NlthaParameters
+from standes.intensitymeasures import avgsa_03, avgsa_06, PeakGroundAcceleration, SpectralAcceleration # type: ignore
 from standes.utils import import_from_path
 from ida_process_recorders import process_recorder_func, edp_tags, edp_idxs # type: ignore
 """
@@ -22,6 +23,13 @@ can live side by side in the same folder.
 
 - injection_file names the module that defines make_injection_functions(model, **params), and
 injection_function_params (default {}) is the dict of extra keyword parameters passed to it.
+
+- convert_collapse_to_ims (default {}) is a {label: intensity-measure} dict. After post
+processing, the collapse fragility is additionally re-expressed in each target IM (collapse
+is linearly scalable) and saved as collapse_fragility_{label}.json. The label drives the
+filename; the stored intensity_measure attribute is repr(im). Example:
+    convert_collapse_to_ims = {"AvgSA_03": avgsa_03(), "AvgSA_06": avgsa_06(), "PGA": PeakGroundAcceleration()}
+This needs no re-running of analyses -- it reads the existing ida_results.
 
 """
 
@@ -46,6 +54,7 @@ trace_tolerance = 0.0
 trace_max_resolution = 0.1
 min_runs = 8
 do_fill = True
+convert_collapse_to_ims = {}
 dt = 0.005
 convergece_test = ("NormDispIncr", 1e-6, 50)
 nlth_analysis_parameters = NlthaParameters(test=convergece_test, dt=dt)
@@ -66,6 +75,7 @@ config = {
     'edp_idxs': edp_idxs,
     'ida_fractiles': [0.16, 0.5, 0.84],
     'calculate_collapse_fragility': True,
+    'convert_collapse_to_ims': convert_collapse_to_ims,
     "ida_parameters": {
         "initialise_model_func": model_init,
         "proc_recorder_func": process_recorder_func,

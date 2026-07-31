@@ -4,6 +4,7 @@ from pathlib import Path
 
 from standes.parallel import run_records_in_subprocesses
 from standes.analysis.ida import collate_ida_results, process_ida_results
+from standes.groundmotion import load_ground_motion_from_json
 from standes.utils import import_from_path
 
 
@@ -82,6 +83,17 @@ def run(config_data: str | Path,
 
     ## POST PROCESSING
     if config["post_process"]:
+        # only load records when collapse-IM conversions are requested (else skip I/O).
+        # build gm_record_files from the same config the workers used, keyed by the
+        # record tags that collate_ida_results returns.
+        convert_collapse_to_ims = config.get("convert_collapse_to_ims")
+        gm_records = None
+        if convert_collapse_to_ims:
+            gm_record_files = {k: Path(config["gm_json_src"]) / v
+                               for k, v in config["gm_json_files"].items()}
+            gm_records = {tag: load_ground_motion_from_json(gm_record_files[tag])
+                          for tag in ida_results.keys()}
+
         process_ida_results(
             ida_results.values(),
             output_folder,
@@ -89,7 +101,11 @@ def run(config_data: str | Path,
             edp_tags=config["edp_tags"],
             ida_fractiles=config["ida_fractiles"],
             collapse_fragility=config["calculate_collapse_fragility"],
-            record_ids=ida_results.keys())
+            record_ids=ida_results.keys(),
+            intensity_measure=config["ida_parameters"]["intensity_measure"],
+            gm_records=gm_records,
+            convert_collapse_to_ims=convert_collapse_to_ims,
+            gravity_factor=config["ida_parameters"]["gravity_factor"])
 
 
 if __name__ == "__main__":
