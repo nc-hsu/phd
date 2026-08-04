@@ -229,6 +229,24 @@ semaphore on), so across all buildings at most `physical cores − 3` record ana
 at once. Each building needs its coordinator + worker + config already in place. See §6
 for why this uses the semaphore and a separate coordinator cap.
 
+### Re-running only the post-processing — `run_postprocess_ida`
+
+`template_run_postprocess_ida.py` rebuilds the IDA outputs from an **already-completed**
+run: it reads the existing `ida_results.pickle` and regenerates the IDA curves and the
+collapse fragility (including the per-IM converted fragilities from
+`convert_collapse_to_ims`). It never touches OpenSees and runs no analyses, so it is cheap
+— use it after changing `edp_idxs` / `edp_tags`, `ida_fractiles`, or the collapse-fragility
+settings in the config.
+
+```bash
+python run_postprocess_ida.py                       # uses config_ida_htf.py
+python run_postprocess_ida.py config_ida_htf_femap695_set.py
+```
+
+It takes the **same config** as the run that produced the results, and errors if
+`ida_results.pickle` is missing. Ground-motion records are only loaded when
+`convert_collapse_to_ims` is set.
+
 ### Folder layout per IDA mode
 
 Every IDA folder holds the same input files (structural model + design JSON, injection
@@ -335,6 +353,25 @@ where `folder` contains `run_batch_msa_per_record.py` + the named config), by ha
 at once; each coordinator draws its NLTHA workers from the shared semaphore, so total live
 workers stay capped machine-wide. Pass `--max-workers` / `--no-semaphore` to run each
 building with a fixed worker count instead of the shared semaphore.
+
+### Re-running only the post-processing — `run_postprocess_msa`
+
+`template_run_postprocess_msa.py` is the MSA analogue of `run_postprocess_ida`: it rebuilds
+the summary outputs of an **already-completed** run without touching OpenSees. Because MSA
+keeps its results as per-record JSON logs (there is no results pickle), it first re-collates
+each stripe from its `record_<t>_log.json` files and rewrites `msa_log.json`, then rewrites
+`msa_summary.json` and `collapse_fragility.json`.
+
+```bash
+python run_postprocess_msa.py                       # uses config_msa.py
+python run_postprocess_msa.py config_msa_AvgSA_03.py
+```
+
+It takes the **same config** as the run that produced the results (it needs
+`gm_selection_src` to find the stripe pickles) and errors if the results folder or the
+stripe pickles are missing. Because it re-collates first, a stripe that was run separately
+and dropped into the results folder is picked up. It always post-processes, regardless of
+the config's `post_process` flag.
 
 ### Folder layout per MSA mode
 
@@ -571,5 +608,6 @@ list-of-jobs pattern.
 - **Several buildings' IDAs on a big machine** → `run_batch_ida_buildings` (§4, §6).
 - **One building MSA** → `run_batch_msa_per_record` + `run_msa_per_record` (§5).
 - **Several buildings' MSAs** → `run_batch_msa_buildings` (§5, §6).
+- **Redo the fragility / curves on a finished run, no analyses** → `run_postprocess_ida` (§4) or `run_postprocess_msa` (§5).
 - **A mixed bag of one-shot analyses** → `run_batch_scripts` (§9).
 - **Generate the folders for any of the above** → the helpers in `copy_templates_to_folders.py` (§8).
