@@ -150,7 +150,7 @@ buildings: list[dict[str, str]] = [
      "config": r"D:\07_wp1_casestudy_sites\site_59\3s\mdof\config_ida_htf_femap695.py"},
 ]
 max_coordinators = 10          # how many building coordinators / windows at once
-window_name_index = 1         # the number of folder to go up in directory to get to unique folder name. e.g. 1 = parent folder of config
+window_name_index = 2         # the number of folder to go up in directory to get to unique folder name. e.g. 1 = parent folder of config
 runner_script_name = "run_batch_ida_per_record.py"
 # Show a console window per record worker (default). Set to False (or pass
 # --quiet) to hide them and stream each worker's output to worker_logs/ instead --
