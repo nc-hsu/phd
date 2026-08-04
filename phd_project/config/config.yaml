@@ -55,8 +55,8 @@ proc_data:
   ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
   dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
   # Site case-study converted fragilities (nb 014)
-  wp1_casestudy_sites_fragility_curves: data_processed/09_structure_fragility_curves/wp1_casestudy_sites
-  wp1_casestudy_sites_collapse_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_specific_collapsefragility_summary.csv
+  wp1_sites_fragility_curves: data_processed/09_structure_fragility_curves/wp1_casestudy_sites
+  wp1_sites_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_femap695_collapsefragility_summary.csv
   # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
@@ -77,6 +77,7 @@ results:
   disaggregation_plots: "results/03_psha/disagg_plots"
   AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
   AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
+  site_fragility_curves: "results/05_site_fragility_curves"
 
 hazard_models:
   root: "hazard_models"
