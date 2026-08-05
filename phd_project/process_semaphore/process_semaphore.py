@@ -87,7 +87,8 @@ def _cleanup_stale_processes(data):
 def get_max_concurrent():
     # Example dynamic max concurrent, adjust as you like
     cpu_count = psutil.cpu_count(logical=False)
-    return max(1, cpu_count - 3)
+    free_cores = 20
+    return max(1, cpu_count - free_cores)
 
 def acquire_slot(pid: int, display_name: str = ""):
     """Try to acquire a slot for a new process with given pid."""
