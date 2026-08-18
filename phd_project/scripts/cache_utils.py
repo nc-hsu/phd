@@ -16,6 +16,9 @@ This module adds a lightweight provenance guard:
   functions: it loads the cache only when the stored manifest matches the
   current inputs, raises :class:`StaleCacheError` when a *managed* artifact's
   inputs have changed, and otherwise computes, pickles and writes the manifest.
+- :func:`json_load_or_compute` is the JSON sibling of the above, used by the
+  fragility-curve notebooks: same provenance rules, but it reads/writes JSON and
+  also returns whether the artifact was reused or rebuilt.
 
 Only the ``hash`` of each named input is compared. Environment metadata (git
 commit, timestamp) is recorded for diagnostics but never compared. The
@@ -203,6 +206,64 @@ def load_or_compute(
     print(f"[cache] '{artifact_fp.name}' loaded (inputs match).")
     with open(artifact_fp, "rb") as f:
         return pickle.load(f)
+
+
+def _np_default(o):
+    """``json.dump`` default: make numpy arrays and scalars serialisable."""
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    if isinstance(o, (np.floating, np.integer)):
+        return o.item()
+    raise TypeError(f"not JSON serialisable: {type(o)}")
+
+
+def _changed_inputs(cached: dict, current: dict) -> list[str]:
+    """Names of inputs whose content hash differs between two fingerprints."""
+    return [name for name in sorted(set(cached) | set(current))
+            if cached.get(name, {}).get("hash") != current.get(name, {}).get("hash")]
+
+
+def json_load_or_compute(artifact_fp: Path, fp_dict: dict, compute_fn,
+                         force: bool = False, input_paths: dict | None = None):
+    """JSON sibling of :func:`load_or_compute`, returning the cache status too.
+
+    Behaves like :func:`load_or_compute` but reads/writes JSON (numpy-aware, via
+    :func:`_np_default`) instead of pickle, and returns ``(result, status)`` where
+    ``status`` is ``"cached"`` or ``"computed"`` so a caller looping over many
+    artifacts can report how many were reused.
+
+    - ``force`` → always run ``compute_fn``, write the JSON and its manifest.
+    - artifact or manifest absent → compute (quiet).
+    - artifact + manifest present and inputs **match** → load and return ``"cached"``.
+    - artifact + manifest present and inputs **differ** → print a ``[stale]`` line
+      naming each changed input (its path, when given in ``input_paths``), then
+      recompute and overwrite.
+
+    ``input_paths`` maps fingerprint input names to the file they came from; it is
+    used only to make the ``[stale]`` message point at the file that changed.
+    """
+    artifact_fp = Path(artifact_fp)
+    manifest_fp = _manifest_path(artifact_fp)
+    input_paths = input_paths or {}
+
+    if not force and artifact_fp.is_file() and manifest_fp.is_file():
+        with open(manifest_fp) as f:
+            cached = json.load(f).get("inputs", {})
+        changed = _changed_inputs(cached, fp_dict)
+        if not changed:
+            with open(artifact_fp) as f:
+                return json.load(f), "cached"
+        for name in changed:
+            where = input_paths.get(name)
+            where = str(where) if where is not None else f"input '{name}' (no file path)"
+            print(f"[stale] {artifact_fp.name}: recomputing -- changed input: {where}")
+
+    result = compute_fn()
+    artifact_fp.parent.mkdir(parents=True, exist_ok=True)
+    with open(artifact_fp, "w") as f:
+        json.dump(result, f, indent=2, default=_np_default)
+    write_manifest(artifact_fp, fp_dict)
+    return result, "computed"
 
 
 def load_manifest(artifact_fp: Path) -> dict:
