@@ -41,6 +41,11 @@ proc_data:
   # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-036)
   AvgSA_03_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_03.json"
   AvgSA_06_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_06.json"
+  # Stripe-coverage remediation from nb 060: reserve stripes that can be run against the
+  # record ensembles already selected, and the additional IMLs that need a fresh
+  # disaggregation. Both are folded back into the IML lists by nb 017.
+  AvgSA_03_reserve_stripes: "data_processed/05_gcim_distributions/reserve_stripes_to_run_AvgSA_03.json"
+  AvgSA_03_additional_imls: "data_processed/05_gcim_distributions/additional_imls_for_disagg_AvgSA_03.json"
   corr_model: "data_processed/02_im_correlation_model"
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
