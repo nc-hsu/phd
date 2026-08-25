@@ -17,6 +17,7 @@ import pytest
 from phd_project.scripts.cache_utils import (
     StaleCacheError,
     fingerprint,
+    json_load_or_compute,
     load_or_compute,
     verify,
 )
@@ -86,6 +87,45 @@ def test_missing_manifest_recomputes(tmp_path):
     (tmp_path / "a.pickle.manifest.json").unlink()
     load_or_compute(art, fp, compute)
     assert calls["n"] == 2
+
+
+def test_json_load_or_compute_branches(tmp_path):
+    """The JSON sibling: same provenance rules, plus a cached/computed status."""
+    calls = {"n": 0}
+    src = tmp_path / "source.json"
+    src.write_text('{"median": 0.4}')
+
+    def compute():
+        calls["n"] += 1
+        return {"median": 0.4, "efc": np.array([[0.1, 0.2], [0.0, 1.0]])}
+
+    art = tmp_path / "frag.json"
+
+    # cold compute writes artifact + manifest, and serialises the numpy array
+    res, status = json_load_or_compute(art, fingerprint(source=src), compute)
+    assert (status, calls["n"]) == ("computed", 1)
+    assert (tmp_path / "frag.json.manifest.json").is_file()
+    assert res["efc"][0][0] == 0.1
+
+    # warm load does not recompute; arrays come back as nested lists
+    res, status = json_load_or_compute(art, fingerprint(source=src), compute)
+    assert (status, calls["n"]) == ("cached", 1)
+    assert res["efc"] == [[0.1, 0.2], [0.0, 1.0]]
+
+    # changed source file -> stale -> recompute and overwrite
+    src.write_text('{"median": 0.5}')
+    _, status = json_load_or_compute(art, fingerprint(source=src), compute,
+                                     input_paths={"source": src})
+    assert (status, calls["n"]) == ("computed", 2)
+
+    # force overrides a matching manifest
+    _, status = json_load_or_compute(art, fingerprint(source=src), compute, force=True)
+    assert (status, calls["n"]) == ("computed", 3)
+
+    # a missing manifest is not trustworthy -> recompute
+    (tmp_path / "frag.json.manifest.json").unlink()
+    _, status = json_load_or_compute(art, fingerprint(source=src), compute)
+    assert (status, calls["n"]) == ("computed", 4)
 
 
 def test_verify_subset(tmp_path):
