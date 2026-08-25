@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nrml
+xmlns="http://openquake.org/xmlns/nrml/0.5"
+xmlns:gml="http://www.opengis.net/gml"
+>
+    <logicTree
+    logicTreeID="ESHM20 Logic Tree - Median Branch"
+    >
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Shallow Default"
+        branchSetID="ASC"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="ASC">
+                <uncertaintyModel>
+                    [KothaEtAl2020ESHM20]
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Craton"
+        branchSetID="Craton"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Craton" >
+                <uncertaintyModel>
+                    [KothaEtAl2020ESHM20]
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Subduction Interface"
+        branchSetID="SubInter"
+        uncertaintyType="gmpeModel" >
+            <logicTreeBranch branchID="SubInter">
+                <uncertaintyModel>
+                    [BCHydroESHM20SInter]
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Subduction Inslab"
+        branchSetID="SubSlab"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="SubSlab">
+                <uncertaintyModel>
+                    [BCHydroESHM20SSlab]
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                    </uncertaintyModel>
+                    <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Non-Subduction Deep"
+        branchSetID="Vrancea"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Vrancea">
+                <uncertaintyModel>
+                    [BCHydroESHM20SSlab]
+                    faba_taper_model = "SFunc"
+                    a = -100.00
+                    b = 100.00
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+
+        <logicTreeBranchSet
+        applyToTectonicRegionType="Volcanic"
+        branchSetID="Volcanic"
+        uncertaintyType="gmpeModel">
+            <logicTreeBranch branchID="Volcanic">
+                <uncertaintyModel>
+                    [KothaEtAl2020ESHM20]
+                </uncertaintyModel>
+                <uncertaintyWeight>1.0</uncertaintyWeight>
+            </logicTreeBranch>
+        </logicTreeBranchSet>
+    </logicTree>
+</nrml>
