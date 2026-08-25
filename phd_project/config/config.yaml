@@ -13,6 +13,9 @@ raw_data:
   eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
   esm_download_manifest: "data_raw/gm_records/ESM/esm_hdf5_download_manifest.csv"
+  # The 22 FEMA P695 far-field record JSONs (in-repo copy of D:/gm_records_p695).
+  # Used by nb 052 to compute each record's AvgSA_03 without the analysis drive attached.
+  femap695_records: "data_raw/fema_P695_records"
   esm_hdf5_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/01_ESM"
   ngasub_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/02_NGASub"
   
@@ -28,6 +31,13 @@ proc_data:
   AvgSA_06_hazard_curves_3sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_3sig.pickle"
   AvgSA_06_hazard_curves_4sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_4sig.pickle"
   AvgSA_06_hazard_curves_5sig: "data_processed/03_site_hazard/AvgSA_06_hazard_curves_60sites_5sig.pickle"
+  # Multi-period SA/PGA hazard from nb 005 (calc SA_psha_eps4, 4-sigma truncation).
+  # _curves:   nb 004's flat shape, hcs[site_id][imt][stat] -> (n_iml, 2); col 0 = IML [g], col 1 = MAFE.
+  # _surfaces: {"imls", "periods", "imts", "sites"}; sites[site_id][stat] -> (n_iml, n_period) of MAFE,
+  #            rows = imls, cols = periods (PGA carried as period 0.0). Assumes one IML grid shared by
+  #            every IMT - true for this calculation, asserted in nb 005, not guaranteed in general.
+  SA_hazard_curves_4sig: "data_processed/03_site_hazard/SA_hazard_curves_60sites_4sig.pickle"
+  SA_hazard_surfaces_4sig: "data_processed/03_site_hazard/SA_hazard_surfaces_60sites_4sig.pickle"
   # Target IMLs for the iml-based disaggregation, chosen in notebook 017.
   # The AvgSA 0-6 file does not exist yet; notebook 020 skips any IM whose file
   # is missing rather than failing.
@@ -56,6 +66,9 @@ proc_data:
   dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
   dc2_scA_reference_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_scA_reference_cbfs.pickle"
   site_specific_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_site_specific_cbfs.pickle"
+  # Sites sharing a byte-identical structural design (nb 051) - one IDA per group
+  unique_structural_designs: "data_processed/08_casestudy_structure_datasets/unique_structural_designs.json"
+  unique_structural_designs_csv: "data_processed/08_casestudy_structure_datasets/unique_structural_designs.csv"
   # Fragility Curves
   ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
   dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
@@ -82,6 +95,9 @@ results:
   disaggregation_plots: "results/03_psha/disagg_plots"
   AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
   AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
+  # MSA-FEMAP695 stripe selections (nb 052): the same 22 FEMA P695 records at every
+  # stripe, one set per design group rather than per site.
+  AvgSA_03_FEMAP695_record_selection: "results/04_record_selection/AvgSA_03_FEMAP695"
   site_fragility_curves: "results/05_site_fragility_curves"
 
 hazard_models:
@@ -153,6 +169,9 @@ analysis_data:
   dc2_sdof_fitting: "E:/03_wp1pt4pt1_dc2_sdof_fitting"
   wp1_casestudy_sites: "D:/07_wp1_casestudy_sites"
   reference_structures_dc2_scA: "D:/06_reference_structures_dc2_scA"
+  # Analyses driven by a FIXED record set (same records at every stripe), organised
+  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052.
+  wp1_fixed_record_sets: "D:/08_wp1_fixed_record_sets"
 
 
 
