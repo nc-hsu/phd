@@ -9,7 +9,11 @@ This module adds a lightweight provenance guard:
 
 - :func:`fingerprint` reduces a set of inputs to a content-based ``{name: {hash,
   summary}}`` dict. Hashes are content-based (not memory addresses), so they are
-  stable across machines and OSes.
+  stable across machines and OSes. File inputs are hashed in a stream (never
+  slurped) and memoised per ``(path, size, mtime_ns)`` for the life of the
+  process, so fingerprinting hundreds of artifacts against the same few source
+  files reads each of them once -- see :data:`_FILE_HASH_CACHE` and
+  :func:`clear_file_hash_cache`.
 - :func:`write_manifest` writes that dict to a ``<artifact>.manifest.json``
   sidecar next to the cached pickle.
 - :func:`load_or_compute` is the single entry point used by the compute
@@ -29,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import pickle
 import subprocess
 from datetime import datetime, timezone
@@ -48,6 +53,52 @@ def _hash_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
+def _hash_file(p: Path) -> str:
+    """SHA-256 of a file's bytes, streamed.
+
+    Identical digest to ``_hash_bytes(p.read_bytes())`` but without holding the
+    whole file on the heap -- the disagg data and the gm database are GB-scale.
+    Mirrors the chunked style of ``oq_runner._source_models_digest``.
+    """
+    with open(p, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+# Content hashes of input files, keyed by (path, size, mtime_ns). The stripe stale
+# check fingerprints every (site, iml) against the SAME handful of source files, so
+# without this the 2.3 GB disagg input was read and hashed once per stripe -- 454
+# stripes x 2.4 GB, ~53 min per notebook.
+#
+# This is an in-process memo ONLY: nothing here is persisted, and the hash stored in
+# a manifest stays a pure content hash. Note the deliberate contrast with
+# ``oq_runner._source_models_digest``, which rejected mtime *because it was
+# persisted* and a git checkout made it lie. Here mtime only decides whether to
+# re-hash within one kernel: a spurious mtime change costs one extra hash (the safe
+# direction), and a real rewrite always moves size or mtime_ns (NTFS mtime
+# granularity is 100 ns).
+_FILE_HASH_CACHE: dict[tuple[str, int, int], str] = {}
+
+
+def file_hash(p: Path, st: os.stat_result | None = None) -> str:
+    """Memoised content SHA-256 of a file.
+
+    ``st`` lets a caller that has already stat-ed the file pass it in rather than
+    paying a second syscall.
+    """
+    p = Path(p)
+    st = st or p.stat()
+    key = (str(p), st.st_size, st.st_mtime_ns)
+    h = _FILE_HASH_CACHE.get(key)
+    if h is None:
+        h = _FILE_HASH_CACHE[key] = _hash_file(p)
+    return h
+
+
+def clear_file_hash_cache() -> None:
+    """Drop the in-process file-hash memo, forcing the next fingerprint to re-read."""
+    _FILE_HASH_CACHE.clear()
+
+
 def _fingerprint_one(name: str, value) -> dict:
     """Return ``{"hash": str, "summary": str}`` for a single input value.
 
@@ -60,12 +111,14 @@ def _fingerprint_one(name: str, value) -> dict:
         shape = value.shape if isinstance(value, pd.DataFrame) else (len(value),)
         return {"hash": h, "summary": f"pandas shape={tuple(shape)}"}
 
-    # A path to an existing file: hash the file bytes (cheap, stable).
+    # A path to an existing file: hash the file bytes (stable, and memoised on
+    # (path, size, mtime_ns) -- see _FILE_HASH_CACHE).
     if isinstance(value, (str, Path)):
         p = Path(value)
         if p.is_file():
-            h = _hash_bytes(p.read_bytes())
-            return {"hash": h, "summary": f"file {p.name} ({p.stat().st_size} bytes)"}
+            st = p.stat()
+            return {"hash": file_hash(p, st),
+                    "summary": f"file {p.name} ({st.st_size} bytes)"}
         # A plain string that is not a file path: hash its text.
         h = _hash_bytes(str(value).encode())
         return {"hash": h, "summary": f"str {value!r}"}

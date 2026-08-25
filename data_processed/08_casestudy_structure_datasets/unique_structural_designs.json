@@ -1,0 +1,2854 @@
+{
+  "generated_by": "notebooks/03_WP1_ground_motion_set/051-group_sites_by_structural_design.ipynb",
+  "design_root": "C:/Users/clemettn/Documents/phd/casestudy_structures/concentrically_braced_frames/ec8_gen2_site_specific_designs",
+  "match_criterion": "exact json['structure'] block of {tag}_out.json",
+  "float_tolerance": null,
+  "groups": {
+    "3": [
+      {
+        "group_id": 0,
+        "fingerprint": "26435b8268ee6bbf",
+        "representative_site": 0,
+        "representative_tag": "3s_cbf_dc2_site0",
+        "sites": [
+          0,
+          4,
+          8,
+          19,
+          25,
+          26,
+          27,
+          29
+        ],
+        "n_sites": 8,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS114.3x3.2",
+            "CHS114.3x3.2",
+            "CHS114.3x3",
+            "CHS114.3x3",
+            "CHS101.6x2.5",
+            "CHS101.6x2.5"
+          ]
+        }
+      },
+      {
+        "group_id": 1,
+        "fingerprint": "f401ac831c94d559",
+        "representative_site": 1,
+        "representative_tag": "3s_cbf_dc2_site1",
+        "sites": [
+          1,
+          2,
+          5,
+          6,
+          16,
+          23
+        ],
+        "n_sites": 6,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x3.2",
+            "CHS114.3x3.2",
+            "CHS114.3x2.5",
+            "CHS114.3x2.5"
+          ]
+        }
+      },
+      {
+        "group_id": 2,
+        "fingerprint": "84d5e0674089226d",
+        "representative_site": 3,
+        "representative_tag": "3s_cbf_dc2_site3",
+        "sites": [
+          3
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS114.3x3.2",
+            "CHS114.3x3.2",
+            "CHS114.3x3.2",
+            "CHS114.3x3.2",
+            "CHS114.3x2.5",
+            "CHS114.3x2.5"
+          ]
+        }
+      },
+      {
+        "group_id": 3,
+        "fingerprint": "264a066dac41a903",
+        "representative_site": 7,
+        "representative_tag": "3s_cbf_dc2_site7",
+        "sites": [
+          7,
+          10,
+          11,
+          18,
+          24
+        ],
+        "n_sites": 5,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 4,
+        "fingerprint": "7ebd08cb5f289c87",
+        "representative_site": 9,
+        "representative_tag": "3s_cbf_dc2_site9",
+        "sites": [
+          9,
+          20,
+          22
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x3",
+            "CHS114.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 5,
+        "fingerprint": "aa8681c1adee3209",
+        "representative_site": 12,
+        "representative_tag": "3s_cbf_dc2_site12",
+        "sites": [
+          12
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x2.5",
+            "CHS114.3x2.5"
+          ]
+        }
+      },
+      {
+        "group_id": 6,
+        "fingerprint": "e01d851d6206c032",
+        "representative_site": 13,
+        "representative_tag": "3s_cbf_dc2_site13",
+        "sites": [
+          13,
+          28
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x2.5",
+            "CHS114.3x2.5"
+          ]
+        }
+      },
+      {
+        "group_id": 7,
+        "fingerprint": "62957e1dcb327688",
+        "representative_site": 14,
+        "representative_tag": "3s_cbf_dc2_site14",
+        "sites": [
+          14
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS101.6x3.2",
+            "CHS101.6x3.2"
+          ]
+        }
+      },
+      {
+        "group_id": 8,
+        "fingerprint": "5799d88e9d6c6619",
+        "representative_site": 15,
+        "representative_tag": "3s_cbf_dc2_site15",
+        "sites": [
+          15
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x3",
+            "CHS114.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 9,
+        "fingerprint": "7beba18db9802c84",
+        "representative_site": 17,
+        "representative_tag": "3s_cbf_dc2_site17",
+        "sites": [
+          17,
+          21
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 10,
+        "fingerprint": "2c77f9f840beb2c7",
+        "representative_site": 30,
+        "representative_tag": "3s_cbf_dc2_site30",
+        "sites": [
+          30
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 11,
+        "fingerprint": "941758a6f04c3a7e",
+        "representative_site": 31,
+        "representative_tag": "3s_cbf_dc2_site31",
+        "sites": [
+          31,
+          34,
+          43,
+          59
+        ],
+        "n_sites": 4,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS219.1x4",
+            "CHS219.1x4"
+          ]
+        }
+      },
+      {
+        "group_id": 12,
+        "fingerprint": "f9dfcfedfcd1041a",
+        "representative_site": 32,
+        "representative_tag": "3s_cbf_dc2_site32",
+        "sites": [
+          32,
+          33,
+          36,
+          50
+        ],
+        "n_sites": 4,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 13,
+        "fingerprint": "970e0badb461307e",
+        "representative_site": 35,
+        "representative_tag": "3s_cbf_dc2_site35",
+        "sites": [
+          35,
+          39,
+          58
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 14,
+        "fingerprint": "68d62915d5d2d263",
+        "representative_site": 37,
+        "representative_tag": "3s_cbf_dc2_site37",
+        "sites": [
+          37
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 15,
+        "fingerprint": "dcc68e49b636a521",
+        "representative_site": 38,
+        "representative_tag": "3s_cbf_dc2_site38",
+        "sites": [
+          38
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330"
+          ],
+          "braces": [
+            "CHS323.9x6",
+            "CHS323.9x6",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS219.1x5",
+            "CHS219.1x5"
+          ]
+        }
+      },
+      {
+        "group_id": 16,
+        "fingerprint": "de37c0e44d0cf729",
+        "representative_site": 40,
+        "representative_tag": "3s_cbf_dc2_site40",
+        "sites": [
+          40
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 17,
+        "fingerprint": "a5a9d6a15c0525ea",
+        "representative_site": 41,
+        "representative_tag": "3s_cbf_dc2_site41",
+        "sites": [
+          41,
+          54,
+          57
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS177.8x4",
+            "CHS177.8x4"
+          ]
+        }
+      },
+      {
+        "group_id": 18,
+        "fingerprint": "de9b59cf9c4d158d",
+        "representative_site": 42,
+        "representative_tag": "3s_cbf_dc2_site42",
+        "sites": [
+          42,
+          56
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS177.8x4",
+            "CHS177.8x4"
+          ]
+        }
+      },
+      {
+        "group_id": 19,
+        "fingerprint": "3bb83e364f1a8102",
+        "representative_site": 44,
+        "representative_tag": "3s_cbf_dc2_site44",
+        "sites": [
+          44,
+          46,
+          49
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x4",
+            "CHS219.1x4"
+          ]
+        }
+      },
+      {
+        "group_id": 20,
+        "fingerprint": "657b978bd3bd3e6c",
+        "representative_site": 45,
+        "representative_tag": "3s_cbf_dc2_site45",
+        "sites": [
+          45,
+          52
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 21,
+        "fingerprint": "7daeb08f9e684203",
+        "representative_site": 47,
+        "representative_tag": "3s_cbf_dc2_site47",
+        "sites": [
+          47
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 22,
+        "fingerprint": "522d28f1b4590dbf",
+        "representative_site": 48,
+        "representative_tag": "3s_cbf_dc2_site48",
+        "sites": [
+          48,
+          51
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS219.1x5",
+            "CHS219.1x5"
+          ]
+        }
+      },
+      {
+        "group_id": 23,
+        "fingerprint": "c12ab2b0af2d4fab",
+        "representative_site": 53,
+        "representative_tag": "3s_cbf_dc2_site53",
+        "sites": [
+          53
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS219.1x4",
+            "CHS219.1x4"
+          ]
+        }
+      },
+      {
+        "group_id": 24,
+        "fingerprint": "89d8e790e0da04f8",
+        "representative_site": 55,
+        "representative_tag": "3s_cbf_dc2_site55",
+        "sites": [
+          55
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200",
+            "HEB200"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      }
+    ],
+    "5": [
+      {
+        "group_id": 0,
+        "fingerprint": "75a54b2a188243a0",
+        "representative_site": 0,
+        "representative_tag": "5s_cbf_dc2_site0",
+        "sites": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          12,
+          13,
+          14,
+          15,
+          16,
+          19,
+          20,
+          22,
+          23,
+          27,
+          28,
+          29
+        ],
+        "n_sites": 21,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x3.2",
+            "CHS114.3x3.2"
+          ]
+        }
+      },
+      {
+        "group_id": 1,
+        "fingerprint": "c0b8440118b8921f",
+        "representative_site": 7,
+        "representative_tag": "5s_cbf_dc2_site7",
+        "sites": [
+          7
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 2,
+        "fingerprint": "339214fd1822bf3b",
+        "representative_site": 10,
+        "representative_tag": "5s_cbf_dc2_site10",
+        "sites": [
+          10,
+          18,
+          24
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 3,
+        "fingerprint": "c009436eb7856366",
+        "representative_site": 11,
+        "representative_tag": "5s_cbf_dc2_site11",
+        "sites": [
+          11
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 4,
+        "fingerprint": "d5c2e89e23af0a72",
+        "representative_site": 17,
+        "representative_tag": "5s_cbf_dc2_site17",
+        "sites": [
+          17
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 5,
+        "fingerprint": "61bba8a43e036622",
+        "representative_site": 21,
+        "representative_tag": "5s_cbf_dc2_site21",
+        "sites": [
+          21
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3"
+          ]
+        }
+      },
+      {
+        "group_id": 6,
+        "fingerprint": "1747c45c75c945d1",
+        "representative_site": 25,
+        "representative_tag": "5s_cbf_dc2_site25",
+        "sites": [
+          25,
+          26
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS168.3x3",
+            "CHS139.7x3",
+            "CHS139.7x3",
+            "CHS114.3x3",
+            "CHS114.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 7,
+        "fingerprint": "60c4af28432bdda2",
+        "representative_site": 30,
+        "representative_tag": "5s_cbf_dc2_site30",
+        "sites": [
+          30
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 8,
+        "fingerprint": "22d263d7ad3262c9",
+        "representative_site": 31,
+        "representative_tag": "5s_cbf_dc2_site31",
+        "sites": [
+          31,
+          43
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 9,
+        "fingerprint": "74e06ee26ed555d7",
+        "representative_site": 32,
+        "representative_tag": "5s_cbf_dc2_site32",
+        "sites": [
+          32,
+          35,
+          36
+        ],
+        "n_sites": 3,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 10,
+        "fingerprint": "16bea3a43de360c1",
+        "representative_site": 33,
+        "representative_tag": "5s_cbf_dc2_site33",
+        "sites": [
+          33
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 11,
+        "fingerprint": "c05ba911274af27c",
+        "representative_site": 34,
+        "representative_tag": "5s_cbf_dc2_site34",
+        "sites": [
+          34,
+          53
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 12,
+        "fingerprint": "57d5fab9634c6b51",
+        "representative_site": 37,
+        "representative_tag": "5s_cbf_dc2_site37",
+        "sites": [
+          37
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 13,
+        "fingerprint": "3185b2e06cb158b2",
+        "representative_site": 38,
+        "representative_tag": "5s_cbf_dc2_site38",
+        "sites": [
+          38
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB320",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x6",
+            "CHS323.9x6",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS219.1x4",
+            "CHS219.1x4"
+          ]
+        }
+      },
+      {
+        "group_id": 14,
+        "fingerprint": "1f57875913b6a66e",
+        "representative_site": 39,
+        "representative_tag": "5s_cbf_dc2_site39",
+        "sites": [
+          39
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 15,
+        "fingerprint": "5b7d45ea95ac86df",
+        "representative_site": 40,
+        "representative_tag": "5s_cbf_dc2_site40",
+        "sites": [
+          40
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 16,
+        "fingerprint": "47b3daefd2900c60",
+        "representative_site": 41,
+        "representative_tag": "5s_cbf_dc2_site41",
+        "sites": [
+          41,
+          47,
+          54,
+          55,
+          57
+        ],
+        "n_sites": 5,
+        "sections": {
+          "columns": [
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS168.3x4",
+            "CHS168.3x4"
+          ]
+        }
+      },
+      {
+        "group_id": 17,
+        "fingerprint": "b8303656de5489db",
+        "representative_site": 42,
+        "representative_tag": "5s_cbf_dc2_site42",
+        "sites": [
+          42,
+          56
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB260",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS168.3x4",
+            "CHS168.3x4"
+          ]
+        }
+      },
+      {
+        "group_id": 18,
+        "fingerprint": "042e040171523dfe",
+        "representative_site": 44,
+        "representative_tag": "5s_cbf_dc2_site44",
+        "sites": [
+          44,
+          46
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS177.8x4",
+            "CHS177.8x4"
+          ]
+        }
+      },
+      {
+        "group_id": 19,
+        "fingerprint": "36f5e60132fbc84a",
+        "representative_site": 45,
+        "representative_tag": "5s_cbf_dc2_site45",
+        "sites": [
+          45,
+          52
+        ],
+        "n_sites": 2,
+        "sections": {
+          "columns": [
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS168.3x4",
+            "CHS168.3x4"
+          ]
+        }
+      },
+      {
+        "group_id": 20,
+        "fingerprint": "b53469857a0b405e",
+        "representative_site": 48,
+        "representative_tag": "5s_cbf_dc2_site48",
+        "sites": [
+          48
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE360",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS244.5x6.3",
+            "CHS244.5x6.3",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 21,
+        "fingerprint": "64fc4b3174aabb67",
+        "representative_site": 49,
+        "representative_tag": "5s_cbf_dc2_site49",
+        "sites": [
+          49
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB280",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS244.5x6.3",
+            "CHS244.5x6.3",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS219.1x5",
+            "CHS219.1x5",
+            "CHS177.8x4",
+            "CHS177.8x4"
+          ]
+        }
+      },
+      {
+        "group_id": 22,
+        "fingerprint": "8bc84bf1b17f03e5",
+        "representative_site": 50,
+        "representative_tag": "5s_cbf_dc2_site50",
+        "sites": [
+          50
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB220",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS168.3x4",
+            "CHS168.3x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 23,
+        "fingerprint": "dc19100694b4d8e6",
+        "representative_site": 51,
+        "representative_tag": "5s_cbf_dc2_site51",
+        "sites": [
+          51
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      },
+      {
+        "group_id": 24,
+        "fingerprint": "a09b247db3a2e01c",
+        "representative_site": 58,
+        "representative_tag": "5s_cbf_dc2_site58",
+        "sites": [
+          58
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB240",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160",
+            "HEB160"
+          ],
+          "beams": [
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS219.1x4",
+            "CHS193.7x4",
+            "CHS193.7x4",
+            "CHS177.8x4",
+            "CHS177.8x4",
+            "CHS168.3x3",
+            "CHS168.3x3"
+          ]
+        }
+      },
+      {
+        "group_id": 25,
+        "fingerprint": "160a1b2b53d394fb",
+        "representative_site": 59,
+        "representative_tag": "5s_cbf_dc2_site59",
+        "sites": [
+          59
+        ],
+        "n_sites": 1,
+        "sections": {
+          "columns": [
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB300",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180",
+            "HEB180"
+          ],
+          "beams": [
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE330",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300",
+            "IPE300"
+          ],
+          "braces": [
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS323.9x5",
+            "CHS273x5",
+            "CHS273x5",
+            "CHS244.5x5",
+            "CHS244.5x5",
+            "CHS193.7x4",
+            "CHS193.7x4"
+          ]
+        }
+      }
+    ]
+  },
+  "summary": {
+    "3": {
+      "n_sites": 60,
+      "n_unique": 25
+    },
+    "5": {
+      "n_sites": 60,
+      "n_unique": 26
+    }
+  }
+}

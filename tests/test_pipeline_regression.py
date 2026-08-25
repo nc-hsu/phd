@@ -10,12 +10,20 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from phd_project.scripts import cache_utils, disagg_shards
+from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
+    _disagg_fingerprint_input,
+)
 from phd_project.scripts.cache_utils import (
     StaleCacheError,
+    clear_file_hash_cache,
     fingerprint,
     json_load_or_compute,
     load_or_compute,
@@ -37,6 +45,61 @@ def test_fingerprint_is_deterministic_and_content_based():
     df2 = df.copy()
     df2.loc[0, "a"] = 99
     assert fingerprint(gm_db=df2)["gm_db"]["hash"] != fp1["gm_db"]["hash"]
+
+
+def test_file_hash_matches_read_bytes(tmp_path):
+    """The memoised/streamed hash must equal a plain sha256 of the whole file.
+
+    This is what keeps every already-written manifest valid across the switch to
+    streamed hashing -- if it ever fails, hundreds of cached artifacts go stale.
+    """
+    clear_file_hash_cache()
+    p = tmp_path / "big.bin"
+    p.write_bytes(os.urandom(3_000_000))  # > the 1 MB-ish chunking used internally
+    assert fingerprint(f=p)["f"]["hash"] == hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def test_file_hash_is_memoised(monkeypatch, tmp_path):
+    clear_file_hash_cache()
+    p = tmp_path / "a.bin"
+    p.write_bytes(b"payload")
+
+    calls = {"n": 0}
+    real = cache_utils._hash_file
+
+    def counting(path):
+        calls["n"] += 1
+        return real(path)
+
+    monkeypatch.setattr(cache_utils, "_hash_file", counting)
+
+    h1 = fingerprint(f=p)["f"]["hash"]
+    h2 = fingerprint(f=p)["f"]["hash"]
+    assert h1 == h2
+    assert calls["n"] == 1  # second fingerprint served from the memo
+
+
+def test_file_hash_cache_invalidates_on_rewrite(tmp_path):
+    """A rewritten file must re-hash, including when the size is unchanged."""
+    clear_file_hash_cache()
+    p = tmp_path / "a.bin"
+
+    p.write_bytes(b"aaaa")
+    h_first = fingerprint(f=p)["f"]["hash"]
+
+    # same size, different content -- only mtime_ns distinguishes them. Force a
+    # distinct mtime so the test does not depend on the filesystem clock.
+    st = p.stat()
+    p.write_bytes(b"bbbb")
+    os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+    h_same_size = fingerprint(f=p)["f"]["hash"]
+    assert h_same_size != h_first
+    assert h_same_size == hashlib.sha256(b"bbbb").hexdigest()
+
+    # different size
+    p.write_bytes(b"cccccccc")
+    os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000))
+    assert fingerprint(f=p)["f"]["hash"] == hashlib.sha256(b"cccccccc").hexdigest()
 
 
 def test_load_or_compute_branches(tmp_path):
@@ -157,6 +220,131 @@ def _basic_ctx():
         "selection_imts": [_Stub("PGA"), _Stub("RSD595")],
         "imt_weights": np.array([0.5, 0.5]),
     }
+
+
+# --------------------------------------------------------------------------- #
+# Per-site disagg shards                                                       #
+# --------------------------------------------------------------------------- #
+
+def _fake_disagg(n_sites=3):
+    """{site: {imt: {iml: DataFrame}}}, the shape nb 021 collates."""
+    return {
+        site: {"AvgSA": {iml: pd.DataFrame({"Mag": [5.0 + site], "P(m|X>x)": [iml]})
+                         for iml in (0.27, 0.285, 1.3368)}}
+        for site in range(n_sites)
+    }
+
+
+def _same(a, b):
+    assert set(a) == set(b)
+    for site in a:
+        assert set(a[site]) == set(b[site])
+        for imt in a[site]:
+            # exact float keys matter: they are the pipeline's (site, iml) keys
+            assert list(a[site][imt]) == list(b[site][imt])
+            for iml in a[site][imt]:
+                pd.testing.assert_frame_equal(a[site][imt][iml], b[site][imt][iml])
+    return True
+
+
+def test_shards_round_trip_and_subset(tmp_path):
+    data = _fake_disagg()
+    fp = fingerprint(rng_seed=1)
+    disagg_shards.write_shards(tmp_path, data, fp)
+
+    assert _same(disagg_shards.load_shards(tmp_path), data)
+
+    only_1 = disagg_shards.load_shards(tmp_path, sites=[1])
+    assert set(only_1) == {1}
+    assert disagg_shards.load_shards(tmp_path, sites=()) == {}
+
+    with pytest.raises(FileNotFoundError):
+        disagg_shards.load_shards(tmp_path, sites=[99])
+
+
+def test_shard_index_has_exact_iml_keys(tmp_path):
+    """The index must reproduce the native float keys bit-for-bit.
+
+    wanted_stripe_keys() matches against these, so an index that rounded would
+    silently shift the whole (site, iml) key set.
+    """
+    data = _fake_disagg()
+    disagg_shards.write_shards(tmp_path, data, fingerprint(rng_seed=1))
+    index = disagg_shards.read_index(tmp_path)
+    for site, imt_dict in data.items():
+        for imt, iml_dict in imt_dict.items():
+            assert index[site][imt] == sorted(iml_dict)
+
+
+def test_shard_path_round_trip():
+    p = disagg_shards.shard_path("d", 7)
+    assert p.name == "site_007.pickle"
+    assert disagg_shards.site_from_shard_name(p.name) == 7
+    with pytest.raises(ValueError):
+        disagg_shards.site_from_shard_name("not_a_shard.pickle")
+
+
+def test_load_or_compute_shards_branches(tmp_path):
+    calls = {"n": 0}
+    data = _fake_disagg()
+
+    def compute():
+        calls["n"] += 1
+        return data
+
+    fp = fingerprint(rng_seed=1)
+
+    # cold -> compute + write
+    assert _same(disagg_shards.load_or_compute_shards(tmp_path, fp, compute), data)
+    assert calls["n"] == 1
+
+    # warm, matching manifests -> load, no recompute
+    assert _same(disagg_shards.load_or_compute_shards(tmp_path, fp, compute), data)
+    assert calls["n"] == 1
+
+    # changed inputs -> recompute
+    disagg_shards.load_or_compute_shards(tmp_path, fingerprint(rng_seed=2), compute)
+    assert calls["n"] == 2
+
+    # force -> recompute even on a match
+    disagg_shards.load_or_compute_shards(
+        tmp_path, fingerprint(rng_seed=2), compute, force_recompute=True)
+    assert calls["n"] == 3
+
+
+def test_shards_digest_tracks_content(tmp_path):
+    clear_file_hash_cache()
+    disagg_shards.write_shards(tmp_path, _fake_disagg(), fingerprint(rng_seed=1))
+    first = disagg_shards.shards_digest(tmp_path)
+    assert first == disagg_shards.shards_digest(tmp_path)
+
+    # change one shard's bytes -> digest moves
+    victim = disagg_shards.shard_path(tmp_path, 1)
+    st = victim.stat()
+    victim.write_bytes(victim.read_bytes() + b"extra")
+    os.utime(victim, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+    clear_file_hash_cache()
+    assert disagg_shards.shards_digest(tmp_path) != first
+
+
+def test_stripe_fingerprint_is_site_scoped(tmp_path):
+    """Sharded source_fps must fingerprint THIS site's shard, and nothing else.
+
+    That is what keeps one site's rebuilt disagg from invalidating every other
+    site's stripes. The legacy monolith shape must still work unchanged (AvgSA_06).
+    """
+    clear_file_hash_cache()
+    disagg_shards.write_shards(tmp_path, _fake_disagg(), fingerprint(rng_seed=1))
+
+    sharded = {"disagg_shard_dir": tmp_path}
+    assert "disagg_site_shard" in _disagg_fingerprint_input(sharded, 1)
+    assert _disagg_fingerprint_input(sharded, 1) != _disagg_fingerprint_input(sharded, 2)
+    # site=None -> the whole-set digest, for batch artifacts
+    assert "disagg_shards_digest" in _disagg_fingerprint_input(sharded)
+
+    legacy = {"disagg_data_file": tmp_path / "_index.json"}
+    assert list(_disagg_fingerprint_input(legacy)) == ["disagg_data_file"]
+    assert _disagg_fingerprint_input(legacy, 1) == _disagg_fingerprint_input(legacy, 2)
 
 
 def test_engine_call_pattern_and_round3_empty(tmp_path, monkeypatch):

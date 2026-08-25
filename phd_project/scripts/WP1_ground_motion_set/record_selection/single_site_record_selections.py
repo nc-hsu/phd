@@ -26,6 +26,7 @@ from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     optimise_ground_motion_ensembles_for_sites_with_shuffles,
 )
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
+from phd_project.scripts.disagg_shards import load_shards
 from phd_project.plotting import custom_log_formatter
 
 cfg = load_config()
@@ -33,7 +34,7 @@ cfg = load_config()
 
 # Filepaths:
 # input file paths
-fp_disagg_data = cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"]
+fp_disagg_shards = cfg["proc_data"]["AvgSA_03_disagg_data_shards"]
 fp_disagg_stats = cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"]
 fp_gcim_dists = cfg["proc_data"]["gcim_dists"] / f"gcim_dist_AvgSA_03_rake-90.pickle"
 fp_site_model = cfg["hazard_models"]["eshm20_wp1_site_model"]
@@ -54,9 +55,9 @@ site_id = 30
 poe =  0.0001
 
 #################### Load Data #################################################
-# Load the disaggregation data
-with open(fp_disagg_data, "rb") as f:
-    disagg_data = pickle.load(f)
+# Load the disaggregation data. It is stored one pickle per site, so this debug
+# script reads only the single site it inspects instead of every site's data.
+disagg_data = load_shards(fp_disagg_shards, sites=[site_id])
 
 with open(fp_disagg_stats, "rb") as f:
     disagg_stats = pickle.load(f)

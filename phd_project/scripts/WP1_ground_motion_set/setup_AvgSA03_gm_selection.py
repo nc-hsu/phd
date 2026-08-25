@@ -7,6 +7,7 @@ import pandas as pd
 from openquake.hazardlib.imt import PGA, SA, RSD595, AvgSA, IA, IMT
 
 from phd_project.config.config import load_config
+from phd_project.scripts.disagg_shards import load_shards, read_index
 
 from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     ESHM20SiteRupCtxBuilder,
@@ -43,9 +44,15 @@ def stripe_source_fps() -> dict:
     computed identically throughout. Deliberately EXCLUDES the per-site IML
     subset JSON (``AvgSA_03_imls_for_selection``): that grows the set of wanted
     stripes without changing any existing stripe's fingerprint.
+
+    ``disagg_shard_dir`` is the *directory* of per-site shards, not a file:
+    ``stripe_input_fingerprint`` resolves it to ``site_NNN.pickle`` for the stripe's
+    own site, so re-running the disaggregation for one site leaves the other 59
+    sites' stripes valid. Never fingerprint the directory itself -- a non-file path
+    is hashed as a string, which looks valid while tracking nothing.
     """
     return {
-        "disagg_data_file":  cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"],
+        "disagg_shard_dir":  cfg["proc_data"]["AvgSA_03_disagg_data_shards"],
         "disagg_stats_file": cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"],
         "gm_db_file":        cfg["proc_data"]["gm_database"],
         "site_model_file":   cfg["hazard_models"]["eshm20_wp1_site_model"],
@@ -53,7 +60,67 @@ def stripe_source_fps() -> dict:
     }
 
 
-def setup_AvgSA03_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125):
+DISAGG_IMT = "AvgSA"   # conditioning IM name used as the disagg_data key
+
+
+def _select_stripe_keys(iml_keys_by_site: dict, disagg_stats, imls_for_selection: dict,
+                        imt: str = DISAGG_IMT):
+    """Resolve the wanted ``(site, iml)`` keys against what was disaggregated.
+
+    ``iml_keys_by_site[site]`` is that site's list of **native** disagg iml keys.
+    Returns ``(keys, invalid)``: ``keys`` in the canonical pipeline order (grouped
+    by site, and within a site in the order the ``union`` list requests them),
+    ``invalid`` the requested-but-unusable ``(site, iml)``.
+
+    Single source of this logic, shared by :func:`wanted_stripe_keys` (which reads
+    the shard index and opens no shard) and :func:`_set_up_selection` (which loads
+    the shards). If the two ever disagreed, the stale check would target a
+    different key set from the one that gets computed.
+    """
+    keys, invalid = [], []
+    for site in sorted(iml_keys_by_site):
+        site_entry = imls_for_selection.get(str(site))
+        wanted = site_entry.get("union") if site_entry else None
+        if wanted is None:
+            continue  # site not listed in the subset JSON -> skip
+        iml_keys = iml_keys_by_site[site]
+        for iml in wanted:
+            if iml is None:
+                continue  # upper-stripe placeholder (iml above the hazard ceiling)
+            # validity probe: a zero-hazard / excluded iml has no stats row (poe None)
+            poe = get_poe_from_disaggstats(disagg_stats, site, imt, iml)
+            key = next((k for k in iml_keys if np.isclose(k, iml)), None)
+            if poe is None or key is None:
+                invalid.append((site, iml))
+                continue
+            keys.append((site, key))
+    # grouped by site; stable, so the within-site request order is preserved
+    return sorted(keys, key=lambda x: x[0]), invalid
+
+
+def wanted_stripe_keys(imt: str = DISAGG_IMT) -> list[tuple[int, float]]:
+    """The full wanted ``(site, iml)`` key set, without opening a disagg shard.
+
+    Reads only the shard ``_index.json``, the 0.1 MB disagg-stats pickle and the
+    IML-subset JSON, so it runs in milliseconds. Notebooks 031/032/033 use it to
+    run the stale check *before* deciding which shards (if any) to load.
+
+    Guaranteed to equal ``list(setup_AvgSA03_gcim_gm_selection()[0].keys())`` --
+    both go through :func:`_select_stripe_keys`.
+    """
+    index = read_index(cfg["proc_data"]["AvgSA_03_disagg_data_shards"])
+    iml_keys_by_site = {site: d[imt] for site, d in index.items() if imt in d}
+
+    with open(cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"], "rb") as f:
+        disagg_stats = pickle.load(f)
+    with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
+        imls_for_selection = json.load(f)
+
+    keys, _ = _select_stripe_keys(iml_keys_by_site, disagg_stats, imls_for_selection, imt)
+    return keys
+
+
+def setup_AvgSA03_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125, sites=None):
     ########### set some parameters for the selection ##########################
     t_lower = 0.025     # lower SA period considered in selection
     t_upper = 3         # upper SA period considered in selection
@@ -78,10 +145,18 @@ def setup_AvgSA03_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125):
                                "IA": weight_ia})
 
     return _set_up_selection(conditioning_imt, selection_imts, imt_weights, 
-                             nonSA_imt_strs, sa_periods, t_upper)
+                             nonSA_imt_strs, sa_periods, t_upper, sites)
 
 
-def setup_AvgSA03_gcim_gm_selection(weight_rsd595=0.25):
+def setup_AvgSA03_gcim_gm_selection(weight_rsd595=0.25, sites=None):
+    """Build everything the AvgSA([0,3]) record selection needs.
+
+    ``sites`` selects which per-site disagg shards to load: ``None`` loads every
+    site with a wanted stripe (the old whole-monolith behaviour), an iterable loads
+    only those, and ``()`` loads none -- for callers that need the selection context
+    and stats but no disagg data (nb 033, and the stale check in 031/032 before it
+    knows what is stale). ``site_iml_disaggs`` is restricted to the loaded sites.
+    """
     ########### set some parameters for the selection ##########################
     t_lower = 0.025     # lower SA period considered in selection
     t_upper = 3         # upper SA period considered in selection
@@ -97,7 +172,7 @@ def setup_AvgSA03_gcim_gm_selection(weight_rsd595=0.25):
     imt_weights = _im_weights(selection_imts, {"RSD595": weight_rsd595})
 
     return _set_up_selection(conditioning_imt, selection_imts, imt_weights, 
-                             nonSA_imt_strs, sa_periods, t_upper)
+                             nonSA_imt_strs, sa_periods, t_upper, sites)
 
 
 def _im_weights(selection_imts, spec_weights: dict[str, float]):
@@ -121,19 +196,20 @@ def _im_weights(selection_imts, spec_weights: dict[str, float]):
 
 def _set_up_selection(
         conditioning_imt, selection_imts, imt_weights,
-        nonSA_imt_strs, sa_periods, t_upper):
+        nonSA_imt_strs, sa_periods, t_upper, sites=None):
 
     # some other things
     assumed_rake = -90  # assumed rake for RSD595 calculation
     occurence = True    # the record selection should be performed based on occurence
 
     ####################### Load Data ##########################################
-    # Load the IML-based disaggregation (the sig4 / eps4 truncation set from nb 021).
-    # disagg_data is flat: disagg_data[site][imt][iml] -> DataFrame
+    # The IML-based disaggregation (the sig4 / eps4 truncation set from nb 021) is
+    # stored per site: <shard_dir>/site_NNN.pickle -> {imt: {iml: DataFrame}}, plus
+    # an _index.json carrying the native iml keys. We resolve the wanted (site, iml)
+    # from the index FIRST and then load only the shards those keys need, so a
+    # caller after a couple of sites does not pay for all 60.
     # disagg_stats is a flat DataFrame, one row per (site, imt, imtl) with a poe column.
-    fp = cfg["proc_data"]["AvgSA_03_disagg_data_gm_selection"]
-    with open(fp, "rb") as f:
-        disagg_data = pickle.load(f)
+    shard_dir = cfg["proc_data"]["AvgSA_03_disagg_data_shards"]
 
     fp = cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"]
     with open(fp, "rb") as f:
@@ -146,36 +222,33 @@ def _set_up_selection(
         imls_for_selection = json.load(f)
 
     # organise the disagg data, keyed by (site, iml). iml is the native key of the
-    # disagg data (disagg_data[site][imt][iml]); poe is derived downstream only
-    # where it is needed as metadata (see get_poe_from_disaggstats).
+    # disagg data (shard[imt][iml]); poe is derived downstream only where it is
+    # needed as metadata (see get_poe_from_disaggstats). The key set comes from the
+    # index via _select_stripe_keys -- the SAME helper wanted_stripe_keys() uses, so
+    # the stale check can never target a different key set from what is built here.
     imt = conditioning_imt.name  # "AvgSA" (only works for AvgSA; see disagg_imt comment below)
-    site_iml_disaggs = {}
-    invalid = []  # (site, iml) requested in the JSON but not usable (no stats row / no disagg df)
-    for site in sorted(disagg_data.keys()):
-        site_entry = imls_for_selection.get(str(site))
-        wanted = site_entry.get("union") if site_entry else None
-        if wanted is None:
-            continue  # site not listed in the subset JSON -> skip
-        iml_keys = list(disagg_data[site][imt].keys())
-        for iml in wanted:
-            if iml is None:
-                continue  # upper-stripe placeholder (iml above the hazard ceiling) -> skip
-            # validity probe: a zero-hazard / excluded iml has no stats row (poe is None)
-            poe = get_poe_from_disaggstats(disagg_stats, site, imt, iml)
-            key = next((k for k in iml_keys if np.isclose(k, iml)), None)
-            if poe is None or key is None:
-                # e.g. a zero-hazard / excluded iml (dropped from stats in nb 021) or
-                # an iml that was never disaggregated -> skip gracefully.
-                invalid.append((site, iml))
-                continue
-            # Key by the exact disagg_data iml float (the native key); poe is 1:1 with
-            # iml per site and is derived downstream where it is needed as metadata.
-            site_iml_disaggs[(site, key)] = disagg_data[site][imt][key]
-    site_imls = sorted(list(site_iml_disaggs.keys()), key=lambda x: x[0])
-    site_iml_disaggs = {k: site_iml_disaggs[k] for k in site_imls}
+    index = read_index(shard_dir)
+    iml_keys_by_site = {site: d[imt] for site, d in index.items() if imt in d}
+    all_keys, invalid = _select_stripe_keys(
+        iml_keys_by_site, disagg_stats, imls_for_selection, imt)
+
+    # Load only the shards the caller asked for (None -> every site that has a
+    # wanted stripe; () -> none at all).
+    if sites is None:
+        load_sites = {s for s, _ in all_keys}
+    else:
+        load_sites = {int(s) for s in sites}
+    shards = load_shards(shard_dir, load_sites)
+
+    # Key by the exact iml float (the native key); poe is 1:1 with iml per site and
+    # is derived downstream where it is needed as metadata.
+    site_iml_disaggs = {(site, key): shards[site][imt][key]
+                        for site, key in all_keys if site in shards}
 
     print(f"Built {len(site_iml_disaggs)} (site, iml) disaggregations "
-          f"across {len({s for s, _ in site_iml_disaggs})} sites.")
+          f"across {len({s for s, _ in site_iml_disaggs})} sites "
+          f"({len(shards)} of {len(index)} shards loaded; "
+          f"{len(all_keys)} (site, iml) wanted in total).")
     if invalid:
         print(f"WARNING: {len(invalid)} (site, iml) requested in imls_for_selection are not "
               f"present in disagg_stats/disagg_data and were skipped:")

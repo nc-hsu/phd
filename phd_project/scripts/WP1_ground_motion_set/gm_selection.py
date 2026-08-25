@@ -54,6 +54,7 @@ from phd_project.scripts.cache_utils import (
     manifest_matches,
     StaleCacheError,
 )
+from phd_project.scripts.disagg_shards import shard_path, shards_digest
 
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 from phd_project.scripts.oqhelpers import parse_nrml_logic_tree
@@ -771,6 +772,24 @@ def stripe_pickle_path(result_folder, site, iml) -> Path:
     return Path(result_folder) / f"site_{site}__stripe_iml_{iml_filename_tag(iml)}__gm_selection.pickle"
 
 
+def _disagg_fingerprint_input(source_fps: dict, site=None) -> dict:
+    """The disagg entry of a fingerprint, for either storage layout.
+
+    Sharded (AvgSA_03): ``source_fps["disagg_shard_dir"]`` → the one shard this
+    stripe depends on, or the whole-set digest when ``site is None`` (batch
+    artifacts genuinely depend on every site in their batch).
+
+    Legacy monolith (AvgSA_06, still on one pickle): ``disagg_data_file``, hashed
+    exactly as before.
+    """
+    if "disagg_shard_dir" in source_fps:
+        shard_dir = source_fps["disagg_shard_dir"]
+        if site is None:
+            return {"disagg_shards_digest": shards_digest(shard_dir)}
+        return {"disagg_site_shard": shard_path(shard_dir, site)}
+    return {"disagg_data_file": source_fps["disagg_data_file"]}
+
+
 def stripe_input_fingerprint(site, iml, source_fps: dict,
                              basic_selection_ctx: dict, selection_config: dict) -> dict:
     """Provenance fingerprint of everything that determines *one* stripe's result.
@@ -783,15 +802,19 @@ def stripe_input_fingerprint(site, iml, source_fps: dict,
     what makes the cache incremental: adding IMLs to the ``union`` lists grows the
     *set* of wanted stripes without changing any existing stripe's fingerprint.
 
-    ``source_fps`` must provide ``disagg_data_file``, ``disagg_stats_file``,
-    ``gm_db_file``, ``site_model_file`` and ``gmm_lt_file`` (paths). Because all
-    three notebooks must compute an identical fingerprint, ``selection_config``
-    (percentiles + round config) is centralised in the setup module — see
-    ``SELECTION_CONFIG``.
+    ``source_fps`` must provide ``disagg_stats_file``, ``gm_db_file``,
+    ``site_model_file``, ``gmm_lt_file`` and the disagg input in one of its two
+    forms (see :func:`_disagg_fingerprint_input`). Because all three notebooks must
+    compute an identical fingerprint, ``selection_config`` (percentiles + round
+    config) is centralised in the setup module — see ``SELECTION_CONFIG``.
+
+    With the sharded layout the disagg entry is **this site's shard only**, which
+    is what makes staleness site-precise: re-running the disaggregation for one
+    site leaves every other site's stripes valid instead of invalidating all ~450.
     """
     sc = selection_config
     return fingerprint(
-        disagg_data_file=source_fps["disagg_data_file"],
+        **_disagg_fingerprint_input(source_fps, site),
         disagg_stats_file=source_fps["disagg_stats_file"],
         gm_db_file=source_fps["gm_db_file"],
         site_model_file=source_fps["site_model_file"],
@@ -2102,10 +2125,12 @@ def build_final_ensembles(
 
     # Base inputs common to every stage. Source files are hashed by their bytes
     # (cheap and stable) rather than re-hashing the large in-memory objects.
+    # The stage / final artifacts cover a whole batch, so their disagg input is the
+    # digest of the entire shard set rather than any single site's shard.
     base_inputs = {
         "gm_db_file": source_fps["gm_db_file"],
         "gcim_file": source_fps["gcim_file"],
-        "disagg_data_file": source_fps["disagg_data_file"],
+        **_disagg_fingerprint_input(source_fps),
         "disagg_stats_file": source_fps["disagg_stats_file"],
         "site_model_file": source_fps["site_model_file"],
         "rng_seed": rng_seed,

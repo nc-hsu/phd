@@ -52,6 +52,7 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 | `002-im_correlations` | record flatfiles | IM correlation models | — |
 | `003-psha_setup_and_analyses` | `sites.csv` | OpenQuake hazard calcs | `001` |
 | `004-psha_results` | OQ calcs | hazard curves per site | `003` |
+| `005-sa_psha_results` | OQ calc `SA_psha_eps4` | PGA/SA hazard curves per site + per-site hazard surfaces (IML x period) | `003` |
 | `010_cbfs_reference_designs…` | — | `casestudy_designs_dc2_scA_reference` designs, reference MDOF folders, design-parameter dataset `…/08_casestudy_structure_datasets/ec8_gen2_dc2_scA_reference_cbfs.pickle`, `…/ec8_gen2_reference_structures/3s/mdof/{po,cpo,modal,ida}.py` | — |
 | `011-create_site_casestudies…` | `sites.csv` | site MDOF folders (modal + cpo + FEMA P695 IDA), `site_designs_summary.csv`, design-parameter dataset `…/08_casestudy_structure_datasets/ec8_gen2_site_specific_cbfs.pickle`, `…/casestudy_sites/3s/mdof/{cpo,ida}.py` | `001` |
 | `012`–`014` *(archived)* | — | moved to `partly_completed_ideas/reference_sdofs_and_sdof_parameterisation/` | — |

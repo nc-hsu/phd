@@ -44,7 +44,10 @@ proc_data:
   disagg_imls_AvgSA_03: "data_processed/03_site_hazard/AvgSA_03_imls_for_disaggregation.csv"
   disagg_imls_AvgSA_06: "data_processed/03_site_hazard/AvgSA_06_imls_for_disaggregation.csv"
   # Disagg inputs to record selection: the 4-sigma-truncation ("sig4") IML-based set from nb 021
-  AvgSA_03_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_03_disagg_data_wp1sites_eps4.pickle"
+  # Per-site disagg shards from nb 021: <dir>/site_NNN.pickle + _index.json. Sharded
+  # so a stripe's fingerprint names only its OWN site (see scripts/disagg_shards.py)
+  # -- re-running the disagg for one site no longer invalidates all ~450 stripes.
+  AvgSA_03_disagg_data_shards:        "data_processed/03_site_hazard/AvgSA_03_disagg_data_wp1sites_eps4"
   AvgSA_03_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_03_disagg_stats_wp1sites_eps4.pickle"
   AvgSA_06_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_06_disagg_data_wp1sites_eps4.pickle"
   AvgSA_06_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_06_disagg_stats_wp1sites_eps4.pickle"
