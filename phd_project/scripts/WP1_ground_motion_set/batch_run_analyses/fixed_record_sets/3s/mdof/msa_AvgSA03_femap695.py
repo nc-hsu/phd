@@ -6,6 +6,9 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 
+from phd_project.process_semaphore.process_semaphore import (
+    set_max_concurrent, describe_max_concurrent, DEFAULT_RESERVED_CORES)
+
 
 ## TOP-LEVEL multi-building MSA launcher (the MSA analogue of
 ## run_batch_ida_buildings.py).
@@ -19,13 +22,21 @@ from tqdm import tqdm
 ##
 ## Each coordinator (run_batch_msa_per_record.py) dispatches every (stripe, record)
 ## pair at once, drawing its NLTHA workers from the shared, machine-global
-## process_semaphore by default, so across ALL active buildings at most
-## `physical_cores - 3` NLTHA runs are live at once. As a building finishes, its
-## coordinator retires and the launcher starts the next building in its place.
+## process_semaphore by default, so across ALL active buildings at most `--n-cores`
+## NLTHA runs are live at once. As a building finishes, its coordinator retires and
+## the launcher starts the next building in its place.
+##
+## --n-cores is REQUIRED on the semaphore path: it sets the machine-global cap for
+## every analysis process on this box (not just this launcher's) and is sticky until
+## the next --n-cores changes it, so each campaign has to state the budget it wants.
+## Large models need a much lower cap than small ones -- one worker per core thrashes
+## the L3 cache and saturates the memory bus, making the workstation unusable for
+## everyone else.
 ##
 ## The semaphore can be swapped for a fixed per-building worker count (--max-workers
-## / --no-semaphore), and each building's per-worker console windows show by default
-## -- pass --quiet to hide them and stream worker output to worker_logs/ instead.
+## / --no-semaphore), in which case --n-cores does not apply. Each building's
+## per-worker console windows show by default -- pass --quiet to hide them and stream
+## worker output to worker_logs/ instead.
 
 # --- configure here -------------------------------------------------------
 # The buildings to run. Each entry is a folder containing run_batch_msa_per_record.py
@@ -95,6 +106,9 @@ show_worker_windows = True
 # count instead.
 use_semaphore = True
 max_workers = None            # fixed worker count per building when use_semaphore is False
+# Machine-global cap on simultaneous NLTHA workers (the process_semaphore cap, NOT
+# the per-building max_workers). None -> must be supplied via --n-cores.
+n_cores = None
 # --------------------------------------------------------------------------
 
 
@@ -165,13 +179,20 @@ def run(building_specs: list[dict[str, str]] | None = None,
         window_name_index: int = window_name_index,
         show_worker_windows: bool = show_worker_windows,
         use_semaphore: bool = use_semaphore,
-        max_workers: int | None = max_workers):
+        max_workers: int | None = max_workers,
+        n_cores: int | None = n_cores):
 
     specs = building_specs if building_specs is not None else buildings
     resolved = resolve_buildings(specs)
 
-    workers_desc = ("shared semaphore" if use_semaphore
-                    else f"{max_workers if max_workers is not None else 'cores - 3'} workers/building")
+    # Set the machine-global worker cap before anything is launched. The spawned
+    # coordinators read it from the semaphore's config file rather than being
+    # passed it, so deployed run_batch_msa_per_record.py copies need no update.
+    if use_semaphore and n_cores is not None:
+        set_max_concurrent(n_cores, set_by=Path(__file__).name)
+
+    workers_desc = (f"shared semaphore, {describe_max_concurrent()}" if use_semaphore
+                    else f"{max_workers if max_workers is not None else f'cores - {DEFAULT_RESERVED_CORES}'} workers/building")
     print(f"Launch Time: {datetime.now()} | {len(resolved)} building(s), "
           f"up to {max_coordinators} coordinator(s) at once, "
           f"workers: {workers_desc}, "
@@ -215,12 +236,19 @@ def run(building_specs: list[dict[str, str]] | None = None,
 
 if __name__ == "__main__":
     # launch from the terminal, e.g.
-    #   python run_batch_msa_buildings.py
-    #   python run_batch_msa_buildings.py --quiet --max-coordinators 5
-    #   python run_batch_msa_buildings.py --max-workers 4
+    #   python run_batch_msa_buildings.py --n-cores 20
+    #   python run_batch_msa_buildings.py --n-cores 60 --quiet --max-coordinators 5
+    #   python run_batch_msa_buildings.py --max-workers 4        (no semaphore, no --n-cores)
     # By default the buildings list configured at the top of this file is run.
     parser = argparse.ArgumentParser(
         description="Run MSAs for several buildings at once, sharing one machine-global core cap.")
+    parser.add_argument("--n-cores", type=int, default=n_cores,
+                        help="machine-global cap on simultaneous NLTHA workers across ALL "
+                             f"launchers on this machine (default policy: physical cores - "
+                             f"{DEFAULT_RESERVED_CORES}). Sticky until the next --n-cores. "
+                             "Required unless --max-workers/--no-semaphore is used. Use a low "
+                             "value (~20) for large models, which otherwise thrash the cache "
+                             "and make the workstation unusable for others.")
     parser.add_argument("--max-coordinators", type=int, default=max_coordinators,
                         help="how many building coordinators (windows) to run at once")
     parser.add_argument("--window-name-index", type=int, default=window_name_index,
@@ -232,12 +260,17 @@ if __name__ == "__main__":
                              "shared semaphore (implies --no-semaphore)")
     parser.add_argument("--no-semaphore", action="store_true",
                         help="do not use the machine-global process_semaphore (each building "
-                             "runs with a fixed worker count from --max-workers, or cores - 3)")
+                             "runs with a fixed worker count from --max-workers, or cores - 4)")
     args = parser.parse_args()
 
     use_semaphore = not args.no_semaphore and args.max_workers is None
+    if use_semaphore and args.n_cores is None:
+        parser.error("--n-cores is required when using the shared semaphore; pass "
+                     "--max-workers N to run each building with a fixed worker count instead")
+
     run(max_coordinators=args.max_coordinators,
         window_name_index=args.window_name_index,
         show_worker_windows=not args.quiet,
         use_semaphore=use_semaphore,
-        max_workers=args.max_workers)
+        max_workers=args.max_workers,
+        n_cores=args.n_cores)

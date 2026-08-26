@@ -116,8 +116,10 @@ structure set, storeys and system, the filenames are just the analysis type: `po
 Generation goes through `phd_project/scripts/templates/copy_templates_to_folders.py`:
 `configure_batch_run_file` for the po/cpo/modal launchers, and `copy_batch_ida_buildings` for
 the multi-building IDA coordinator (`ida.py`). Total concurrency is capped globally by
-`phd_project/process_semaphore/process_semaphore.py` (physical cores − 3), so launchers can be
-started back to back without oversubscribing the machine.
+`phd_project/process_semaphore/process_semaphore.py`, so launchers can be started back to back
+without oversubscribing the machine. Each launcher must state that cap with `--n-cores N`
+(default policy when unset: physical cores − 4); it is machine-wide and sticky. Use a low
+value (~20) for large models — see §6 of the templates Readme.
 
 > **Read `phd_project/scripts/templates/Readme.md`** before writing a new setup notebook — it
 > documents the run-script/config contract, the IDA and MSA modes, the semaphore, and the

@@ -1,62 +1,25 @@
-# import json
-# import time
-# import psutil
-# from pathlib import Path
-# from filelock import FileLock
-# from contextlib import contextmanager
+"""
+Machine-global process semaphore for the parallel analysis launchers.
 
-# SEMAPHORE_PATH = Path(__file__).parents[0] / "global_process_counter.json"
-# LOCK = FileLock(str(SEMAPHORE_PATH) + ".lock")
+A single, file-locked JSON file (``process_slots.json``) records the PIDs of every
+NLTHA worker currently running on this machine, so that several independently
+launched batches still share ONE core budget instead of each claiming the whole
+box.
 
-# def calculate_max_concurrent_dynamic():
-#     usage = psutil.cpu_percent(interval=1)
-#     if usage < 40:
-#         return psutil.cpu_count(logical=False)
-#     elif usage < 60:
-#         return max(1, psutil.cpu_count(logical=False) - 1)
-#     else:
-#         return max(1, psutil.cpu_count(logical=False) - 2)
-    
+The cap itself lives in ``semaphore_config.json`` (git-ignored, per-machine) and is
+set from the launchers' ``--n-cores`` flag via :func:`set_max_concurrent`. It is
+sticky: it stays until the next ``--n-cores`` changes it. When nothing has been
+set, the cap falls back to ``physical cores - DEFAULT_RESERVED_CORES``.
 
-# def increment_semaphore():
-#     with LOCK:
-#         count = 0
-#         if SEMAPHORE_PATH.exists():
-#             count = json.loads(SEMAPHORE_PATH.read_text())["count"]
-#         if count >= MAX_GLOBAL_PROCS:
-#             return False
-#         SEMAPHORE_PATH.write_text(json.dumps({"count": count + 1}))
-#         return True
+Why the cap is a parameter: large (e.g. 5-storey) models do not fit in the L3
+cache slice of a core, so running one worker per core saturates the memory bus and
+makes the shared workstation unusable for everyone else. Those campaigns need a
+much lower cap than small models do, and that is a per-campaign decision rather
+than a property of the machine.
 
-
-# def decrement_semaphore():
-#     with LOCK:
-#         if SEMAPHORE_PATH.exists():
-#             data = json.loads(SEMAPHORE_PATH.read_text())
-#             data["count"] = max(0, data["count"] - 1)
-#             SEMAPHORE_PATH.write_text(json.dumps(data))
-
-
-# def wait_for_slot():
-#     while not increment_semaphore():
-#         time.sleep(0.5)
-
-
-# def get_current_count():
-#     with LOCK:
-#         if SEMAPHORE_PATH.exists():
-#             return json.loads(SEMAPHORE_PATH.read_text())["count"]
-#         return 0
-    
-
-# @contextmanager
-# def acquire_process_slot():
-#     wait_for_slot()
-#     try:
-#         yield
-#     finally:
-#         decrement_semaphore()
-
+Public API (duck-typed by ``standes.parallel.run_records_in_subprocesses``):
+``acquire_slot``, ``release_slot``, ``get_current_running``, ``get_max_concurrent``.
+"""
 import json
 import time
 from pathlib import Path
@@ -66,6 +29,16 @@ from datetime import datetime
 
 SEMAPHORE_PATH = Path(__file__).parent / "process_slots.json"
 LOCK = FileLock(str(SEMAPHORE_PATH) + ".lock")
+
+# cores left free for the OS and interactive work when no cap has been set
+DEFAULT_RESERVED_CORES = 4
+
+# the sticky, machine-global cap written by the launchers' --n-cores flag. A
+# SEPARATE file (and lock) from process_slots.json: the slots file is hot runtime
+# state, and acquire_slot() reads the cap while already holding LOCK.
+CONFIG_PATH = Path(__file__).parent / "semaphore_config.json"
+CONFIG_LOCK = FileLock(str(CONFIG_PATH) + ".lock")
+
 
 def _read_data():
     if SEMAPHORE_PATH.exists():
@@ -84,11 +57,77 @@ def _cleanup_stale_processes(data):
             running.append(proc_info)
     data["running"] = running
 
-def get_max_concurrent():
-    # Example dynamic max concurrent, adjust as you like
-    cpu_count = psutil.cpu_count(logical=False)
-    free_cores = 40
-    return max(1, cpu_count - free_cores)
+
+def _read_config() -> dict:
+    """The stored cap settings, or {} if nothing is set or the file is unusable.
+
+    Never raises: a missing, corrupt or half-written config must fall back to the
+    default cap rather than kill a batch that is already running.
+    """
+    try:
+        with CONFIG_LOCK:
+            if not CONFIG_PATH.exists():
+                return {}
+            data = json.loads(CONFIG_PATH.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def physical_cores() -> int:
+    """Physical core count, falling back to logical cores then 1.
+
+    ``psutil.cpu_count(logical=False)`` returns None on some machines/containers.
+    """
+    return psutil.cpu_count(logical=False) or psutil.cpu_count() or 1
+
+
+def default_max_concurrent() -> int:
+    """The cap used when --n-cores has never been set: physical cores - 4."""
+    return max(1, physical_cores() - DEFAULT_RESERVED_CORES)
+
+
+def get_max_concurrent() -> int:
+    """The machine-global cap on simultaneous workers, clamped to [1, cores]."""
+    n = _read_config().get("max_concurrent")
+    if n is None:
+        return default_max_concurrent()
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return default_max_concurrent()
+    return max(1, min(n, physical_cores()))
+
+
+def set_max_concurrent(n: int | None, set_by: str = "") -> int:
+    """Set (or, with n=None, clear) the sticky machine-global cap.
+
+    Takes effect immediately for every process on this machine: coordinators and
+    launchers re-read the cap on each slot check, so lowering it mid-run drains
+    the running workers down to the new value instead of replacing them.
+
+    Returns the cap now in force.
+    """
+    with CONFIG_LOCK:
+        CONFIG_PATH.write_text(json.dumps({
+            "max_concurrent": None if n is None else int(n),
+            "set_at": datetime.now().isoformat(timespec="seconds"),
+            "set_by": set_by,
+        }, indent=2))
+    return get_max_concurrent()
+
+
+def describe_max_concurrent() -> str:
+    """One-line summary of the active cap, for a launcher's startup banner."""
+    config = _read_config()
+    cap = get_max_concurrent()
+    cores = physical_cores()
+    if config.get("max_concurrent") is None:
+        return f"cap: {cap} of {cores} physical cores (default, cores - {DEFAULT_RESERVED_CORES})"
+    origin = " by " + config["set_by"] if config.get("set_by") else ""
+    return (f"cap: {cap} of {cores} physical cores "
+            f"(set {config.get('set_at', '?')}{origin})")
+
 
 def acquire_slot(pid: int, display_name: str = ""):
     """Try to acquire a slot for a new process with given pid."""
@@ -120,4 +159,3 @@ def get_current_running():
         _cleanup_stale_processes(data)
         _write_data(data)
         return data["running"]
-

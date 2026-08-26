@@ -1,3 +1,4 @@
+import argparse
 import sys
 import subprocess
 import time
@@ -5,9 +6,22 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 from phd_project.process_semaphore.process_semaphore import (
-    acquire_slot, release_slot, get_current_running, get_max_concurrent)
+    acquire_slot, release_slot, get_current_running, get_max_concurrent,
+    set_max_concurrent, describe_max_concurrent, DEFAULT_RESERVED_CORES)
+
+## Generic batch launcher: runs every (script, config) pair below, with the number
+## of simultaneous jobs capped by the shared, machine-global process_semaphore.
+##
+## --n-cores is REQUIRED: it sets that cap for every analysis process on this box
+## (not just this launcher's) and is sticky until the next --n-cores changes it, so
+## each campaign has to state the budget it wants. Large models need a much lower
+## cap than small ones -- one job per core thrashes the L3 cache and saturates the
+## memory bus, making the workstation unusable for everyone else.
 
 running_processes = []  # List of dicts: {proc, script, config, start_time}
+
+# Machine-global cap on simultaneous jobs. None -> must be supplied via --n-cores.
+n_cores = None
 
 # Paths to your scripts and the configurations
 scripts_and_configs = [
@@ -71,7 +85,11 @@ def check_for_finished(pbar):
             still_running.append(entry)
     running_processes = still_running
 
-def main():
+def main(n_cores: int | None = n_cores):
+    if n_cores is not None:
+        set_max_concurrent(n_cores, set_by=Path(__file__).name)
+    print(f"Launch Time: {datetime.now()} | {describe_max_concurrent()}")
+
     total_scripts = sum(len(entry["config"]) for entry in scripts_and_configs)
     pbar = tqdm(total=total_scripts, desc="Batch Progress", unit="script")
 
@@ -107,4 +125,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # launch from the terminal, e.g.
+    #   python run_batch_scripts.py --n-cores 20
+    parser = argparse.ArgumentParser(
+        description="Run every configured (script, config) pair, sharing one "
+                    "machine-global core cap.")
+    parser.add_argument("--n-cores", type=int, default=n_cores, required=(n_cores is None),
+                        help="machine-global cap on simultaneous jobs across ALL launchers "
+                             f"on this machine (default policy: physical cores - "
+                             f"{DEFAULT_RESERVED_CORES}). Sticky until the next --n-cores. "
+                             "Use a low value (~20) for large models, which otherwise thrash "
+                             "the cache and make the workstation unusable for others.")
+    args = parser.parse_args()
+
+    main(n_cores=args.n_cores)

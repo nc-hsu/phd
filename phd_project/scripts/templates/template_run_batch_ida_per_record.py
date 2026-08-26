@@ -20,7 +20,8 @@ def run(config_data: str | Path,
         max_workers: int | None = None,
         use_semaphore: bool = False,
         worker_script: str | Path | None = None,
-        show_worker_windows: bool = True):
+        show_worker_windows: bool = True,
+        n_cores: int | None = None):
 
     config_path = Path(config_data)
     if not (config_path.exists() and config_path.is_file()):
@@ -61,8 +62,14 @@ def run(config_data: str | Path,
                 "'process_semaphore.process_semaphore'. Install phd_project or add "
                 "the folder containing process_semaphore to PYTHONPATH, or run with "
                 "use_semaphore=False (max_workers).")
+        # n_cores is None when this coordinator was spawned by a *_buildings
+        # launcher -- that launcher has already set the machine-global cap, and we
+        # must not overwrite it. Only a direct CLI run sets it here.
+        if n_cores is not None:
+            semaphore_module.set_max_concurrent(n_cores, set_by=Path(__file__).name)
 
-    print(f"Launch Time: {datetime.now()}")
+    print(f"Launch Time: {datetime.now()}"
+          + (f" | {semaphore_module.describe_max_concurrent()}" if semaphore_module else ""))
     start_time = datetime.now()
 
     # fire one subprocess per record and wait for them all
@@ -110,19 +117,28 @@ def run(config_data: str | Path,
 
 if __name__ == "__main__":
     # launch from the terminal, e.g.
-    #   python run_batch_ida_per_record.py config_ida_htf_femap695_set.py
     #   python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --max-workers 4
+    #   python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --use-semaphore --n-cores 20
     parser = argparse.ArgumentParser(
         description="Run an IDA for a single building, parallelised across ground motion records.")
     parser.add_argument("config", nargs="?", default="config_ida_htf.py",
                         help="IDA config file (relative to this folder, or an absolute path)")
     parser.add_argument("--max-workers", type=int, default=None,
-                        help="max records to run at once (default: physical cores - 3)")
+                        help="max records to run at once for THIS coordinator "
+                             "(default: physical cores - 4)")
     parser.add_argument("--use-semaphore", action="store_true",
                         help="use the machine-global process_semaphore instead of --max-workers")
+    parser.add_argument("--n-cores", type=int, default=None,
+                        help="with --use-semaphore: the machine-global cap on simultaneous "
+                             "workers across ALL launchers on this machine (default policy: "
+                             "physical cores - 4). Sticky until the next --n-cores.")
     parser.add_argument("--quiet", action="store_true",
                         help="no worker windows; stream worker output to worker_logs/ instead")
     args = parser.parse_args()
+
+    if args.use_semaphore and args.n_cores is None:
+        parser.error("--n-cores is required with --use-semaphore; drop --use-semaphore "
+                     "and pass --max-workers N to run with a fixed local worker count instead")
 
     config_path = Path(args.config)
     if not config_path.is_absolute():
@@ -130,4 +146,5 @@ if __name__ == "__main__":
 
     run(config_path, max_workers=args.max_workers,
         use_semaphore=args.use_semaphore,
-        show_worker_windows=not args.quiet)
+        show_worker_windows=not args.quiet,
+        n_cores=args.n_cores)

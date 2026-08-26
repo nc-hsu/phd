@@ -205,11 +205,15 @@ config file.
 ```bash
 python run_batch_ida_per_record.py config_ida_htf_femap695_set.py
 python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --max-workers 4
+python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --use-semaphore --n-cores 20
 python run_batch_ida_per_record.py config_ida_htf_femap695_set.py --quiet
 ```
 
-- `--max-workers N` — cap how many records run at once (default: physical cores − 3).
-- `--use-semaphore` — use the shared machine-global cap instead (see §6).
+- `--max-workers N` — cap how many records this coordinator runs at once (default:
+  physical cores − 4).
+- `--use-semaphore` — use the shared machine-global cap instead (see §6). Requires
+  `--n-cores`.
+- `--n-cores N` — with `--use-semaphore`, set that machine-global cap (see §6).
 - `--quiet` — don't open a window per worker; stream each worker's output to a log file
   instead (see §7).
 
@@ -220,14 +224,15 @@ single machine-wide core budget — the way to saturate a many-core box. Edit th
 `buildings` list at the top (each entry is a folder + a config filename), then:
 
 ```bash
-python run_batch_ida_buildings.py
-python run_batch_ida_buildings.py --quiet --max-coordinators 5
+python run_batch_ida_buildings.py --n-cores 60
+python run_batch_ida_buildings.py --n-cores 20 --quiet --max-coordinators 5
 ```
 
 It launches one `run_batch_ida_per_record` coordinator per building (each with the shared
-semaphore on), so across all buildings at most `physical cores − 3` record analyses run
-at once. Each building needs its coordinator + worker + config already in place. See §6
-for why this uses the semaphore and a separate coordinator cap.
+semaphore on), so across all buildings at most `--n-cores` record analyses run at once.
+`--n-cores` is required — see §6 for what it sets and how to choose it. Each building
+needs its coordinator + worker + config already in place. See §6 also for why this uses
+the semaphore and a separate coordinator cap.
 
 ### Re-running only the post-processing — `run_postprocess_ida`
 
@@ -448,15 +453,38 @@ Two independent ideas control concurrency. Understanding them tells you which mo
 ### Local cap vs. shared semaphore
 
 - **Local `max_workers`** (default) — each coordinator limits *its own* workers to
-  `physical cores − 3`. Fine for **one** coordinator. Run several coordinators this way
+  `physical cores − 4`. Fine for **one** coordinator. Run several coordinators this way
   and they don't know about each other, so you oversubscribe the machine.
 - **Shared semaphore** (`--use-semaphore` / `use_semaphore=True`) — a single
   machine-global file-locked counter caps **all** workers across **all** coordinators at
-  `physical cores − 3` combined. This is what lets several buildings/sites run together
-  without fighting over cores.
+  `--n-cores` combined. This is what lets several buildings/sites run together without
+  fighting over cores.
 
-> The cap is `physical cores − 3`. On a machine where you want a different reserve, adjust
-> it in `phd_project/process_semaphore/process_semaphore.py`.
+### Setting the shared cap — `--n-cores`
+
+`--n-cores N` sets the semaphore's cap. It is **required** on every launcher whenever the
+semaphore path is active (not required if you pass `--max-workers` / `--no-semaphore`),
+because it is a machine-wide decision that each campaign has to state explicitly.
+
+- **It is machine-global, not per-launcher.** It caps every analysis process on the box,
+  including batches someone else started. It is *not* `max_workers`, which caps only one
+  coordinator's own children.
+- **It is sticky.** The value persists in `phd_project/process_semaphore/semaphore_config.json`
+  (git-ignored, per-machine) until the next `--n-cores` changes it. That file is why
+  separately launched batches share one budget, and why you never need to edit — or
+  commit — a core count in the source again.
+- **It takes effect immediately.** The cap is re-read on every slot check, so lowering it
+  from a second shell (`set_max_concurrent(8)`) drains a running batch down to the new
+  value instead of replacing finished workers.
+- **Choosing a value.** With nothing set the cap falls back to `physical cores − 4`. That
+  suits small models. Large models (e.g. 5-storey MDOFs) do not fit in a core's L3 cache
+  slice, so one worker per core saturates the memory bus and makes the workstation
+  unusable for everyone else — those campaigns want roughly `--n-cores 20`.
+
+```bash
+# check what the cap is right now, without launching anything
+python -c "from phd_project.process_semaphore.process_semaphore import describe_max_concurrent; print(describe_max_concurrent())"
+```
 
 ### Coordinators vs. workers
 

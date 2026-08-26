@@ -6,6 +6,9 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 
+from phd_project.process_semaphore.process_semaphore import (
+    set_max_concurrent, describe_max_concurrent, DEFAULT_RESERVED_CORES)
+
 
 ## TOP-LEVEL multi-building IDA launcher.
 ##
@@ -18,10 +21,16 @@ from tqdm import tqdm
 ##
 ## Each coordinator (run_batch_ida_per_record.py) draws its per-record IDA workers
 ## from the shared, machine-global process_semaphore, so across ALL active
-## buildings at most `physical_cores - 3` IDA runs are live at once. As a building
-## finishes its records, its coordinator retires and the launcher starts the next
-## building in its place. This is how a handful of buildings fill a many-core box
-## from a single launch script.
+## buildings at most `--n-cores` IDA runs are live at once. As a building finishes
+## its records, its coordinator retires and the launcher starts the next building
+## in its place. This is how a handful of buildings fill a many-core box from a
+## single launch script.
+##
+## --n-cores is REQUIRED: it sets the machine-global cap for every analysis process
+## on this box (not just this launcher's) and is sticky until the next --n-cores
+## changes it, so each campaign has to state the budget it wants. Large models need
+## a much lower cap than small ones -- one worker per core thrashes the L3 cache and
+## saturates the memory bus, which makes the workstation unusable for everyone else.
 
 # --- configure here -------------------------------------------------------
 # The buildings to run. Each entry is a folder containing run_batch_ida_per_record.py
@@ -54,6 +63,9 @@ runner_script_name = "run_batch_ida_per_record.py"
 # --quiet) to hide them and stream each worker's output to worker_logs/ instead --
 # useful when many workers run at once and the windows would be noise.
 show_worker_windows = True
+# Machine-global cap on simultaneous IDA workers (the process_semaphore cap, NOT
+# the per-coordinator max_workers). None -> must be supplied via --n-cores.
+n_cores = None
 # --------------------------------------------------------------------------
 
 
@@ -118,13 +130,21 @@ def launch_building(runner: Path, config: Path, show_windows: bool, window_name_
 def run(building_specs: list[dict[str, str]] | None = None,
         max_coordinators: int = max_coordinators,
         show_worker_windows: bool = show_worker_windows,
-        window_name_index: int = window_name_index):
+        window_name_index: int = window_name_index,
+        n_cores: int | None = n_cores):
 
     specs = building_specs if building_specs is not None else buildings
     resolved = resolve_buildings(specs)
 
+    # Set the machine-global worker cap before anything is launched. The spawned
+    # coordinators read it from the semaphore's config file rather than being
+    # passed it, so deployed run_batch_ida_per_record.py copies need no update.
+    if n_cores is not None:
+        set_max_concurrent(n_cores, set_by=Path(__file__).name)
+
     print(f"Launch Time: {datetime.now()} | {len(resolved)} building(s), "
           f"up to {max_coordinators} coordinator(s) at once, "
+          f"{describe_max_concurrent()}, "
           f"worker windows: {'on' if show_worker_windows else 'off (logging to worker_logs/)'}")
 
     running = []  # {proc, title, start_time}
@@ -162,11 +182,17 @@ def run(building_specs: list[dict[str, str]] | None = None,
 
 if __name__ == "__main__":
     # launch from the terminal, e.g.
-    #   python run_batch_ida_buildings.py
-    #   python run_batch_ida_buildings.py --quiet --max-coordinators 5
+    #   python run_batch_ida_buildings.py --n-cores 20
+    #   python run_batch_ida_buildings.py --n-cores 60 --quiet --max-coordinators 5
     # By default the buildings list configured at the top of this file is run.
     parser = argparse.ArgumentParser(
         description="Run IDAs for several buildings at once, sharing one machine-global core cap.")
+    parser.add_argument("--n-cores", type=int, default=n_cores, required=(n_cores is None),
+                        help="machine-global cap on simultaneous IDA workers across ALL "
+                             f"launchers on this machine (default policy: physical cores - "
+                             f"{DEFAULT_RESERVED_CORES}). Sticky until the next --n-cores. "
+                             "Use a low value (~20) for large models, which otherwise thrash "
+                             "the cache and make the workstation unusable for others.")
     parser.add_argument("--max-coordinators", type=int, default=max_coordinators,
                         help="how many building coordinators (windows) to run at once")
     parser.add_argument("--quiet", action="store_true",
@@ -177,4 +203,5 @@ if __name__ == "__main__":
 
     run(max_coordinators=args.max_coordinators,
         show_worker_windows=not args.quiet,
-        window_name_index=args.window_name_index)
+        window_name_index=args.window_name_index,
+        n_cores=args.n_cores)
