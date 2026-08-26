@@ -14,7 +14,7 @@ raw_data:
   rho_models: "data_raw/correlation_models"
   esm_download_manifest: "data_raw/gm_records/ESM/esm_hdf5_download_manifest.csv"
   # The 22 FEMA P695 far-field record JSONs (in-repo copy of D:/gm_records_p695).
-  # Used by nb 052 to compute each record's AvgSA_03 without the analysis drive attached.
+  # Used by nb 052 / 054 to compute each record's AvgSA_03 without the analysis drive attached.
   femap695_records: "data_raw/fema_P695_records"
   esm_hdf5_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/01_ESM"
   ngasub_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/02_NGASub"
@@ -75,9 +75,14 @@ proc_data:
   # Fragility Curves
   ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
   dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
-  # Site case-study converted fragilities (nb 014)
+  # Site case-study converted fragilities (nb 014, and nb 053 which fans the
+  # per-design-group conversion back out into exactly these per-site files)
   wp1_sites_fragility_curves: data_processed/09_structure_fragility_curves/wp1_casestudy_sites
   wp1_sites_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_femap695_collapsefragility_summary.csv
+  # Per-design-group converted fragilities (nb 053) - the artefact the per-site files
+  # above are copied from, one folder per group_{n}s_{gid}.
+  wp1_groups_fragility_curves: data_processed/09_structure_fragility_curves/wp1_design_groups
+  wp1_groups_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_design_groups/group_femap695_collapsefragility_summary.csv
   # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
@@ -98,9 +103,11 @@ results:
   disaggregation_plots: "results/03_psha/disagg_plots"
   AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
   AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
-  # MSA-FEMAP695 stripe selections (nb 052): the same 22 FEMA P695 records at every
+  # MSA-FEMAP695 stripe selections (nb 054): the same 22 FEMA P695 records at every
   # stripe, one set per design group rather than per site.
   AvgSA_03_FEMAP695_record_selection: "results/04_record_selection/AvgSA_03_FEMAP695"
+  # Per-design-group FEMA P695 IDA runs (nb 052): the group -> member-site map.
+  group_ida_femap695: "results/06_group_ida_femap695"
   site_fragility_curves: "results/05_site_fragility_curves"
 
 hazard_models:
@@ -173,7 +180,7 @@ analysis_data:
   wp1_casestudy_sites: "D:/07_wp1_casestudy_sites"
   reference_structures_dc2_scA: "D:/06_reference_structures_dc2_scA"
   # Analyses driven by a FIXED record set (same records at every stripe), organised
-  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052.
+  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052 (IDA) and 054 (MSA).
   wp1_fixed_record_sets: "D:/08_wp1_fixed_record_sets"
 
 

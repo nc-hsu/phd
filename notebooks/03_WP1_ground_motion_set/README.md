@@ -61,6 +61,10 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 | `030`–`037` | flatfile, disagg results | GCIM distributions, selected record sets | `020` |
 | `040`–`042` | selection results | downloaded + converted records | `037` |
 | `050_setup_msa_runs…` | stripe IMLs, converted records, model folders | MSA files + `site_*_msa_*` launchers | `042`, `011`, `017` |
+| `051-group_sites_by_structural_design` | site designs (`011`) | `unique_structural_designs.{csv,json}` — the 51 unique designs behind the 120 (site, storey) pairs | `011` |
+| `052-setup_ida_femap695_by_design_group` | design groups (`051`), site designs (`011`), existing per-site `ida_femap695` results | per-group IDA folders under `wp1_fixed_record_sets`, migrated 3s results, `fixed_record_sets/{n}s/mdof/ida_femap695.py`, `results/06_group_ida_femap695/group_folder_map.csv` | `011`, `051` |
+| `053-convert_group_ida_femap695_fragilities_to_avgsa` | per-group IDA results (`052`), design groups (`051`), site designs (`011`) | per-group collapse fragilities in SA / AvgSA_03 / AvgSA_06 under `wp1_design_groups/`, fanned back out to the per-site `site_{ii}/{tag}_ida_femap695_collapsefragility_{im}.json` files `014` wrote (so `054` / `061` are unchanged), plus a snapshot of `014`'s files and the group/site summary CSVs | `052` |
+| `054-setup_msa_femap695_by_design_group` | group IDA fragilities (`053`), design groups (`051`), FEMA P695 records | MSA-FEMAP695 stripe selections, per-group MSA files, `fixed_record_sets/{n}s/mdof/msa_AvgSA03_femap695.py` | `051`, `053` |
 
 > **Note.** `050` still adds MSA files to a per-site `sdof_param/` folder and writes
 > `site_sdof_param_msa_*` launchers. Since `011` no longer builds SDOF folders, that half of
