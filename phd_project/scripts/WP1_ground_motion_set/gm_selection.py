@@ -786,7 +786,18 @@ def _disagg_fingerprint_input(source_fps: dict, site=None) -> dict:
         shard_dir = source_fps["disagg_shard_dir"]
         if site is None:
             return {"disagg_shards_digest": shards_digest(shard_dir)}
-        return {"disagg_site_shard": shard_path(shard_dir, site)}
+        fp = shard_path(shard_dir, site)
+        # cache_utils hashes a NON-EXISTENT path as a plain string, which yields a
+        # perfectly valid-looking fingerprint that tracks nothing -- every stripe
+        # would then be permanently stale, silently, and the notebooks would
+        # recompute forever. Fail loudly instead (cf. oq_runner.fingerprint_calc).
+        if not Path(fp).is_file():
+            raise FileNotFoundError(
+                f"Disagg shard for site {site} is missing: {fp}\n"
+                f"Cannot fingerprint the stripe without it. If the shards were "
+                f"never pulled on this machine, run 'dvc pull'; if nb 021 has not "
+                f"been run here, run it first.")
+        return {"disagg_site_shard": fp}
     return {"disagg_data_file": source_fps["disagg_data_file"]}
 
 
