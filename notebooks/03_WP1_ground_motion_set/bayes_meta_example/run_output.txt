@@ -1,0 +1,80 @@
+====================================================================
+STAGE 0  the simulated world
+====================================================================
+  true m                    0.120
+  true tau                  0.150
+  typical measurement SE    0.117
+
+====================================================================
+STAGE 1  what a naive summary would tell you
+====================================================================
+  mean of observed ratios   +0.123   (close to true m -- means are easy)
+  SD of observed ratios     0.168    <-- looks like tau but is NOT
+  true tau                  0.150
+  inflation                 1.12x
+
+  The naive SD overstates the real site-to-site variation, because it
+  contains the estimation noise as well. Fit a correction factor to
+  that scatter and you are partly fitting noise.
+Initializing NUTS using jitter+adapt_diag...
+Sequential sampling (4 chains in 1 job)
+NUTS: [m, tau, z]
+Sampling 4 chains for 2_000 tune and 2_000 draw iterations (8_000 + 8_000 draws total) took 12 seconds.
+
+====================================================================
+STAGE 3  sampler diagnostics
+====================================================================
+      mean     sd  hdi_3%  hdi_97%  ess_bulk  r_hat
+m    0.121  0.023   0.079    0.164  7676.477  1.000
+tau  0.121  0.023   0.079    0.164  3459.531  1.001
+  divergences: 0   (want 0)
+
+====================================================================
+STAGE 4  the posterior
+====================================================================
+  m    median +0.121   90% [+0.084, +0.158]   truth +0.120
+  tau  median 0.120   90% [0.086, 0.160]   truth 0.150
+  naive SD would have said tau = 0.168
+
+  Note what the posterior gives you that a point estimate cannot:
+    P(tau < 0.10)  = 0.17
+    P(tau > 0.20)  = 0.00
+  i.e. an honest statement of how well tau is pinned down.
+
+  PREDICTION for a site never analysed (this is the thesis deliverable):
+    after correcting by m, ln-ratio lands in [-0.081, +0.323] 90% of the time
+    i.e. theta within a factor of 1.38
+    -- and this already includes uncertainty in m AND in tau.
+
+====================================================================
+STAGE 5  shrinkage
+====================================================================
+  noisiest site      se=0.219  observed +0.182  ->  model +0.133   (truth +0.166)
+  most precise site  se=0.071  observed -0.032  ->  model +0.009   (truth -0.099)
+  RMS error vs truth:  raw observations 0.125   model estimates 0.083  (34% better)
+
+====================================================================
+STAGE 6  same real variation, different measurement precision
+====================================================================
+  (true tau held fixed at 0.15 in both rows)
+  regime                 typical SE  naive SD   posterior tau        90% interval
+Initializing NUTS using jitter+adapt_diag...
+Sequential sampling (4 chains in 1 job)
+NUTS: [m, tau, z]
+Sampling 4 chains for 2_000 tune and 2_000 draw iterations (8_000 + 8_000 draws total) took 13 seconds.
+  theta-like (precise)         0.06     0.136           0.125      [0.103, 0.152]
+Initializing NUTS using jitter+adapt_diag...
+Sequential sampling (4 chains in 1 job)
+NUTS: [m, tau, z]
+Sampling 4 chains for 2_000 tune and 2_000 draw iterations (8_000 + 8_000 draws total) took 12 seconds.
+  beta-like (noisy)            0.24     0.251           0.097      [0.017, 0.173]
+
+  The naive SD is badly inflated in the noisy row -- it would have you
+  believe sites vary far more than they do. The model recovers roughly
+  the right tau in both, but honestly reports much wider uncertainty
+  when the measurements are poor. That widening is the point: it is
+  what stops you building a correction factor on top of noise.
+
+====================================================================
+figures written: fig1_data.png fig2_posterior.png fig3_shrinkage.png fig4_prediction.png
+====================================================================
