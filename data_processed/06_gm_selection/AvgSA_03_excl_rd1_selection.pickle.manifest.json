@@ -25,27 +25,11 @@
       "summary": "int=1"
     },
     "stage": {
-      "hash": "2ffbf163994c7169259cea52b450412a0c80b78642c5ed6de3dc03d7a9b5523e",
-      "summary": "str 'final_ensembles'"
+      "hash": "9adc9ec76bcc59f564d6392c9b627ac1d3e691a4f110fc1e9014c3e1d9f3a92b",
+      "summary": "str 'select_r1'"
     },
-    "round_unbounded": {
-      "hash": "8c42f8c618a50990fc7d47fd68d7eb129376bf1a3c3fe79e021b3d22b048f6dc",
-      "summary": "tuple"
-    },
-    "force_optimisation": {
-      "hash": "79fe13da9da2b9205a97752c306821a1cd0cee2d91536a606b375698aadf3b3d",
-      "summary": "tuple"
-    },
-    "shuffle": {
-      "hash": "ffb7f5bc635d80837292088a868cd3232dd6da440ef0a958439409c5f153e912",
-      "summary": "tuple"
-    },
-    "n_shuffles": {
-      "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
-      "summary": "int=5"
-    },
-    "shuffle_rng_seeds": {
-      "hash": "362517922af3f1799a085c924ff34b085caab059f43634b7bde76bca5c2a2169",
+    "only": {
+      "hash": "a0d6884337eff57b8516298534e1de7f5fb02816601bed2ce8f40185c7aec367",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -102,8 +86,8 @@
     }
   },
   "_meta": {
-    "artifact": "AvgSA_03_final_ensembles.pickle",
+    "artifact": "AvgSA_03_excl_rd1_selection.pickle",
     "git_commit": "eab78f32",
-    "written_at": "2026-08-27T07:01:20.896261+00:00"
+    "written_at": "2026-08-27T07:01:20.846075+00:00"
   }
 }
