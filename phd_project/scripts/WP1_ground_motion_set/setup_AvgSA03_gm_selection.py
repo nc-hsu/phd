@@ -36,6 +36,79 @@ SELECTION_CONFIG = {
 }
 
 
+# Records that were SELECTED but cannot be obtained from their source database
+# (the download crashes / the waveform is missing upstream). Each entry names one
+# physical record by the identity its database uses in the combined selection DB:
+#
+#   NGA-Sub : ("event_id", "station_code") == (NGAsubEQID, NGAsubSSN); the download
+#             unit is the whole NGASub_RSN_<rsn> folder, so BOTH component rows
+#             (H1, H2) must go.
+#   ESM     : ("event_id", "station_code", "location_code"); the download unit is
+#             the single {event}__{station}__{loc}.h5, so all component rows
+#             (U, V) must go.
+#
+# This is documentation + input to the one-off reselection cell at the end of nb
+# 032. Keep "rsn" (NGA-Sub) purely as a human cross-reference; the row match is on
+# the identity fields.
+UNAVAILABLE_RECORDS = [
+    {
+        "database": "NGASub",
+        # (NGAsubEQID, NGAsubSSN) for RSN 4040498 -- Fukushimaoki, 2011-07-24, Mw 6.34,
+        # Subduction Interface. Two rows in the combined DB: 68491 (H1), 112568 (H2).
+        "identity": {"event_id": "4000044", "station_code": "4002282"},
+        "rsn": 4040498,
+        "reason": "PEER NGA-Sub portal crashes on this RSN; the waveform cannot be "
+                  "downloaded",
+        "date": "2026-08-27",
+        "affected_stripes": [(31, 1.15)],
+    },
+]
+
+
+def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = None,
+                             verbose: bool = True) -> pd.DataFrame:
+    """Return a COPY of ``gm_db`` with every row of each unavailable record removed.
+
+    **Deliberately NOT called by :func:`setup_AvgSA03_gcim_gm_selection`.** The
+    default selection path must keep using the full database, because
+    ``gm_selection.stripe_input_fingerprint`` hashes the database *file's bytes*:
+    the ~510 stripes already on disk were selected from the complete DB and their
+    manifests say so. Filtering by default would make every future selection
+    silently inconsistent with that provenance -- and editing the CSV itself is
+    worse still, since the selection results identify records by the DataFrame's
+    positional ``RangeIndex`` (see ``greedy_optimise_ensemble``), which every row
+    below a deleted one would shift.
+
+    Use this ONLY from the one-off reselection cell in nb 032, which reselects a
+    single ``(site, iml)`` around a record that turned out to be undownloadable
+    and records the deviation in the stripe's ``db_exclusions`` key.
+
+    Dropping is done with ``DataFrame.drop(index=...)`` so the surviving rows keep
+    their original index labels -- that equivalence with the on-disk DB is the
+    whole point of filtering in memory rather than on disk.
+    """
+    records = UNAVAILABLE_RECORDS if records is None else records
+    meta = gm_db["metadata"]
+
+    to_drop = pd.Index([])
+    for rec in records:
+        mask = meta["database"] == rec["database"]
+        for field, value in rec["identity"].items():
+            mask &= meta[field].astype(str) == str(value)
+        hits = meta.index[mask]
+        if verbose:
+            label = rec.get("rsn", rec["identity"])
+            print(f"  excluding {rec['database']} record {label}: "
+                  f"{len(hits)} row(s) {list(hits)}")
+        to_drop = to_drop.union(hits)
+
+    filtered = gm_db.drop(index=to_drop)
+    if verbose:
+        print(f"gm_db: {len(gm_db)} -> {len(filtered)} rows "
+              f"({len(to_drop)} dropped)")
+    return filtered
+
+
 def stripe_source_fps() -> dict:
     """Source-file paths that determine each stripe's result.
 

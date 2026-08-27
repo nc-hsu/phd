@@ -66,6 +66,18 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 | `053-convert_group_ida_femap695_fragilities_to_avgsa` | per-group IDA results (`052`), design groups (`051`), site designs (`011`) | per-group collapse fragilities in SA / AvgSA_03 / AvgSA_06 under `wp1_design_groups/`, fanned back out to the per-site `site_{ii}/{tag}_ida_femap695_collapsefragility_{im}.json` files `014` wrote (so `054` / `061` are unchanged), plus a snapshot of `014`'s files and the group/site summary CSVs | `052` |
 | `054-setup_msa_femap695_by_design_group` | group IDA fragilities (`053`), design groups (`051`), FEMA P695 records | MSA-FEMAP695 stripe selections, per-group MSA files, `fixed_record_sets/{n}s/mdof/msa_AvgSA03_femap695.py` | `051`, `053` |
 
+> **Note — undownloadable records.** A record the selection picked can turn out to be
+> impossible to fetch from its source database. Do **not** delete it from
+> `data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv`: the per-stripe
+> fingerprint hashes that file's bytes (so every stripe goes stale), the stored ensembles
+> identify records by the database's positional index (so every row below the deleted one
+> shifts), and round 4's shuffle depends on the frame length (so already-analysed stripes
+> could change). Instead declare the record in
+> `setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS` and use the one-off reselection cell at
+> the end of nb `032`, which reselects only the affected stripe against an in-memory-filtered
+> copy of the database and stamps the deviation into that stripe's `db_exclusions` key. The
+> cell prints the run order; note that stripe's manifest still claims the full database.
+
 > **Note.** `050` still adds MSA files to a per-site `sdof_param/` folder and writes
 > `site_sdof_param_msa_*` launchers. Since `011` no longer builds SDOF folders, that half of
 > `050` now has no inputs — update `050` (or drop its `sdof_param` system) before running it.
