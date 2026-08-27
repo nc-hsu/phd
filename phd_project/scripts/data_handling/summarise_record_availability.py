@@ -296,14 +296,20 @@ def main(argv=None):
     parser.add_argument("--out-dir", type=Path, default=None)
     args = parser.parse_args(argv)
 
+
     cfg = load_config()
     gm_selection_dir = args.gm_selection_dir or cfg["proc_data"]["gm_selection"]
     ngasub_folder = args.ngasub_folder or cfg["raw_data"]["ngasub_folder"]
     esm_folder = args.esm_folder or cfg["raw_data"]["esm_hdf5_folder"]
     site_model = args.site_model or cfg["hazard_models"]["eshm20_wp1_site_model"]
     out_dir = args.out_dir or gm_selection_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    return summarise_availability(gm_selection_dir, ngasub_folder, esm_folder, site_model, out_dir)
 
+
+def summarise_availability(gm_selection_dir, ngasub_folder, esm_folder, site_model_fp, out_dir):
+
+    out_dir.mkdir(parents=True, exist_ok=True)
     print(f"Inventorying share:\n  NGA-Sub: {ngasub_folder}\n  ESM:     {esm_folder}")
     available_ngasub = inventory_ngasub(ngasub_folder)
     available_esm = inventory_esm(esm_folder)
@@ -311,11 +317,11 @@ def main(argv=None):
 
     site_region = {}
     try:
-        site_df = pd.read_csv(site_model)
+        site_df = pd.read_csv(site_model_fp)
         if "region" in site_df.columns:
             site_region = {i: site_df["region"].iloc[i] for i in range(len(site_df))}
     except Exception as exc:  # region is informational only
-        print(f"⚠️  could not read site model {site_model}: {exc}")
+        print(f"⚠️  could not read site model {site_model_fp}: {exc}")
 
     # Step 2: gather requirements for both IMs.
     all_rows = []
