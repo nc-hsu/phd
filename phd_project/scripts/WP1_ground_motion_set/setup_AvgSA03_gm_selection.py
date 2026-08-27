@@ -40,26 +40,48 @@ SELECTION_CONFIG = {
 # (the download crashes / the waveform is missing upstream). Each entry names one
 # physical record by the identity its database uses in the combined selection DB:
 #
-#   NGA-Sub : ("event_id", "station_code") == (NGAsubEQID, NGAsubSSN); the download
-#             unit is the whole NGASub_RSN_<rsn> folder, so BOTH component rows
-#             (H1, H2) must go.
+#   NGA-Sub : ("index" == NGAsubRSN) or ("event_id", "station_code") ==
+#             (NGAsubEQID, NGAsubSSN); the download unit is the whole
+#             NGASub_RSN_<rsn> folder, so BOTH component rows (H1, H2) must go.
 #   ESM     : ("event_id", "station_code", "location_code"); the download unit is
 #             the single {event}__{station}__{loc}.h5, so all component rows
 #             (U, V) must go.
 #
+# An identity value may be a single value (equality) or a list (membership), which
+# is how a whole network is excluded: the combined DB carries no "Network" column,
+# so the network is expressed as its list of RSNs.
+#
 # This is documentation + input to the one-off reselection cell at the end of nb
-# 032. Keep "rsn" (NGA-Sub) purely as a human cross-reference; the row match is on
+# 032. "label" is a human tag for the console output; the row match is only ever on
 # the identity fields.
 UNAVAILABLE_RECORDS = [
     {
         "database": "NGASub",
-        # (NGAsubEQID, NGAsubSSN) for RSN 4040498 -- Fukushimaoki, 2011-07-24, Mw 6.34,
-        # Subduction Interface. Two rows in the combined DB: 68491 (H1), 112568 (H2).
-        "identity": {"event_id": "4000044", "station_code": "4002282"},
-        "rsn": 4040498,
-        "reason": "PEER NGA-Sub portal crashes on this RSN; the waveform cannot be "
-                  "downloaded",
+        "label": "NGA-Sub network ONA (28 RSNs, 4040476-4040503)",
+        # The ONA "network" is a single downhole array -- one location
+        # (38.398757, 141.498107) with four sensors at 1.7 / 27.3 / 61.5 / 147.1 m
+        # depth (NGAsubSSN 4002280-4002283), recorded for seven 2011 Japan events.
+        # Its flatfile entries are visibly unfinished (Station_Name is the
+        # placeholder "Ground Observation Point", Shortest_Usable_Period and
+        # Epsilon_Phi_pt7 are -999, Vs30 is inferred with Vs30_Code "2J_3J"), and
+        # the PEER portal serves no waveform for any of them: 0 of 28 have ever
+        # downloaded, while K-NET / KiK-net (~40k records) download fine.
+        # RSN list derived from Network == "ONA" in NGASub_SA_flatfile_rotD50.csv on
+        # the HSU share. 24 of the 28 survive into the combined selection DB (48
+        # rows, H1 + H2), at index labels 68473-68496 and 112550-112573.
+        "identity": {"index": [
+            "4040476", "4040477", "4040478", "4040479", "4040480", "4040481",
+            "4040482", "4040483", "4040484", "4040485", "4040486", "4040487",
+            "4040488", "4040489", "4040490", "4040491", "4040492", "4040493",
+            "4040494", "4040495", "4040496", "4040497", "4040498", "4040499",
+            "4040500", "4040501", "4040502", "4040503",
+        ]},
+        "reason": "PEER NGA-Sub portal serves no waveform for any ONA record; the "
+                  "download crashes. Found via RSN 4040498, then confirmed across "
+                  "the whole network.",
         "date": "2026-08-27",
+        # Only one ONA record was ever selected: RSN 4040498 (Fukushimaoki 2011,
+        # Mw 6.34), in this stripe.
         "affected_stripes": [(31, 1.15)],
     },
 ]
@@ -94,11 +116,17 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
     for rec in records:
         mask = meta["database"] == rec["database"]
         for field, value in rec["identity"].items():
-            mask &= meta[field].astype(str) == str(value)
+            col = meta[field].astype(str)
+            # a list value matches any of its entries (used to name a whole network
+            # by its RSNs); a scalar is a plain equality match on one record.
+            if isinstance(value, (list, tuple, set)):
+                mask &= col.isin({str(v) for v in value})
+            else:
+                mask &= col == str(value)
         hits = meta.index[mask]
         if verbose:
-            label = rec.get("rsn", rec["identity"])
-            print(f"  excluding {rec['database']} record {label}: "
+            label = rec.get("label", rec["identity"])
+            print(f"  excluding {rec['database']} {label}: "
                   f"{len(hits)} row(s) {list(hits)}")
         to_drop = to_drop.union(hits)
 

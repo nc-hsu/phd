@@ -72,11 +72,12 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 > fingerprint hashes that file's bytes (so every stripe goes stale), the stored ensembles
 > identify records by the database's positional index (so every row below the deleted one
 > shifts), and round 4's shuffle depends on the frame length (so already-analysed stripes
-> could change). Instead declare the record in
-> `setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS` and use the one-off reselection cell at
-> the end of nb `032`, which reselects only the affected stripe against an in-memory-filtered
-> copy of the database and stamps the deviation into that stripe's `db_exclusions` key. The
-> cell prints the run order; note that stripe's manifest still claims the full database.
+> could change). Instead declare the record -- or the whole network, as its list of RSNs --
+> in `setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS` and use the one-off reselection cell
+> at the end of nb `032`, which reselects only the affected stripe against an
+> in-memory-filtered copy of the database and stamps the deviation into that stripe's
+> `db_exclusions` key. The cell prints the run order; note that stripe's manifest still
+> claims the full database.
 
 > **Note.** `050` still adds MSA files to a per-site `sdof_param/` folder and writes
 > `site_sdof_param_msa_*` launchers. Since `011` no longer builds SDOF folders, that half of
