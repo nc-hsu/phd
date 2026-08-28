@@ -83,6 +83,10 @@ proc_data:
   # above are copied from, one folder per group_{n}s_{gid}.
   wp1_groups_fragility_curves: data_processed/09_structure_fragility_curves/wp1_design_groups
   wp1_groups_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_design_groups/group_femap695_collapsefragility_summary.csv
+  # Per-design-group MSA-FEMAP695 fragilities (nb 061) - collected from the group MSA
+  # runs and fanned back out into the per-site files above.
+  wp1_groups_msa_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_collapsefragility_summary.csv
+  wp1_sites_msa_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_msa_femap695_collapsefragility_summary.csv
   # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
@@ -108,6 +112,8 @@ results:
   AvgSA_03_FEMAP695_record_selection: "results/04_record_selection/AvgSA_03_FEMAP695"
   # Per-design-group FEMA P695 IDA runs (nb 052): the group -> member-site map.
   group_ida_femap695: "results/06_group_ida_femap695"
+  # Per-design-group MSA-FEMAP695 runs (nb 054): the fragility figures written by nb 061.
+  group_msa_femap695: "results/07_group_msa_femap695"
   site_fragility_curves: "results/05_site_fragility_curves"
 
 hazard_models:
