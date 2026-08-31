@@ -1,52 +1,40 @@
 {
   "inputs": {
+    "disagg_stripe_data": {
+      "hash": "fa9d2efc48f7e113b5f46d315169d733eba565afb95097812495ac48c52ec898",
+      "summary": "str '0deadbef48bc8ba160fe955500188ee8c22d6044bf02957bc6575ba62eaa1f93'"
+    },
+    "disagg_stats_row": {
+      "hash": "d01dbbb96a697617dd8d8a51470f1fae0d7b1118b0c8e884d0faf14dc47bccdc",
+      "summary": "pandas shape=(1, 18)"
+    },
     "gm_db_file": {
       "hash": "4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e",
       "summary": "file ESM-NGAsub_combined.csv (119815913 bytes)"
-    },
-    "gcim_file": {
-      "hash": "72454759c92d3915f3f9317143dfb33f6346823d4f734fbcc87784b7b3553d93",
-      "summary": "file gcim_dist_AvgSA_03.pickle (74772570 bytes)"
-    },
-    "disagg_shards_digest": {
-      "hash": "a8a4039f9d2b1cfa9a96b34382eb37d99ac2a014aa975ede199fecaf13f77b27",
-      "summary": "str '0af72f1a3c2411e4a3e41b5cd2b2c7a30499bbe2cbad0a8b17c71acb456bf30a'"
-    },
-    "disagg_stats_file": {
-      "hash": "3eb1f291c0bc66d29b71bc91aea8135de349c510d46432433af5b9113ac68f04",
-      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (177935 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
       "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
     },
-    "rng_seed": {
-      "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "summary": "int=1"
+    "gmm_lt_file": {
+      "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+      "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
     },
-    "stage": {
-      "hash": "2ffbf163994c7169259cea52b450412a0c80b78642c5ed6de3dc03d7a9b5523e",
-      "summary": "str 'final_ensembles'"
+    "site": {
+      "hash": "aea92132c4cbeb263e6ac2bf6c183b5d81737f179f21efdc5863739672f0f470",
+      "summary": "int=38"
     },
-    "round_unbounded": {
-      "hash": "8c42f8c618a50990fc7d47fd68d7eb129376bf1a3c3fe79e021b3d22b048f6dc",
+    "iml": {
+      "hash": "3c313029520ae8a48442fcc5cdbe487e09ea759aadc1f469190e13f9117be119",
+      "summary": "float=1.8039"
+    },
+    "percentiles": {
+      "hash": "eece83e4dfe0b0d09abb908a4be1733a90e2e549e35d736d250184c0e81f3abb",
       "summary": "tuple"
     },
-    "force_optimisation": {
-      "hash": "79fe13da9da2b9205a97752c306821a1cd0cee2d91536a606b375698aadf3b3d",
-      "summary": "tuple"
-    },
-    "shuffle": {
-      "hash": "ffb7f5bc635d80837292088a868cd3232dd6da440ef0a958439409c5f153e912",
-      "summary": "tuple"
-    },
-    "n_shuffles": {
-      "hash": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
-      "summary": "int=5"
-    },
-    "shuffle_rng_seeds": {
-      "hash": "362517922af3f1799a085c924ff34b085caab059f43634b7bde76bca5c2a2169",
-      "summary": "tuple"
+    "round_config": {
+      "hash": "114a609d8c9ed7f04ee4a0cb1c32be2bfe54fc6924a3fa23fa3e71a03fc95da0",
+      "summary": "str \"([[], ['d'], ['m', 'd', 'vs30'], ['m', 'd', 'vs30']], [False, False, False, False], [False, False, False, True], 5, [1, 2, 3, 4, 5], 1)\""
     },
     "n_ensembles": {
       "hash": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
@@ -102,8 +90,8 @@
     }
   },
   "_meta": {
-    "artifact": "AvgSA_03_final_ensembles.pickle",
+    "artifact": "site_38__stripe_iml_01pt804__gm_selection.pickle",
     "git_commit": "e1508955",
-    "written_at": "2026-08-31T08:24:21.042073+00:00"
+    "written_at": "2026-08-31T08:26:07.611017+00:00"
   }
 }
