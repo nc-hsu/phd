@@ -99,15 +99,38 @@ def clear_file_hash_cache() -> None:
     _FILE_HASH_CACHE.clear()
 
 
+def dataframe_content_hash(df) -> str:
+    """Position-independent content SHA-256 of a DataFrame or Series.
+
+    The single definition of "what these rows contain", shared by
+    :func:`_fingerprint_one`, the per-stripe disagg fingerprints
+    (``gm_selection.stripe_input_fingerprint``) and the manifest migration, so a
+    hash written by one is comparable with a hash computed by another.
+
+    Two deliberate choices:
+
+    - The index is **dropped**, not hashed. A stripe's stats row is one row out of
+      a 1314-row table; hashing its position would make re-ordering the table
+      invalidate every stripe -- exactly the too-coarse-granularity bug this
+      helper exists to avoid.
+    - The column names are folded in, because ``hash_pandas_object`` hashes values
+      only and would not notice a rename or a re-order of identically-typed columns.
+    """
+    obj = df.reset_index(drop=True)
+    payload = pd.util.hash_pandas_object(obj, index=False).values.tobytes()
+    cols = tuple(obj.columns) if isinstance(obj, pd.DataFrame) else (obj.name,)
+    return _hash_bytes(payload + repr(cols).encode())
+
+
 def _fingerprint_one(name: str, value) -> dict:
     """Return ``{"hash": str, "summary": str}`` for a single input value.
 
     Dispatches on type so that DataFrames hash by content, file paths hash by
     their bytes, and everything else falls back to a deterministic pickle hash.
     """
-    # pandas objects: hash the values + index, summarise the shape.
+    # pandas objects: hash the values + columns, summarise the shape.
     if isinstance(value, (pd.DataFrame, pd.Series)):
-        h = _hash_bytes(pd.util.hash_pandas_object(value, index=True).values.tobytes())
+        h = dataframe_content_hash(value)
         shape = value.shape if isinstance(value, pd.DataFrame) else (len(value),)
         return {"hash": h, "summary": f"pandas shape={tuple(shape)}"}
 

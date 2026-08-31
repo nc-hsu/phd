@@ -54,7 +54,11 @@ from phd_project.scripts.cache_utils import (
     manifest_matches,
     StaleCacheError,
 )
-from phd_project.scripts.disagg_shards import shard_path, shards_digest
+from phd_project.scripts.disagg_shards import (
+    shard_path,
+    shards_digest,
+    stripe_content_hash,
+)
 
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 from phd_project.scripts.oqhelpers import parse_nrml_logic_tree
@@ -741,15 +745,26 @@ def get_imtl_from_disaggstats(disagg_stats, site_id, imt, poe):
     return imtl
 
 
+def stats_row(disagg_stats, site_id, imt, imtl):
+    """The ``disagg_stats`` row(s) for one ``(site_id, imt, imtl)``, possibly empty.
+
+    Single definition of "which row is this stripe's", shared by
+    :func:`get_poe_from_disaggstats` and :func:`stripe_input_fingerprint` so the
+    poe a stripe was selected with and the row its fingerprint hashes can never be
+    different rows. The imtl is matched with a tolerance (``np.isclose``) because
+    the requested value may come from a JSON list with slightly different rounding.
+    """
+    return disagg_stats[(disagg_stats["site_id"] == site_id) &
+                        (disagg_stats["imt"] == imt) &
+                        (np.isclose(disagg_stats["imtl"], imtl))]
+
+
 def get_poe_from_disaggstats(disagg_stats, site_id, imt, imtl):
     """Return the poe for (site_id, imt, imtl), or None if there is no matching
     stats row (e.g. a zero-hazard / excluded IML). Returns None rather than
     raising so a requested-but-unusable IML can be skipped gracefully by the
-    caller. The imtl is matched with a tolerance (np.isclose) because the
-    requested value may come from a JSON list with slightly different rounding."""
-    row = disagg_stats[(disagg_stats["site_id"] == site_id) &
-                       (disagg_stats["imt"] == imt) &
-                       (np.isclose(disagg_stats["imtl"], imtl))]
+    caller."""
+    row = stats_row(disagg_stats, site_id, imt, imtl)
     if row.empty:
         return None
     return float(row["poe"].values[0])
@@ -772,12 +787,20 @@ def stripe_pickle_path(result_folder, site, iml) -> Path:
     return Path(result_folder) / f"site_{site}__stripe_iml_{iml_filename_tag(iml)}__gm_selection.pickle"
 
 
-def _disagg_fingerprint_input(source_fps: dict, site=None) -> dict:
+def _disagg_fingerprint_input(source_fps: dict, site=None, iml=None,
+                              imt: str = "AvgSA") -> dict:
     """The disagg entry of a fingerprint, for either storage layout.
 
-    Sharded (AvgSA_03): ``source_fps["disagg_shard_dir"]`` → the one shard this
-    stripe depends on, or the whole-set digest when ``site is None`` (batch
-    artifacts genuinely depend on every site in their batch).
+    Sharded (AvgSA_03), ``source_fps["disagg_shard_dir"]``:
+
+    - ``site`` and ``iml`` given: ``disagg_stripe_data``, the content hash of
+      that one ``(site, imt, iml)`` DataFrame, read from the shard set's
+      ``_content_hashes.json``. This is the *stripe*-precise entry. Sharding by
+      site was not enough on its own: an OpenQuake ``iml_disagg`` run covers all
+      60 sites at ONE iml, so adding one MSA stripe rewrites every shard, and a
+      whole-shard hash then marked all ~500 already-selected stripes stale.
+    - ``site is None``: the whole-set digest -- batch artifacts genuinely depend
+      on every site in their batch.
 
     Legacy monolith (AvgSA_06, still on one pickle): ``disagg_data_file``, hashed
     exactly as before.
@@ -797,36 +820,66 @@ def _disagg_fingerprint_input(source_fps: dict, site=None) -> dict:
                 f"Cannot fingerprint the stripe without it. If the shards were "
                 f"never pulled on this machine, run 'dvc pull'; if nb 021 has not "
                 f"been run here, run it first.")
-        return {"disagg_site_shard": fp}
+        if iml is None:
+            raise ValueError("a stripe fingerprint needs both site and iml")
+        # Raises FileNotFoundError when _content_hashes.json is absent -- no silent
+        # fallback to a whole-shard hash, which would restore the bug invisibly.
+        return {"disagg_stripe_data": stripe_content_hash(shard_dir, site, imt, iml)}
     return {"disagg_data_file": source_fps["disagg_data_file"]}
 
 
 def stripe_input_fingerprint(site, iml, source_fps: dict,
-                             basic_selection_ctx: dict, selection_config: dict) -> dict:
+                             basic_selection_ctx: dict, selection_config: dict,
+                             disagg_stats) -> dict:
     """Provenance fingerprint of everything that determines *one* stripe's result.
 
     This is the single definition used across notebooks 031/032/033 to decide
     whether a ``(site, iml)`` stripe is still valid. It hashes only the inputs
-    that *produce* that stripe — the upstream files (by bytes), the specific
+    that *produce* that stripe -- the upstream data it reads, the specific
     site/iml, the gcim percentiles, the round configuration, and the selection
-    context — and **deliberately excludes the per-site IML subset JSON**. That is
+    context -- and **deliberately excludes the per-site IML subset JSON**. That is
     what makes the cache incremental: adding IMLs to the ``union`` lists grows the
     *set* of wanted stripes without changing any existing stripe's fingerprint.
 
-    ``source_fps`` must provide ``disagg_stats_file``, ``gm_db_file``,
-    ``site_model_file``, ``gmm_lt_file`` and the disagg input in one of its two
-    forms (see :func:`_disagg_fingerprint_input`). Because all three notebooks must
-    compute an identical fingerprint, ``selection_config`` (percentiles + round
-    config) is centralised in the setup module — see ``SELECTION_CONFIG``.
+    The invariant it enforces is *stripe*-precise: **only a change to this
+    stripe's own disaggregation DataFrame or its own disagg-stats row invalidates
+    it.** Two entries carry that, and both are content hashes of a single stripe's
+    worth of data rather than of a file:
 
-    With the sharded layout the disagg entry is **this site's shard only**, which
-    is what makes staleness site-precise: re-running the disaggregation for one
-    site leaves every other site's stripes valid instead of invalidating all ~450.
+    - ``disagg_stripe_data`` -- this ``(site, imt, iml)`` DataFrame, via the shard
+      set's ``_content_hashes.json`` (see :func:`_disagg_fingerprint_input`).
+    - ``disagg_stats_row`` -- this stripe's row of ``disagg_stats``, hashed from
+      the DataFrame the caller already holds (the stats pickle stays one file;
+      only the granularity of what is hashed changed).
+
+    Both used to be whole-file hashes, and that was the bug: an OpenQuake
+    ``iml_disagg`` run covers all 60 sites at one iml, so appending a single MSA
+    stripe rewrote all 60 shards *and* the shared stats pickle, marking every one
+    of the ~500 already-selected stripes stale even though not one of their own
+    disaggregations had changed.
+
+    ``source_fps`` must provide ``gm_db_file``, ``site_model_file``,
+    ``gmm_lt_file`` and the disagg input in one of its two forms (see
+    :func:`_disagg_fingerprint_input`). ``disagg_stats`` is the loaded stats
+    DataFrame -- 175 KB, and every caller already has it from
+    ``setup_AvgSA03_gcim_gm_selection``. Because all three notebooks must compute
+    an identical fingerprint, ``selection_config`` (percentiles + round config) is
+    centralised in the setup module -- see ``SELECTION_CONFIG``.
     """
     sc = selection_config
+    imt = source_fps.get("disagg_imt", "AvgSA")
+    row = stats_row(disagg_stats, site, imt, iml)
+    if row.empty:
+        # _select_stripe_keys drops any (site, iml) without a stats row, so a
+        # wanted stripe always has one. Reaching here means the caller built its
+        # key set from a different disagg_stats than it passed in.
+        raise KeyError(
+            f"No disagg_stats row for site {site}, imt {imt!r}, iml {iml} -- "
+            f"cannot fingerprint the stripe. The stats passed here must be the "
+            f"same ones wanted_stripe_keys() resolved the key set against.")
     return fingerprint(
-        **_disagg_fingerprint_input(source_fps, site),
-        disagg_stats_file=source_fps["disagg_stats_file"],
+        **_disagg_fingerprint_input(source_fps, site, iml, imt),
+        disagg_stats_row=row,
         gm_db_file=source_fps["gm_db_file"],
         site_model_file=source_fps["site_model_file"],
         gmm_lt_file=source_fps["gmm_lt_file"],

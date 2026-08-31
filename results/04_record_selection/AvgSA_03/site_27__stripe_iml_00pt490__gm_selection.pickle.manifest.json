@@ -1,12 +1,12 @@
 {
   "inputs": {
-    "disagg_site_shard": {
-      "hash": "bfb6e419d404bd129edf26f027449b506cb147d270892fbd623b4c8ef5753dc7",
-      "summary": "file site_027.pickle (68319511 bytes)"
+    "disagg_stripe_data": {
+      "hash": "b88f9111354f3afee7a59e4679b22e72a188153589a6cf4380ce67d8b3e8e5c0",
+      "summary": "str '254226caec5a3e5fc6073fec105473221907d28385b0de2a6917df1ed3a81388'"
     },
-    "disagg_stats_file": {
-      "hash": "e6c19bb3ebaa4f61b0e7d5cfaf099a7f162cbddb7ec3c9a0f1a23a26175d4423",
-      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (174635 bytes)"
+    "disagg_stats_row": {
+      "hash": "b2cacf140a9a85bf1aca2deb618557a249c415f9a548e57bad5d19340ef7f486",
+      "summary": "pandas shape=(1, 18)"
     },
     "gm_db_file": {
       "hash": "4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e",
@@ -92,6 +92,8 @@
   "_meta": {
     "artifact": "site_27__stripe_iml_00pt490__gm_selection.pickle",
     "git_commit": "eefd21aa",
-    "written_at": "2026-08-26T12:41:04.544305+00:00"
+    "written_at": "2026-08-26T12:41:04.544305+00:00",
+    "migrated_at": "2026-08-31T07:50:36.454297+00:00",
+    "migrated_from": "whole-file disagg hashes -> per-stripe content hashes; shard sha256 bfb6e419d404bd129edf26f027449b506cb147d270892fbd623b4c8ef5753dc7, stats sha256 e6c19bb3ebaa4f61b0e7d5cfaf099a7f162cbddb7ec3c9a0f1a23a26175d4423"
   }
 }

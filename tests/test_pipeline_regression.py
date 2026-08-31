@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 
 from phd_project.scripts import cache_utils, disagg_shards
+from phd_project.scripts.WP1_ground_motion_set import gm_selection
 from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     _disagg_fingerprint_input,
 )
@@ -327,24 +328,105 @@ def test_shards_digest_tracks_content(tmp_path):
     assert disagg_shards.shards_digest(tmp_path) != first
 
 
-def test_stripe_fingerprint_is_site_scoped(tmp_path):
-    """Sharded source_fps must fingerprint THIS site's shard, and nothing else.
+def test_stripe_fingerprint_is_site_and_iml_scoped(tmp_path):
+    """A stripe entry must name THIS (site, iml) DataFrame, and nothing else.
 
-    That is what keeps one site's rebuilt disagg from invalidating every other
-    site's stripes. The legacy monolith shape must still work unchanged (AvgSA_06).
+    The legacy monolith shape must still work unchanged (AvgSA_06).
     """
     clear_file_hash_cache()
     disagg_shards.write_shards(tmp_path, _fake_disagg(), fingerprint(rng_seed=1))
 
     sharded = {"disagg_shard_dir": tmp_path}
-    assert "disagg_site_shard" in _disagg_fingerprint_input(sharded, 1)
-    assert _disagg_fingerprint_input(sharded, 1) != _disagg_fingerprint_input(sharded, 2)
+    assert "disagg_stripe_data" in _disagg_fingerprint_input(sharded, 1, 0.27)
+    assert (_disagg_fingerprint_input(sharded, 1, 0.27)
+            != _disagg_fingerprint_input(sharded, 2, 0.27))
+    assert (_disagg_fingerprint_input(sharded, 1, 0.27)
+            != _disagg_fingerprint_input(sharded, 1, 0.285))
+    # site given but no iml is a programming error, not a silently coarser hash
+    with pytest.raises(ValueError):
+        _disagg_fingerprint_input(sharded, 1)
     # site=None -> the whole-set digest, for batch artifacts
     assert "disagg_shards_digest" in _disagg_fingerprint_input(sharded)
 
     legacy = {"disagg_data_file": tmp_path / "_index.json"}
     assert list(_disagg_fingerprint_input(legacy)) == ["disagg_data_file"]
     assert _disagg_fingerprint_input(legacy, 1) == _disagg_fingerprint_input(legacy, 2)
+
+
+def test_adding_an_iml_across_all_sites_leaves_other_stripes_valid(tmp_path):
+    """The regression test for the all-517-stripes-stale bug.
+
+    An OpenQuake ``iml_disagg`` run covers ALL sites at ONE iml, so adding one MSA
+    stripe rewrites every shard. Under whole-shard hashes that marked every
+    already-selected stripe stale. Only the NEW (site, iml) may move now.
+    """
+    clear_file_hash_cache()
+    disagg_shards.clear_content_hash_cache()
+    data = _fake_disagg()
+    disagg_shards.write_shards(tmp_path, data, fingerprint(rng_seed=1))
+
+    sharded = {"disagg_shard_dir": tmp_path}
+    before = {(site, iml): _disagg_fingerprint_input(sharded, site, iml)
+              for site in data for iml in data[site]["AvgSA"]}
+
+    # a new stripe disaggregated for every site, exactly as calc 122 was
+    for site in data:
+        data[site]["AvgSA"][1.8039] = pd.DataFrame(
+            {"Mag": [7.0 + site], "P(m|X>x)": [1.8039]})
+    disagg_shards.write_shards(tmp_path, data, fingerprint(rng_seed=2))
+    clear_file_hash_cache()
+    disagg_shards.clear_content_hash_cache()
+
+    for key, fp in before.items():
+        assert _disagg_fingerprint_input(sharded, *key) == fp, f"{key} went stale"
+    assert "disagg_stripe_data" in _disagg_fingerprint_input(sharded, 0, 1.8039)
+
+
+def test_stats_row_hash_ignores_row_position(tmp_path):
+    """A stripe's stats entry must not depend on where its row sits in the table.
+
+    021 appends rows for a new iml to the single stats pickle. If the hash carried
+    row position, every stripe below the insertion point would go stale.
+    """
+    stats = pd.DataFrame({
+        "site_id": [0, 0, 1], "imt": ["AvgSA"] * 3,
+        "imtl": [0.27, 0.285, 0.27], "poe": [0.1, 0.05, 0.2],
+    })
+    row = gm_selection.stats_row(stats, 0, "AvgSA", 0.285)
+    shuffled = stats.iloc[[2, 1, 0]]
+    assert (cache_utils.dataframe_content_hash(row)
+            == cache_utils.dataframe_content_hash(
+                gm_selection.stats_row(shuffled, 0, "AvgSA", 0.285)))
+    # but a changed value in that row does move it
+    changed = stats.copy()
+    changed.loc[1, "poe"] = 0.06
+    assert (cache_utils.dataframe_content_hash(row)
+            != cache_utils.dataframe_content_hash(
+                gm_selection.stats_row(changed, 0, "AvgSA", 0.285)))
+
+
+def test_write_content_hashes_backfill_matches_write_shards(tmp_path):
+    """The backfill must produce exactly what write_shards emits.
+
+    The manifest migration re-stamps from the backfilled index and the pipeline
+    then checks against the written one; if they differed, every migrated stripe
+    would be stale.
+    """
+    data = _fake_disagg()
+    disagg_shards.write_shards(tmp_path, data, fingerprint(rng_seed=1))
+    written = disagg_shards.content_hashes_path(tmp_path).read_text()
+    disagg_shards.content_hashes_path(tmp_path).unlink()
+    disagg_shards.write_content_hashes(tmp_path)
+    assert disagg_shards.content_hashes_path(tmp_path).read_text() == written
+
+
+def test_missing_content_hashes_index_raises(tmp_path):
+    """No silent fallback to a whole-shard hash -- that is the bug, invisibly."""
+    disagg_shards.write_shards(tmp_path, _fake_disagg(), fingerprint(rng_seed=1))
+    disagg_shards.content_hashes_path(tmp_path).unlink()
+    disagg_shards.clear_content_hash_cache()
+    with pytest.raises(FileNotFoundError, match="write_content_hashes"):
+        _disagg_fingerprint_input({"disagg_shard_dir": tmp_path}, 1, 0.27)
 
 
 def test_engine_call_pattern_and_round3_empty(tmp_path, monkeypatch):

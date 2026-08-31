@@ -147,10 +147,18 @@ def stripe_source_fps() -> dict:
     stripes without changing any existing stripe's fingerprint.
 
     ``disagg_shard_dir`` is the *directory* of per-site shards, not a file:
-    ``stripe_input_fingerprint`` resolves it to ``site_NNN.pickle`` for the stripe's
-    own site, so re-running the disaggregation for one site leaves the other 59
-    sites' stripes valid. Never fingerprint the directory itself -- a non-file path
-    is hashed as a string, which looks valid while tracking nothing.
+    ``stripe_input_fingerprint`` resolves it to that stripe's own entry in the
+    set's ``_content_hashes.json``, so only a stripe whose own disaggregation
+    DataFrame changed goes stale -- re-running the disaggregation for one site, or
+    adding one iml across all sites, leaves every other stripe valid. Never
+    fingerprint the directory itself -- a non-file path is hashed as a string,
+    which looks valid while tracking nothing.
+
+    ``disagg_stats_file`` is still listed because the *batch* artifacts
+    (``build_final_ensembles``) depend on the whole table. Per-stripe fingerprints
+    do not use it: they hash that stripe's single stats row from the loaded
+    DataFrame instead, so appending rows for a new iml no longer invalidates
+    every stripe.
     """
     return {
         "disagg_shard_dir":  cfg["proc_data"]["AvgSA_03_disagg_data_shards"],

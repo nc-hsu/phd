@@ -12,7 +12,11 @@ Two very different things get confused here, so it names them explicitly:
   nothing recorded a stripe as selected. That is the pipeline working as designed,
   not a cache miss.
 - **A genuinely mismatched input**, in which case the differing fingerprint entry
-  is named (e.g. the gm database changed, or this site's disagg shard did).
+  is named. ``disagg_stripe_data`` means this stripe's own disaggregation
+  DataFrame changed; ``disagg_stats_row`` means its own stats row did. Both are
+  per-stripe content hashes, so such a mismatch is real -- unlike the whole-file
+  hashes they replaced, which went stale for all ~500 stripes whenever a single
+  new iml was disaggregated across the 60 sites.
 
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --show 20
@@ -73,11 +77,21 @@ def diagnose(show: int = 10) -> int:
     print(f"  shard dir     : {shard_dir}")
     print(f"                  exists={shard_dir.is_dir()}  shards={len(shards)}  "
           f"_index.json={index_ok}")
+    hashes_ok = disagg_shards.content_hashes_path(shard_dir).is_file()
+    print(f"                  {disagg_shards.CONTENT_HASHES_NAME}={hashes_ok}")
     if not shards or not index_ok:
         print("\n  *** The disagg shards are missing or incomplete. ***")
         print("      Every stripe fingerprint would hash the shard PATH STRING")
         print("      instead of file bytes, so nothing can ever match.")
         print("      Fix: dvc pull  (then re-run this).")
+        return 1
+    if not hashes_ok:
+        print(f"\n  *** No {disagg_shards.CONTENT_HASHES_NAME} in the shard dir. ***")
+        print("      Per-stripe fingerprints are read from it, so the stale check")
+        print("      cannot run at all. This is a shard set written before the")
+        print("      per-stripe index existed.")
+        print("      Fix: disagg_shards.write_content_hashes(shard_dir)  (one pass")
+        print("           over the shards; changes no shard byte).")
         return 1
     print(f"  results folder: {result_folder}")
     print(f"                  {len(list(result_folder.glob('*__stripe_iml_*.pickle')))} "
@@ -86,9 +100,9 @@ def diagnose(show: int = 10) -> int:
 
     # --- the stale check, exactly as the notebooks run it -------------------
     wanted = wanted_stripe_keys()
-    _, _, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
+    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
     fp_fn = lambda s, i: stripe_input_fingerprint(
-        s, i, stripe_source_fps(), ctx, SELECTION_CONFIG)
+        s, i, stripe_source_fps(), ctx, SELECTION_CONFIG, disagg_stats)
 
     reasons, diff_counter, examples = Counter(), Counter(), {}
     stale = []
