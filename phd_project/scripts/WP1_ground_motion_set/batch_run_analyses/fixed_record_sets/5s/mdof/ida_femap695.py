@@ -37,16 +37,6 @@ from phd_project.process_semaphore.process_semaphore import (
 # plus the named config. `config` may be a bare filename (resolved inside the
 # folder) or an absolute path.
 buildings: list[dict[str, str]] = [
-    {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_00\5s\mdof",
-     "config": r"D:\08_wp1_fixed_record_sets\group_5s_00\5s\mdof\config_ida_htf_femap695.py"},
-    {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_01\5s\mdof",
-     "config": r"D:\08_wp1_fixed_record_sets\group_5s_01\5s\mdof\config_ida_htf_femap695.py"},
-    {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_02\5s\mdof",
-     "config": r"D:\08_wp1_fixed_record_sets\group_5s_02\5s\mdof\config_ida_htf_femap695.py"},
-    {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_03\5s\mdof",
-     "config": r"D:\08_wp1_fixed_record_sets\group_5s_03\5s\mdof\config_ida_htf_femap695.py"},
-    {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_04\5s\mdof",
-     "config": r"D:\08_wp1_fixed_record_sets\group_5s_04\5s\mdof\config_ida_htf_femap695.py"},
     {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_05\5s\mdof",
      "config": r"D:\08_wp1_fixed_record_sets\group_5s_05\5s\mdof\config_ida_htf_femap695.py"},
     {"folder": r"D:\08_wp1_fixed_record_sets\group_5s_06\5s\mdof",

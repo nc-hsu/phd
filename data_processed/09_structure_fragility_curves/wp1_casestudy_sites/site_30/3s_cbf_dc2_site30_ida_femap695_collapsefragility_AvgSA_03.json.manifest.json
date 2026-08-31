@@ -1,16 +1,20 @@
 {
   "inputs": {
-    "ida_results": {
-      "hash": "9b284954f866bb710554483e40e54b433b3f948da6df7030741a2d7de9bfe2aa",
-      "summary": "file ida_results.pickle (9138 bytes)"
+    "group_fragility": {
+      "hash": "4322c4b5d3c71c0d4a70c005850fb8042e0ad1b3171187af477ee6a519d4810e",
+      "summary": "file group_3s_10_ida_femap695_collapsefragility_AvgSA_03.json (1569 bytes)"
     },
-    "record_logs": {
-      "hash": "c67c26ec5a7c5a741f159938d09d9824749019a9b0f3c8a881015e385904e23d",
-      "summary": "file record_logs.json (97815 bytes)"
+    "group": {
+      "hash": "a22909a8b19ba2c61e81a693a4a9702e66e585d223edd0de2929a582fdaf1f97",
+      "summary": "str 'group_3s_10'"
     },
-    "im_periods": {
-      "hash": "9cb6c53ae48c645a6476f5844605a3acd30d3550190ccb24a34e02e574eaa7f6",
-      "summary": "ndarray shape=(10,) dtype=float64"
+    "site": {
+      "hash": "624b60c58c9d8bfb6ff1886c2fd605d2adeb6ea4da576068201b6c6958ce93f4",
+      "summary": "int=30"
+    },
+    "storeys": {
+      "hash": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+      "summary": "int=3"
     },
     "pickagm_version": {
       "hash": "0.1.0",
@@ -19,7 +23,7 @@
   },
   "_meta": {
     "artifact": "3s_cbf_dc2_site30_ida_femap695_collapsefragility_AvgSA_03.json",
-    "git_commit": "495639e",
-    "written_at": "2026-08-04T10:59:53.130886+00:00"
+    "git_commit": "9d06785d",
+    "written_at": "2026-08-31T10:29:43.525454+00:00"
   }
 }
