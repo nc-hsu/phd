@@ -803,5 +803,40 @@
       "git_commit": "2c62237",
       "written_at": "2026-08-25T10:08:08.184794+00:00"
     }
+  },
+  "AvgSA_03_disagg_eps4_1pt804": {
+    "calc_id": 122,
+    "config": "config_AvgSA_03_disagg_eps4_1pt804.ini",
+    "description": "[disagg AvgSA03 eps4 iml 1.8039g - ESHM20 all sites]",
+    "inputs": {
+      "config": {
+        "hash": "f253fee52d079e7650af484f3c92519b08bd853933037db0050e3660248ac09b",
+        "summary": "file config_AvgSA_03_disagg_eps4_1pt804.ini (1638 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "d37544cd",
+      "written_at": "2026-08-31T07:00:58.994168+00:00"
+    }
   }
 }
