@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from collections.abc import Sequence
+from scipy.linalg import cho_factor, cho_solve
+from scipy.optimize import minimize
 from scipy.special import psi
 from scipy.stats import kurtosis, skew
 
@@ -22,10 +24,16 @@ _MAX_FIT_RATIO = 10.0
 # One colour per arm, fixed here so every figure in the chapter reads the same way. The
 # two FEMAP695 arms are warm, the site-specific arm cool, because the fixed-vs-site-
 # specific record set is the distinction the comparison is actually about.
-_ARM_COLORS = {"site_msa": "b", "msa_femap695": "tab:orange", "ida_femap695": "r"}
+# The three ida_femap695* arms differ only in where inside the IDA's collapse bracket
+# each record's capacity is placed: the lower bound (the published fragility), the upper
+# bound, or the bracket's geometric mean. See nb 053 section 10.
+_ARM_COLORS = {"site_msa": "b", "msa_femap695": "tab:orange", "ida_femap695": "r",
+               "ida_femap695_ub": "tab:purple", "ida_femap695_avg": "tab:green"}
 _ARM_LABELS = {"site_msa": "MSA site-specific",
                "msa_femap695": "MSA FEMA P695",
-               "ida_femap695": "IDA FEMA P695"}
+               "ida_femap695": "IDA FEMA P695",
+               "ida_femap695_ub": "IDA FEMA P695 (upper bound)",
+               "ida_femap695_avg": "IDA FEMA P695 (geom. avg.)"}
 
 # Efron & Tibshirani (1993) p.128: a bias below a quarter of the estimator's own standard
 # error costs less than 3.1% in RMSE and can be left uncorrected. The second threshold
@@ -553,7 +561,6 @@ def bootstrap_csv_path(
     root: Path | str,
     arm: str,
     quantity: str,
-    n_storeys: int,
     im_tag: str,
     scope: str,
 ) -> Path:
@@ -562,24 +569,70 @@ def bootstrap_csv_path(
     ``arm`` is e.g. ``"msa_femap695"``, ``quantity`` one of ``theta``/``beta``/
     ``theta_stats``/``beta_stats``/``fit_ok``, ``scope`` ``"by_group"`` or ``"by_site"``.
     Both the save and the reload go through here so the two cannot drift apart.
+
+    No storey count in the name: one file carries every storey count, on the second level
+    of its column index for the replicate clouds and of its row index for the per-unit
+    frames - the convention :func:`estimates_csv_path` already followed. Keeping the storey
+    counts together is what lets a consumer ask for every structure at once.
     """
-    return (Path(root)
-            / f"{arm}_bootstrap_{quantity}_{n_storeys}s_{im_tag}_{scope}.csv")
+    return Path(root) / f"{arm}_bootstrap_{quantity}_{im_tag}_{scope}.csv"
+
+
+def select_storeys(
+    df: pd.DataFrame,
+    n_storeys: int | Sequence[int] | None,
+    axis: int = 0,
+) -> pd.DataFrame:
+    """Slice a merged frame down to one or more storey counts.
+
+    ``None`` returns the frame untouched, an ``int`` returns a single storey count with the
+    ``n_storeys`` level dropped - the single-level shape every consumer used before the
+    storey counts were merged into one file - and a sequence returns a subset with the level
+    kept. ``axis`` picks the index the level sits on: 0 for the per-unit frames, 1 for the
+    replicate clouds.
+
+    A storey count that is not in the frame raises rather than coming back as an empty
+    slice, which is the one failure that would otherwise go unnoticed downstream.
+    """
+    if n_storeys is None:
+        return df
+
+    index = df.columns if axis == 1 else df.index
+    if "n_storeys" not in index.names:
+        raise KeyError("frame carries no n_storeys level to select on")
+
+    levels = index.get_level_values("n_storeys")
+    available = sorted(set(levels))
+    scalar = isinstance(n_storeys, (int, np.integer))
+    wanted = [int(n_storeys)] if scalar else [int(n) for n in n_storeys]
+
+    missing = [n for n in wanted if n not in available]
+    if missing:
+        raise KeyError(f"no {missing}-storey data in this frame - it holds {available}")
+
+    if scalar:
+        return df.xs(wanted[0], level="n_storeys", axis=axis)
+
+    keep = levels.isin(wanted)
+    return df.loc[:, keep] if axis == 1 else df.loc[keep]
 
 
 def read_bootstrap_frame(path: Path | str, columns_name: str) -> pd.DataFrame:
     """Read a saved replicate frame back, restoring the labels the CSV cannot carry.
 
-    ``columns.name`` is lost on the round trip, and site numbers come back as strings;
-    both are restored so a reloaded frame is indistinguishable from a freshly computed
-    one. Boolean masks are parsed as ``bool`` by ``read_csv`` and need no special
-    handling.
+    The columns are a ``(unit, n_storeys)`` MultiIndex and both of its levels come back as
+    strings, so site numbers and storey counts are returned to ``int`` - group labels are
+    left as they are - and the level names restored. A reloaded frame is then
+    indistinguishable from a freshly computed one. Boolean masks are parsed as ``bool`` by
+    ``read_csv`` and need no special handling.
     """
-    df = pd.read_csv(path, index_col=0)
+    df = pd.read_csv(path, index_col=0, header=[0, 1])
+    units = df.columns.get_level_values(0)
     if columns_name == "site":
-        df.columns = pd.Index([int(c) for c in df.columns], name="site")
-    else:
-        df.columns.name = columns_name
+        units = [int(u) for u in units]
+    df.columns = pd.MultiIndex.from_arrays(
+        [units, [int(n) for n in df.columns.get_level_values(1)]],
+        names=[columns_name, "n_storeys"])
     df.index.name = "k"
     return df
 
@@ -588,7 +641,7 @@ def load_saved_bootstrap(
     root: Path | str,
     arm: str,
     quantities: Sequence[str],
-    n_storeys: int,
+    n_storeys: int | Sequence[int] | None,
     im_tag: str,
     scope: str,
     k_samples: int | None = None,
@@ -598,25 +651,34 @@ def load_saved_bootstrap(
     The fits are deterministic, so a previous run's output can stand in for repeating
     them. Returning ``None`` on a single missing file - rather than a partial set - is
     what keeps the caller's fallback all-or-nothing: a half-finished save can never be
-    silently mixed with a fresh computation.
+    silently mixed with a fresh computation. A storey count absent from an otherwise
+    complete file counts as missing for the same reason.
+
+    ``n_storeys`` selects out of the merged file the way :func:`select_storeys` describes:
+    ``None`` for every structure at once, an ``int`` for the single-level frame this
+    returned before the storey counts shared a file.
 
     ``k_samples`` guards against picking up a cloud of the wrong size, which is the one
     way a stale file could pass unnoticed after the replicate count changes.
     """
-    paths = {q: bootstrap_csv_path(root, arm, q, n_storeys, im_tag, scope)
-             for q in quantities}
+    paths = {q: bootstrap_csv_path(root, arm, q, im_tag, scope) for q in quantities}
     if not all(p.is_file() for p in paths.values()):
         return None
 
     columns_name = scope.removeprefix("by_")
     frames = {q: read_bootstrap_frame(p, columns_name) for q, p in paths.items()}
 
+    try:
+        frames = {q: select_storeys(df, n_storeys, axis=1) for q, df in frames.items()}
+    except KeyError:
+        return None
+
     if k_samples is not None:
         for q, df in frames.items():
             if len(df) != k_samples:
-                raise ValueError(f"saved {arm} {q} for {n_storeys}s has {len(df)} "
-                                 f"replicates, not k_samples={k_samples} - delete it or "
-                                 f"set REUSE_SAVED = False to refit")
+                raise ValueError(f"saved {arm} {q} has {len(df)} replicates, not "
+                                 f"k_samples={k_samples} - delete it or set "
+                                 f"REUSE_SAVED = False to refit")
     return frames
 
 # load the theta and beta bootstrap stats
@@ -624,55 +686,66 @@ def load_saved_bootstrap_stats(
     root: Path | str,
     arm: str,
     quantities,
-    n_storeys: int,
+    n_storeys: int | Sequence[int] | None,
     im_tag: str,
     scope: str,
     ) -> dict[str, pd.DataFrame] | None:
-    """Reload one arm's saved replicate frames, or ``None`` if any is missing.
+    """Reload one arm's saved summary-statistic frames, or ``None`` if any is missing.
 
     The fits are deterministic, so a previous run's output can stand in for repeating
     them. Returning ``None`` on a single missing file - rather than a partial set - is
     what keeps the caller's fallback all-or-nothing: a half-finished save can never be
     silently mixed with a fresh computation.
 
-    ``k_samples`` guards against picking up a cloud of the wrong size, which is the one
-    way a stale file could pass unnoticed after the replicate count changes.
+    The ``(unit, n_storeys)`` row index comes off disk rather than being attached here;
+    ``n_storeys`` selects out of it as :func:`select_storeys` describes, so passing a
+    single storey count still gives the flat frame this returned before the merge.
     """
-    paths = {q: bootstrap_csv_path(root, arm, q, n_storeys, im_tag, scope)
-             for q in quantities}
+    paths = {q: bootstrap_csv_path(root, arm, q, im_tag, scope) for q in quantities}
     if not all(p.is_file() for p in paths.values()):
         return None
 
     columns_name = "stats"
     index_name = scope.removeprefix("by_")
-    frames = {q: read_bootstrap_stats_frame(p, columns_name, index_name) for q, p in paths.items()}
+    frames = {q: read_bootstrap_stats_frame(p, columns_name, index_name)
+              for q, p in paths.items()}
 
-    
-    for q, df in frames.items():
-        row_index = pd.MultiIndex.from_product([df.index, [n_storeys]], names=("site", "n_storeys"))
-        df = df.set_index(row_index)
-        frames[q] = df
-        
-    return frames
+    try:
+        return {q: select_storeys(df, n_storeys) for q, df in frames.items()}
+    except KeyError:
+        return None
 
 
-def read_bootstrap_stats_frame(path: Path | str, columns_name: str, index_name: str) -> pd.DataFrame:
-    """Read a saved replicate frame back, restoring the labels the CSV cannot carry.
+def read_bootstrap_stats_frame(path: Path | str, columns_name: str,
+                               index_name: str) -> pd.DataFrame:
+    """Read a saved summary-statistic frame back, restoring the labels the CSV cannot carry.
 
-    ``columns.name`` is lost on the round trip, and site numbers come back as strings;
-    both are restored so a reloaded frame is indistinguishable from a freshly computed
-    one. Boolean masks are parsed as ``bool`` by ``read_csv`` and need no special
-    handling.
+    The rows are a ``(unit, n_storeys)`` MultiIndex, restored by
+    :func:`_restore_unit_index`, and ``columns.name`` is lost on the round trip and set
+    back here, so a reloaded frame is indistinguishable from a freshly computed one.
     """
-    df = pd.read_csv(path, index_col=0)
+    df = pd.read_csv(path, index_col=[0, 1])
+    df = _restore_unit_index(df, index_name)
     df.columns.name = columns_name
-    df.index.name = index_name
     return df
 
 
-def reformat_bootstrap_df(df: pd.DataFrame, n_storeys):
-    """Reformat the bootstrap theta and beta dataframes to have multi-index rows"""
-    row_index = pd.MultiIndex.from_product([df.columns, [n_storeys]], names=["site", "n_storeys"])
+def reformat_bootstrap_df(df: pd.DataFrame, n_storeys: int | None = None):
+    """Reformat the bootstrap theta and beta dataframes to have multi-index rows.
+
+    A merged cloud already carries ``(unit, n_storeys)`` on its columns, so transposing is
+    the whole job. ``n_storeys`` is only needed for a frame that has had the level dropped
+    - what :func:`load_saved_bootstrap` returns when asked for a single storey count - and
+    attaches it back as a constant second level.
+    """
+    if isinstance(df.columns, pd.MultiIndex):
+        return df.T
+
+    if n_storeys is None:
+        raise ValueError("single-level columns need an explicit n_storeys to reattach")
+
+    row_index = pd.MultiIndex.from_product([df.columns, [n_storeys]],
+                                           names=[df.columns.name or "site", "n_storeys"])
     df = df.T
     df = df.set_index(row_index, drop=True)
     return df
@@ -819,22 +892,51 @@ def site_fit_estimates(site_fcs: dict[int, dict],
                         index=pd.Index(list(sites), name="site"))
 
 
-def stack_estimates(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
-    """Stack one arm's per-storey point estimates into a single ``(unit, n_storeys)`` frame.
+def stack_unit_frames(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
+    """Merge per-storey frames indexed by site or group onto one ``(unit, n_storeys)`` index.
 
-    ``frames`` is keyed by storey count, each value a ``theta``/``beta`` frame indexed by
-    site or group. The result carries every storey count in one object, indexed the way the
-    meta-regression wants its rows - the same ordering :func:`reformat_bootstrap_df` uses,
-    so an estimate frame and a replicate frame line up row for row.
+    ``frames`` is keyed by storey count, each value indexed by site or group - the shape of
+    a stats frame, a bias frame or a point-estimate frame. The result carries every storey
+    count in one object, indexed the way the meta-regression wants its rows, and is sorted
+    so that a per-unit frame and a transposed replicate cloud line up row for row.
     """
     parts = []
     for n, df in frames.items():
-        part = df[["theta", "beta"]].copy()
+        part = df.copy()
         part.index = pd.MultiIndex.from_product(
             [df.index, [n]], names=[df.index.name or "unit", "n_storeys"])
         parts.append(part)
 
     return pd.concat(parts).sort_index()
+
+
+def stack_estimates(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
+    """Stack one arm's per-storey point estimates into a single ``(unit, n_storeys)`` frame.
+
+    A :func:`stack_unit_frames` narrowed to the two columns the meta-regression reads, so a
+    summary frame carrying extra columns cannot leak them into the saved estimates.
+    """
+    return stack_unit_frames({n: df[["theta", "beta"]] for n, df in frames.items()})
+
+
+def stack_cloud_frames(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
+    """Merge per-storey replicate clouds onto one ``(unit, n_storeys)`` column MultiIndex.
+
+    The column-side counterpart of :func:`stack_unit_frames`: ``frames`` is keyed by storey
+    count, each value a ``k`` x unit cloud, and the result holds every structure in one
+    frame with the replicate index shared. Sorted for the same reason, so transposing it
+    reproduces :func:`stack_unit_frames`' row order exactly.
+    """
+    parts = []
+    for n, df in frames.items():
+        part = df.copy()
+        part.columns = pd.MultiIndex.from_product(
+            [df.columns, [n]], names=[df.columns.name or "unit", "n_storeys"])
+        parts.append(part)
+
+    out = pd.concat(parts, axis=1).sort_index(axis=1)
+    out.index.name = "k"
+    return out
 
 
 def estimates_csv_path(root: Path | str, arm: str, im_tag: str, scope: str) -> Path:
@@ -846,15 +948,14 @@ def estimates_csv_path(root: Path | str, arm: str, im_tag: str, scope: str) -> P
     return Path(root) / f"{arm}_estimates_{im_tag}_{scope}.csv"
 
 
-def read_estimates_frame(path: Path | str,
-                         index_name: str = "site") -> pd.DataFrame:
-    """Read a saved point-estimate frame back, restoring its two-level index.
+def _restore_unit_index(df: pd.DataFrame, index_name: str) -> pd.DataFrame:
+    """Return a ``(unit, n_storeys)`` row index to the types a CSV cannot carry.
 
-    Site numbers and storey counts both come back as strings from a CSV; both are returned
-    to ``int`` so the frame is indistinguishable from a freshly built one. Group labels are
-    left as they are.
+    Site numbers and storey counts both come back as strings; both are returned to ``int``
+    so the frame is indistinguishable from a freshly built one. Group labels are left as
+    they are. Shared by every per-unit frame - estimates, stats and bias - since the merge
+    gave all three the same index.
     """
-    df = pd.read_csv(path, index_col=[0, 1])
     units = df.index.get_level_values(0)
     if index_name == "site":
         units = [int(u) for u in units]
@@ -862,6 +963,12 @@ def read_estimates_frame(path: Path | str,
         [units, [int(n) for n in df.index.get_level_values(1)]],
         names=[index_name, "n_storeys"])
     return df
+
+
+def read_estimates_frame(path: Path | str,
+                         index_name: str = "site") -> pd.DataFrame:
+    """Read a saved point-estimate frame back, restoring its two-level index."""
+    return _restore_unit_index(pd.read_csv(path, index_col=[0, 1]), index_name)
 
 
 def load_estimates(
@@ -893,47 +1000,47 @@ def load_estimates(
     return estimates
 
 
-def bias_csv_path(root: Path | str, arm: str, quantity: str, n_storeys: int,
+def bias_csv_path(root: Path | str, arm: str, quantity: str,
                   im_tag: str, scope: str) -> Path:
     """Canonical filename for a saved bias frame.
 
     Goes through :func:`bootstrap_csv_path` with ``quantity`` suffixed ``_bias``, so the
     bias files sit alongside the clouds they were computed from under the same convention.
     """
-    return bootstrap_csv_path(root, arm, f"{quantity}_bias", n_storeys, im_tag, scope)
+    return bootstrap_csv_path(root, arm, f"{quantity}_bias", im_tag, scope)
 
 
 def read_bias_frame(path: Path | str, index_name: str = "site") -> pd.DataFrame:
     """Read a saved bias frame back, restoring the index labels the CSV cannot carry.
 
     Unlike :func:`read_bootstrap_frame` the rows here are sites or groups, not replicates,
-    so site numbers have to come back as ``int`` on the *index* rather than the columns.
+    so the ``(unit, n_storeys)`` MultiIndex sits on the *index* rather than the columns.
     """
-    df = pd.read_csv(path, index_col=0)
-    if index_name == "site":
-        df.index = pd.Index([int(i) for i in df.index], name="site")
-    else:
-        df.index.name = index_name
-    return df
+    return _restore_unit_index(pd.read_csv(path, index_col=[0, 1]), index_name)
 
 
 def load_saved_bias(root: Path | str, arms: Sequence[str],
-                    quantities: Sequence[str], n_storeys: int, im_tag: str,
+                    quantities: Sequence[str],
+                    n_storeys: int | Sequence[int] | None, im_tag: str,
                     scope: str) -> dict[str, dict[str, pd.DataFrame]] | None:
     """Reload the saved bias frames of several arms, or ``None`` if any is missing.
 
     All-or-nothing for the same reason :func:`load_saved_bootstrap` is: a half-written set
-    must never be silently mixed with a freshly computed one.
+    must never be silently mixed with a freshly computed one. ``n_storeys`` selects out of
+    the merged files as :func:`select_storeys` describes.
     """
-    paths = {(arm, q): bias_csv_path(root, arm, q, n_storeys, im_tag, scope)
+    paths = {(arm, q): bias_csv_path(root, arm, q, im_tag, scope)
              for arm in arms for q in quantities}
     if not all(p.is_file() for p in paths.values()):
         return None
 
     index_name = scope.removeprefix("by_")
     frames: dict[str, dict[str, pd.DataFrame]] = {arm: {} for arm in arms}
-    for (arm, q), path in paths.items():
-        frames[arm][q] = read_bias_frame(path, index_name)
+    try:
+        for (arm, q), path in paths.items():
+            frames[arm][q] = select_storeys(read_bias_frame(path, index_name), n_storeys)
+    except KeyError:
+        return None
     return frames
 
 
@@ -1017,6 +1124,7 @@ def plot_bias_assessment(
     bias_data: dict[str, dict[str, pd.DataFrame]],
     references: dict[str, pd.DataFrame] | None = None,
     contrasts: Sequence[tuple[str, str]] | None = None,
+    n_storeys: int | None = None,
 ) -> tuple[plt.Figure, np.ndarray, plt.Figure, plt.Axes]:
     """Chart the per-site bias of every arm, before and after correction.
 
@@ -1024,6 +1132,11 @@ def plot_bias_assessment(
     ``bias_corrected`` columns :func:`add_bias_correction` adds. The 3x3 grid is arranged
     as columns ``ln theta`` / ``ln beta`` / corrected ``ln beta``, and rows raw bias /
     bias-to-se / bias-to-mcse.
+
+    Both figures put the site number on the x axis, so they show one storey count at a
+    time: pass ``n_storeys`` to pick it out of frames that still carry the level. Plotting
+    every storey count together would stack two structures on each x position, which is why
+    a merged frame with no selection raises rather than drawing something misleading.
 
     The second figure shows what survives on the quantity the comparison is actually about:
     the net bias on each pairwise difference of ``ln beta``, uncorrected against corrected.
@@ -1037,6 +1150,19 @@ def plot_bias_assessment(
     arms = list(bias_data)
     if contrasts is None:
         contrasts = [(a, b) for i, a in enumerate(arms) for b in arms[i + 1:]]
+
+    merged = any("n_storeys" in df.index.names
+                 for quantities in bias_data.values() for df in quantities.values())
+    if merged:
+        if n_storeys is None:
+            available = sorted({n for quantities in bias_data.values()
+                                for df in quantities.values()
+                                for n in df.index.get_level_values("n_storeys")})
+            raise ValueError(f"these bias frames hold storey counts {available} - pass "
+                             f"n_storeys to chart one of them")
+        bias_data = {arm: {q: select_storeys(df, n_storeys)
+                           for q, df in quantities.items()}
+                     for arm, quantities in bias_data.items()}
 
     fig1, axs1 = plt.subplots(3, 3, figsize=(15, 11))
 
@@ -1067,6 +1193,10 @@ def plot_bias_assessment(
     print(f"Net bias on the ln(beta) contrasts, over {n_sites} sites:")
     _contrast_styles = [("o", "tab:blue"), ("s", "tab:green"), ("^", "tab:purple"),
                         ("v", "tab:brown"), ("D", "tab:pink")]
+    if len(contrasts) > len(_contrast_styles):
+        raise ValueError(f"{len(contrasts)} contrasts but only {len(_contrast_styles)} "
+                         f"styles - pass an explicit `contrasts` selection")
+
     for (a, b), (marker, color) in zip(contrasts, _contrast_styles):
         delta = bias_data[a]["beta"]["bias"] - bias_data[b]["beta"]["bias"]
         delta_corr = (bias_data[a]["beta"]["bias_corrected"]
@@ -1261,6 +1391,25 @@ def compute_re_summary_effect(
     return M_re, V_re, SE_re, T_sq, Wis_re
 
 
+def compute_re_summary_effect2(df:pd.DataFrame, effect_column="effect", variance_column="variance") -> pd.DataFrame:
+    """The input dataframe should have  """
+
+    Yis = df[effect_column]
+    Vis = df[variance_column]
+
+    M_re, V_mre, SE_mre, T_sq, Wis_re = compute_re_summary_effect(Vis, Yis)
+
+    T_sq = pd.Series({i:T_sq for i in Wis_re.index}, name="T2")
+    Var_tot = Vis + T_sq
+    Var_tot.name = "Var_tot"
+    Wis_re.name = "W_re"
+    study_values = pd.concat([Yis, Vis, T_sq, Var_tot, Wis_re], axis=1)
+
+    return M_re, V_mre, SE_mre, study_values
+
+
+
+
 def compute_prediction_interval():
     """Computes the prediction interval for the random effects model
     using the estimate of the variance and hte t-distributions with n-2 dofs
@@ -1300,3 +1449,732 @@ def compute_heterogeneity_stats(
     return {"Q": Q, "Q_df": Q_df, "T_sq": T_sq, "T": T, "I_sq": I_sq}
 
 
+# ===========================================================================
+# REML fitting for the A1 family: A1a (2-level), A1b (3-level, rows nested in
+# design groups) and A1c (crossed design x site), all with a KNOWN - and for
+# A1b/A1c dense - sampling covariance matrix.
+#
+#     A1a  y_i = m1                            + u_i + eps_i
+#     A1b  y_i = m1 + d_{g[i]}                 + u_i + eps_i
+#     A1c  y_i = m1 + d_{g[i]} + s_{sigma[i]}  + u_i + eps_i
+#
+#     Sigma = C_known + tau_d^2 Z Z' + tau_s^2 S S' + tau_u^2 I
+#
+# All three are the same model with a different number of variance components,
+# so one routine (fit_reml) serves them all: it takes a LIST of known n x n
+# matrices, ``Gs``, and estimates one variance component per entry. A component
+# is dropped by leaving its matrix out of the list - never by mangling Z or S
+# (one site for everybody makes S S' a matrix of ones, confounded with the
+# fixed intercept; one site per row makes S S' = I, aliased with tau_u^2 I).
+#
+#     A1a   Gs = [I]                  C_known = diag(v1)
+#     A1b   Gs = [ZZt, I]             C_known = diag(v_a) + Z V_bb Z'
+#     A1c   Gs = [ZZt, SSt, I]        C_known = diag(v_a) + Z V_bb Z'
+#
+# where
+#     v1[i]      = Var_r(a_i^(r) - b_{g[i]}^(r))   combined, per ROW
+#     v_a[i]     = Var_r(ln theta_SS_i^(r))        SS arm only, per ROW
+#     V_bb[j,j'] = Cov_r(ln theta_FX_j^(r), ln theta_FX_j'^(r))   per DESIGN
+# and exactly (the arms use disjoint record sets, so are independent)
+#     v1[i] = v_a[i] + V_bb[g[i], g[i]]
+#
+# WHY REML AND NOT DerSimonian-Laird. DL is a single moment equation,
+# E[Q] = (n-1) + C tau^2: one equation, one unknown. A1b has two variance
+# components and A1c has three, so DL cannot identify them. Worse, Q itself
+# presupposes a DIAGONAL sampling covariance, so once Z V_bb Z' enters Sigma
+# there is no Q to write down. REML's objective is stated directly in terms of
+# Sigma and is indifferent to both issues. Keep the DL functions above as the
+# regression test: fit_reml with Gs = [I] and a diagonal C_known must reproduce
+# them.
+#
+# IDENTIFIABILITY WARNING. Every row in design group j subtracts the SAME
+# estimate b_j, so the sampling error contributes v^b_j to every within-group
+# off-diagonal cell of Sigma - the same block pattern as tau_d^2 Z Z'. The two
+# are aliased, separable only through the variation of v^b_j across j. There is
+# no analogous shared term on the site side, so with a diagonal C_known the
+# contamination biases the design/site comparison ENTIRELY in favour of the
+# design. Always pass the full C_known for A1b/A1c, and treat
+# tau_d^2 ~ mean(diag(V_bb)) as a sign you have found noise, not a design
+# effect.
+#
+# Borenstein et al. (2009) Ch. 12 pp. 69-75; Ch. 14 pp. 87-95.
+# Gelman & Hill (2007) Ch. 13.5 ~pp. 289-291 (crossed / non-nested);
+#   Ch. 22 ~pp. 487-500 (comparing variance components).
+# Gelman et al. BDA3 Ch. 5.4-5.5 ~pp. 113-124 (known-variance hierarchical
+#   normal model).
+# ===========================================================================
+
+_REML_ZERO_TOL = 1e-8
+
+
+# ---------------------------------------------------------------------------
+# Design-matrix construction
+# ---------------------------------------------------------------------------
+
+def make_indicator(codes: np.ndarray, n_levels: int | None = None) -> np.ndarray:
+    """Build an n x K 0/1 indicator (dummy) matrix from integer group codes.
+
+    Parameters
+    ----------
+    codes : array of int, shape (n,)
+        ``codes[i]`` is the 0-based group index of row i.
+    n_levels : int, optional
+        Number of columns K. Defaults to ``codes.max() + 1``. Pass it
+        explicitly whenever a level might be unused in this subset of rows --
+        otherwise the matrix silently loses a column and stops lining up with
+        V_bb.
+
+    Returns
+    -------
+    ndarray, shape (n, K), with exactly one 1.0 per row.
+
+    Notes
+    -----
+    ``Z @ Z.T`` is then the n x n matrix with a 1 wherever two rows share a
+    group -- which is the "known matrix" multiplying tau_d^2 in Sigma.
+    """
+    codes = np.asarray(codes, dtype=int)
+    if codes.ndim != 1:
+        raise ValueError(f"codes must be 1-D, got shape {codes.shape}")
+    if codes.min() < 0:
+        raise ValueError("codes must be 0-based non-negative integers")
+
+    K = int(codes.max()) + 1 if n_levels is None else int(n_levels)
+    if codes.max() >= K:
+        raise ValueError(f"code {codes.max()} exceeds n_levels={K}")
+
+    Z = np.zeros((codes.size, K))
+    Z[np.arange(codes.size), codes] = 1.0
+
+    unused = np.flatnonzero(Z.sum(axis=0) == 0)
+    if unused.size:
+        warnings.warn(
+            f"{unused.size} level(s) of this factor have no rows: {unused.tolist()}. "
+            "That is fine for Z Z' but means V_bb carries designs you are not "
+            "fitting -- check this is intentional.", RuntimeWarning, stacklevel=2)
+    return Z
+
+
+def build_codes(row_labels: Sequence, level_labels: Sequence) -> np.ndarray:
+    """Map row group LABELS onto 0-based codes in a FIXED, given level order.
+
+    This exists to prevent the single most likely silent bug in the whole
+    pipeline: aligning rows to V_bb positionally. The order in which designs
+    appear in your ``by_group`` bootstrap object need not match the order rows
+    appear in the ``by_site`` object. Always map by label.
+
+    Parameters
+    ----------
+    row_labels : sequence of length n
+        The design (or site) label of each row, e.g. from the row MultiIndex.
+    level_labels : sequence of length K
+        The canonical level order -- for designs this MUST be the row/column
+        order of V_bb, i.e. ``list(bt_gr.index)``.
+
+    Returns
+    -------
+    ndarray of int, shape (n,), values in 0..K-1.
+    """
+    lookup = {lab: j for j, lab in enumerate(level_labels)}
+    missing = sorted({lab for lab in row_labels if lab not in lookup})
+    if missing:
+        raise KeyError(
+            f"{len(missing)} row label(s) are absent from level_labels: "
+            f"{missing[:5]}{'...' if len(missing) > 5 else ''}. "
+            "The by_site and by_group bootstrap objects disagree.")
+    return np.array([lookup[lab] for lab in row_labels], dtype=int)
+
+
+def bootstrap_cov(replicates: np.ndarray, rowvar: bool = True) -> np.ndarray:
+    """Sampling covariance matrix estimated from stored bootstrap replicates.
+
+        V[j, j'] = 1/(k-1) * sum_r (x_j^(r) - xbar_j)(x_j'^(r) - xbar_j')
+
+    Parameters
+    ----------
+    replicates : ndarray
+        If ``rowvar`` is True (default): shape (J, k) -- one ROW per design,
+        one COLUMN per bootstrap replicate. This matches ``np.log(theta_mgr)``
+        in notebook 073, which is (groups x replicates).
+        If False: shape (k, J).
+    rowvar : bool
+        Orientation flag, passed through to ``np.cov``.
+
+    Returns
+    -------
+    ndarray, shape (J, J).
+
+    Notes
+    -----
+    The result is DENSE, and that is the physically correct answer, not a
+    numerical artefact: every design is fitted to the same fixed record set
+    using the same bootstrap index sets, so a replicate that happens to draw
+    strong records shifts every b_j in the same direction. Independent errors
+    average away at 1/sqrt(n); this shared component does not average away at
+    all, which is why the analytic SE from a diagonal V is too small.
+    """
+    V = np.cov(np.asarray(replicates, dtype=float), rowvar=rowvar)
+    return np.atleast_2d(V)
+
+
+def check_V_bb(V_bb: np.ndarray, n_replicates: int | None = None,
+               verbose: bool = True) -> dict:
+    """Sanity-check an estimated sampling covariance matrix before use.
+
+    Returns a dict of diagnostics and (if ``verbose``) prints them.
+
+    What to look for
+    ----------------
+    mean_offdiag_corr
+        MUST be clearly positive. If it is near zero the replicate loop is not
+        sharing record indices across designs, and the entire premise of the
+        A1c contamination argument collapses. (An observed
+        SE_bootstrap / SE_analytic ratio well above 1 implies it should be
+        solidly positive.)
+    min_eigenvalue
+        Must be >= 0 up to floating-point noise. A sample covariance from k
+        replicates has rank at most k-1, so k must comfortably exceed J.
+    k_over_J
+        You are estimating J(J+1)/2 distinct entries from k replicates. Even
+        when invertible, individual off-diagonals are noisy if this is small;
+        consider a one-factor approximation
+        V_bb ~ lambda lambda' + diag(psi) in that case.
+    """
+    V_bb = np.asarray(V_bb, dtype=float)
+    J = V_bb.shape[0]
+    if V_bb.shape != (J, J):
+        raise ValueError(f"V_bb must be square, got {V_bb.shape}")
+
+    sym_err = float(np.abs(V_bb - V_bb.T).max())
+    eig_min = float(np.linalg.eigvalsh((V_bb + V_bb.T) / 2).min())
+
+    sd = np.sqrt(np.diag(V_bb))
+    R = V_bb / np.outer(sd, sd)
+    offdiag = R[~np.eye(J, dtype=bool)]
+
+    out = {
+        "J": J,
+        "symmetry_error": sym_err,
+        "min_eigenvalue": eig_min,
+        "mean_diag": float(np.mean(np.diag(V_bb))),
+        "mean_offdiag_corr": float(offdiag.mean()),
+        "min_offdiag_corr": float(offdiag.min()),
+        "max_offdiag_corr": float(offdiag.max()),
+        "n_distinct_entries": J * (J + 1) // 2,
+        "k_over_J": None if n_replicates is None else n_replicates / J,
+    }
+
+    if verbose:
+        print("V_bb diagnostics")
+        print(f"  shape                 : {J} x {J}")
+        print(f"  symmetry error        : {sym_err:.3e}   (want ~0)")
+        print(f"  min eigenvalue        : {eig_min:+.3e}   (want >= 0)")
+        print(f"  mean diagonal (v^b)   : {out['mean_diag']:.5f}")
+        print(f"  mean off-diag corr    : {out['mean_offdiag_corr']:+.4f}"
+              f"   <-- MUST be clearly > 0")
+        print(f"  off-diag corr range   : [{out['min_offdiag_corr']:+.3f},"
+              f" {out['max_offdiag_corr']:+.3f}]")
+        if n_replicates is not None:
+            print(f"  k / J                 : {n_replicates} / {J}"
+                  f" = {out['k_over_J']:.1f}   (want >> 1)")
+
+    if sym_err > 1e-9:
+        warnings.warn("V_bb is not symmetric", RuntimeWarning, stacklevel=2)
+    if eig_min < -1e-10:
+        warnings.warn(f"V_bb is not PSD (min eigenvalue {eig_min:.2e})",
+                      RuntimeWarning, stacklevel=2)
+    if out["mean_offdiag_corr"] < 0.01:
+        warnings.warn(
+            "mean off-diagonal correlation of V_bb is ~0. The bootstrap "
+            "replicates do not appear to share record indices across designs. "
+            "Check the replicate loop before fitting A1b/A1c.",
+            RuntimeWarning, stacklevel=2)
+    return out
+
+
+# def build_C_known(v_a: np.ndarray, Z: np.ndarray | None = None,
+#                   V_bb: np.ndarray | None = None) -> np.ndarray:
+#     """Assemble the known (parameter-free) part of Sigma.
+
+#     Parameters
+#     ----------
+#     v_a : ndarray, shape (n,)
+#         For A1b/A1c: the SS-arm sampling variance per row,
+#         ``Var_r(ln theta_SS_i^(r))``.
+#         For A1a: pass the COMBINED variance v1 and leave Z / V_bb as None.
+#     Z : ndarray, shape (n, J), optional
+#         Design indicator.
+#     V_bb : ndarray, shape (J, J), optional
+#         MSA-FX sampling covariance over designs.
+
+#     Returns
+#     -------
+#     ndarray, shape (n, n):  diag(v_a)                    if Z/V_bb omitted
+#                             diag(v_a) + Z V_bb Z'        otherwise
+#     """
+#     v_a = np.asarray(v_a, dtype=float).ravel()
+#     C = np.diag(v_a)
+#     if (Z is None) != (V_bb is None):
+#         raise ValueError("pass both Z and V_bb, or neither")
+#     if Z is not None:
+#         Z = np.asarray(Z, dtype=float)
+#         V_bb = np.asarray(V_bb, dtype=float)
+#         if Z.shape[1] != V_bb.shape[0]:
+#             raise ValueError(
+#                 f"Z has {Z.shape[1]} design columns but V_bb is "
+#                 f"{V_bb.shape[0]} x {V_bb.shape[0]} -- these must match, and "
+#                 "the column order of Z must be the row order of V_bb "
+#                 "(use build_codes).")
+#         C = C + Z @ V_bb @ Z.T
+#     return C
+
+
+def check_variance_split(v_a: np.ndarray, V_bb: np.ndarray,
+                         design_codes: np.ndarray, v1: np.ndarray,
+                         rtol: float = 1e-6) -> None:
+    """Assert that the split of v1 into (v_a, V_bb) is self-consistent.
+
+    Because the SS arm uses site-specific records and the FX arm a fixed shared
+    set, the two are independent, so exactly:
+
+        v1[i] = v_a[i] + V_bb[g[i], g[i]]
+
+    A failure means either the row -> design mapping is wrong (positional
+    instead of label-based) or the SS and FX replicates are not aligned by
+    replicate index r.
+    """
+    lhs = np.asarray(v_a, float) + np.diag(np.asarray(V_bb, float))[design_codes]
+    rhs = np.asarray(v1, float)
+    if not np.allclose(lhs, rhs, rtol=rtol):
+        worst = int(np.argmax(np.abs(lhs - rhs)))
+        raise AssertionError(
+            "v_a + diag(V_bb)[g[i]] != v1. Worst row "
+            f"{worst}: {lhs[worst]:.6g} vs {rhs[worst]:.6g}. "
+            "Check the label-based design mapping and the replicate alignment.")
+
+
+# ---------------------------------------------------------------------------
+# REML objective and fitting
+# ---------------------------------------------------------------------------
+
+def _build_sigma(C_known: np.ndarray, tau2: np.ndarray,
+                 Gs: Sequence[np.ndarray]) -> np.ndarray:
+    """Sigma = C_known + sum_p tau2[p] * Gs[p]."""
+    Sigma = C_known.copy()
+    for t, G in zip(tau2, Gs):
+        Sigma = Sigma + t * G
+    return Sigma
+
+
+def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
+             C_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
+    """Negative restricted log-likelihood, written in Viechtbauer's (2005) form.
+
+    THE EQUATION
+    ------------
+    Writing V for the marginal covariance of y (called Sigma elsewhere in this
+    module), Viechtbauer (2005), "Bias and Efficiency of Meta-Analytic Variance
+    Estimators in the Random-Effects Model", JEBS 30(3), 261-293, states the
+    restricted log-likelihood as
+
+        log L_REML = -1/2 log|V|
+                     -1/2 log|X' V^-1 X|
+                     -1/2 y' P y                        (+ a constant)
+
+    with the "REML projection matrix"
+
+        P = V^-1  -  V^-1 X (X' V^-1 X)^-1 X' V^-1
+
+    and this function returns MINUS that, dropping the constant:
+
+        nll = 1/2 [ log|V| + log|X' V^-1 X| + y' P y ]
+
+    In this module
+
+        V = C_known + sum_p exp(logpar[p]) * Gs[p]
+
+    so C_known holds the known sampling covariance and each Gs[p] is the known
+    0/1 pattern (Z Z', S S', I) through which one variance component acts.
+
+    WHAT P DOES
+    -----------
+    P is a GLS residual-maker. Multiplying by P simultaneously (i) whitens by
+    V^-1 and (ii) projects out the column space of X. Equivalently, and this is
+    worth knowing because it is the cheaper way to compute the same number,
+
+        y' P y  ==  (y - X b)' V^-1 (y - X b),    b = (X' V^-1 X)^-1 X' V^-1 y
+
+    i.e. the GLS-weighted sum of squared residuals about the GLS fit. The two
+    expressions are algebraically identical; P just says it in one symbol
+    rather than three steps. ``reml_nll_chol`` below uses the residual form.
+
+    WHY THE MIDDLE TERM (this is the whole point of REML)
+    -----------------------------------------------------
+    -1/2 log|X' V^-1 X| is what distinguishes REML from plain ML. It accounts
+    for the degrees of freedom spent estimating the q fixed effects, which ML
+    ignores and is therefore biased low for the variance components. The
+    simplest case makes it concrete: for y_i ~ N(mu, sigma^2) with X = 1,
+
+        ML   -> sigma^2_hat = sum (y_i - ybar)^2 / n
+        REML -> sigma^2_hat = sum (y_i - ybar)^2 / (n - 1)
+
+    REML is literally "the thing that gives you n - 1 instead of n". With only
+    an intercept the correction is modest but not negligible at n = 60.
+
+    IMPLEMENTATION NOTES
+    --------------------
+    * ``np.linalg.slogdet`` is used, never ``log(det(V))``. det(V) underflows
+      hard at these sizes: for this study's Sigma it is about 9e-86 at n = 60,
+      8e-176 at n = 120 and EXACTLY 0.0 by n = 240, so log(det(V)) would
+      silently return -inf.
+    * The explicit inverse is safe here -- the fitted Sigma has a condition
+      number around 50 (n = 60) to 100 (n = 120). It costs roughly 1.7x
+      (n = 60) to 3.5x (n = 120) the Cholesky version per evaluation, which is
+      sub-millisecond and irrelevant for a single fit. It is only worth
+      switching to ``reml_nll_chol`` inside the outer-bootstrap loop, where
+      1000 replicates turn ~3 minutes into ~11.
+    * A non-PSD V (which the optimiser can propose) returns a large finite
+      penalty rather than raising, so the search simply backs away from it.
+
+    Parameters
+    ----------
+    logpar : ndarray, shape (p,)
+        ``log(tau^2)`` for each variance component. The log scale keeps the
+        components positive without constrained optimisation -- at the cost
+        that exactly zero is unreachable (see _REML_ZERO_TOL).
+    y : ndarray, shape (n,)
+    X : ndarray, shape (n, q)
+        Fixed-effects design. Intercept-only for A1: ``np.ones((n, 1))``.
+    C_known : ndarray, shape (n, n)
+    Gs : sequence of p arrays, each (n, n)
+
+    Returns
+    -------
+    float
+    """
+    tau2 = np.exp(logpar)
+
+    # V = C_known + sum_p tau2[p] * Gs[p]
+    V = _build_sigma(C_known, tau2, Gs)
+
+    # --- log|V| ------------------------------------------------------------
+    # slogdet returns (sign, log|det|); sign must be +1 for a positive-definite
+    # V. Anything else means the optimiser has wandered somewhere invalid.
+    sign_V, logdet_V = np.linalg.slogdet(V)
+    if sign_V <= 0 or not np.isfinite(logdet_V):
+        return 1e10
+
+    # --- V^-1 --------------------------------------------------------------
+    try:
+        Vi = np.linalg.inv(V)
+    except np.linalg.LinAlgError:
+        return 1e10
+
+    # --- X' V^-1 X  and  log|X' V^-1 X| ------------------------------------
+    XtViX = X.T @ Vi @ X
+    sign_X, logdet_XtViX = np.linalg.slogdet(XtViX)
+    if sign_X <= 0 or not np.isfinite(logdet_XtViX):
+        return 1e10
+
+    try:
+        XtViX_inv = np.linalg.inv(XtViX)
+    except np.linalg.LinAlgError:
+        return 1e10
+
+    # --- P = V^-1 - V^-1 X (X' V^-1 X)^-1 X' V^-1 --------------------------
+    ViX = Vi @ X                                   # n x q
+    P = Vi - ViX @ XtViX_inv @ ViX.T               # n x n
+
+    # --- y' P y ------------------------------------------------------------
+    quad = float(y @ P @ y)
+
+    val = 0.5 * (logdet_V + logdet_XtViX + quad)
+    return val if np.isfinite(val) else 1e10
+
+
+def reml_nll_chol(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
+                  C_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
+    """Same objective as ``reml_nll``, via Cholesky factorisation.
+
+    Mathematically identical -- it evaluates y' P y in its equivalent residual
+    form (y - X b)' V^-1 (y - X b) and gets both log-determinants from the
+    triangular factors -- but never forms an explicit inverse and never
+    materialises the n x n matrix P.
+
+    Faster by roughly 1.7x at n = 60 and 3.5x at n = 120. Use it via
+    ``fit_reml(..., method="cholesky")`` when fitting inside the outer
+    bootstrap; ``reml_nll`` is the readable reference implementation and the
+    default.
+
+    The two must agree to ~1e-13. ``tests/`` should assert that.
+    """
+    tau2 = np.exp(logpar)
+    Sigma = _build_sigma(C_known, tau2, Gs)
+
+    try:
+        cf = cho_factor(Sigma, lower=True, check_finite=False)
+    except np.linalg.LinAlgError:
+        return 1e10
+    # cho_factor returns (L, lower); diag(L) gives the log-determinant cheaply,
+    # as log|Sigma| = 2 * sum(log(diag(L))).
+    logdet_Sigma = 2.0 * np.sum(np.log(np.diag(cf[0])))
+    if not np.isfinite(logdet_Sigma):
+        return 1e10
+
+    Si_X = cho_solve(cf, X, check_finite=False)     # Sigma^-1 X
+    Si_y = cho_solve(cf, y, check_finite=False)     # Sigma^-1 y
+    XtSiX = X.T @ Si_X
+
+    try:
+        cfx = cho_factor(XtSiX, lower=True, check_finite=False)
+    except np.linalg.LinAlgError:
+        return 1e10
+    logdet_XtSiX = 2.0 * np.sum(np.log(np.diag(cfx[0])))
+
+    beta = cho_solve(cfx, X.T @ Si_y, check_finite=False)   # generalised least squares estimate
+    resid = y - X @ beta
+    quad = float(resid @ cho_solve(cf, resid, check_finite=False))
+
+    val = 0.5 * (logdet_Sigma + logdet_XtSiX + quad)
+    return val if np.isfinite(val) else 1e10
+
+
+def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
+             Gs: Sequence[np.ndarray], names: Sequence[str] | None = None,
+             n_starts: int = 4, seed: int = 0,
+             zero_tol: float = _REML_ZERO_TOL, verbose: bool = False,
+             method: str = "explicit") -> dict:
+    """Fit a linear mixed model with KNOWN sampling covariance by REML.
+
+    Parameters
+    ----------
+    y : ndarray, shape (n,)
+        Effect sizes (log-ratios).
+    X : ndarray, shape (n, q)
+        Fixed-effects design; ``np.ones((n, 1))`` for an intercept-only fit.
+    C_known : ndarray, shape (n, n)
+        Parameter-free part of Sigma -- see ``build_C_known``.
+    Gs : sequence of (n, n) arrays
+        One known matrix per variance component, e.g. ``[ZZt, SSt, I]``.
+    names : sequence of str, optional
+        Labels for the components, e.g. ``["tau_d2", "tau_s2", "tau_u2"]``.
+    n_starts : int
+        Number of random restarts. REML surfaces over variance components are
+        often flat or multi-modal, so a single Nelder-Mead run can stop early.
+        All starts are run and the best objective wins; the spread across
+        starts is reported as ``start_spread`` and should be ~0.
+    seed : int
+        Seed for the restart jitter, so the fit is reproducible.
+    zero_tol : float
+        Components below this are reported as exactly 0.0 and flagged in
+        ``at_zero_boundary``.
+    method : {"explicit", "cholesky"}
+        Which implementation of the REML objective to minimise. Both give the
+        same answer to ~1e-13.
+        "explicit"  -- ``reml_nll``, written in Viechtbauer's (2005) notation
+                       with the projection matrix P spelled out. The default,
+                       because it is the readable reference.
+        "cholesky"  -- ``reml_nll_chol``, ~1.7x faster at n = 60 and ~3.5x at
+                       n = 120. Worth switching to inside the outer-bootstrap
+                       loop; irrelevant for a single fit.
+
+    Returns
+    -------
+    dict with keys
+        beta               (q,)   GLS fixed effects
+        se_beta            (q,)   standard errors, sqrt(diag((X'Sigma^-1 X)^-1))
+        vcov_beta          (q,q)
+        tau2               (p,)   fitted variance components (zeroed if tiny)
+        tau                (p,)   sqrt of the above
+        names              list of str
+        at_zero_boundary   (p,) bool -- component hit the lower boundary
+        converged          bool
+        nll                float  minimised objective
+        start_spread       float  max - min objective across restarts
+        method             str    which objective implementation was used
+        Sigma              (n,n)  fitted covariance, for diagnostics
+
+    Caveats
+    -------
+    * ``se_beta`` conditions on the fitted variance components as if they were
+      known. It therefore UNDERSTATES uncertainty in m1, mildly. Report
+      bootstrap intervals as the inferential result.
+    * No standard errors are produced for the variance components themselves;
+      there is no honest closed form here. Get those from the outer bootstrap.
+    * ``at_zero_boundary`` being True is informative, not an error: it means the
+      data contain no evidence for that source of variation beyond what the
+      known sampling covariance already explains.
+    """
+    y = np.asarray(y, dtype=float).ravel()
+    X = np.asarray(X, dtype=float)
+    if X.ndim == 1:
+        X = X[:, None]
+    C_known = np.asarray(C_known, dtype=float)
+    Gs = [np.asarray(G, dtype=float) for G in Gs]
+
+    n = y.size
+    p = len(Gs)
+    if X.shape[0] != n:
+        raise ValueError(f"X has {X.shape[0]} rows but y has {n}")
+    if C_known.shape != (n, n):
+        raise ValueError(f"C_known must be {n} x {n}, got {C_known.shape}")
+    for idx, G in enumerate(Gs):
+        if G.shape != (n, n):
+            raise ValueError(f"Gs[{idx}] must be {n} x {n}, got {G.shape}")
+    if names is None:
+        names = [f"tau2_{i}" for i in range(p)]
+    if len(names) != p:
+        raise ValueError("len(names) must match len(Gs)")
+
+    objectives = {"explicit": reml_nll, "cholesky": reml_nll_chol}
+    if method not in objectives:
+        raise ValueError(f"method must be one of {sorted(objectives)}, got {method!r}")
+    objective = objectives[method]
+
+    # Starting values: split the total observed variance evenly over the
+    # components, then jitter on the log scale for the restarts.
+    rng = np.random.default_rng(seed)
+    base = max(float(np.var(y)) / max(p, 1), 1e-8)
+    starts = [np.log(np.full(p, base))]
+    for _ in range(max(n_starts - 1, 0)):
+        starts.append(np.log(np.full(p, base)) + rng.normal(0.0, 1.5, p))
+
+    results = []
+    for x0 in starts:
+        res = minimize(objective, x0, args=(y, X, C_known, Gs),
+                       method="Nelder-Mead",
+                       options={"xatol": 1e-9, "fatol": 1e-11, "maxiter": 20000,
+                                "maxfev": 20000})
+        results.append(res)
+
+    objs = np.array([r.fun for r in results])
+    best = results[int(np.argmin(objs))]
+    start_spread = float(objs.max() - objs.min())
+    if start_spread > 1e-4 and verbose:
+        print(f"[fit_reml] objective spread across {len(starts)} starts: "
+              f"{start_spread:.3e} -- surface may be flat or multi-modal")
+
+    tau2 = np.exp(best.x)
+    at_zero = tau2 < zero_tol
+    tau2 = np.where(at_zero, 0.0, tau2)
+
+    # Final quantities at the optimum.
+    Sigma = _build_sigma(C_known, tau2, Gs)
+    cf = cho_factor(Sigma, lower=True, check_finite=False)
+    Si_X = cho_solve(cf, X, check_finite=False)
+    XtSiX = X.T @ Si_X
+    vcov = np.linalg.inv(XtSiX)
+    beta = vcov @ (X.T @ cho_solve(cf, y, check_finite=False))
+
+    return {
+        "beta": beta,
+        "se_beta": np.sqrt(np.diag(vcov)),
+        "vcov_beta": vcov,
+        "tau2": tau2,
+        "tau": np.sqrt(tau2),
+        "names": list(names),
+        "at_zero_boundary": at_zero,
+        "converged": bool(best.success),
+        "nll": float(best.fun),
+        "start_spread": start_spread,
+        "method": method,
+        "Sigma": Sigma,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Convenience wrappers -- these just choose the right Gs and C_known
+# ---------------------------------------------------------------------------
+
+# def fit_A1a(y, v1, **kw) -> dict:
+#     """Two-level random-effects meta-analysis, REML.
+
+#         y_i = m1 + u_i + eps_i,   eps_i ~ N(0, v1_i)
+
+#     ``v1`` is the COMBINED bootstrap variance of the difference,
+#     Var_r(a_i^(r) - b_{g[i]}^(r)) -- i.e. exactly the ``v1_boot`` already used
+#     for the DerSimonian-Laird fit. This is the fit to compare against DL and
+#     against PyMare's ``method='REML'``.
+#     """
+#     y = np.asarray(y, float).ravel()
+#     n = y.size
+#     return fit_reml(y, np.ones((n, 1)), np.diag(np.asarray(v1, float).ravel()),
+#                     [np.eye(n)], names=["tau_u2"], **kw)
+
+
+# def fit_A1b(y, C_known, design_codes, n_designs=None, **kw) -> dict:
+#     """Three-level model: rows nested in design groups.
+
+#         y_i = m1 + d_{g[i]} + u_i + eps_i
+
+#     Adds tau_d^2. Pass the FULL ``C_known`` (with Z V_bb Z') -- with a diagonal
+#     C_known, tau_d^2 will absorb the shared-b sampling covariance and read too
+#     high.
+
+#     Note that A1b alone does NOT answer "does the building or the site matter
+#     more": its residual tau_u^2 still bundles site effects, design x site
+#     interaction and row noise together. Use it for the ICC
+#     tau_d^2 / (tau_d^2 + tau_u^2) and as a stepping stone to A1c.
+#     """
+#     y = np.asarray(y, float).ravel()
+#     n = y.size
+#     Z = make_indicator(design_codes, n_designs)
+#     return fit_reml(y, np.ones((n, 1)), C_known, [Z @ Z.T, np.eye(n)],
+#                     names=["tau_d2", "tau_u2"], **kw)
+
+
+# def fit_A1c(y, C_known, design_codes, site_codes,
+#             n_designs=None, n_sites=None, X=None, **kw) -> dict:
+#     """Crossed design x site model -- the reportable A1 fit.
+
+#         y_i = m1 + d_{g[i]} + s_{sigma[i]} + u_i + eps_i
+
+#     Design and site are CROSSED, not nested: a design spans several sites and a
+#     site hosts several designs. u_i therefore absorbs the design x site
+#     interaction, and must be kept -- without it the interaction is silently
+#     credited to whichever of d or s the data happen to favour.
+
+#     The comparison of interest is tau_d vs tau_s. Because they are two
+#     ESTIMATED standard deviations, do not compare the two point estimates: form
+#     the difference (or ratio) per outer-bootstrap replicate and report its
+#     interval.
+
+#     Pass ``X`` to add covariates (A0b / A3); default is intercept-only.
+#     """
+#     y = np.asarray(y, float).ravel()
+#     n = y.size
+#     Z = make_indicator(design_codes, n_designs)
+#     S = make_indicator(site_codes, n_sites)
+#     if X is None:
+#         X = np.ones((n, 1))
+#     return fit_reml(y, X, C_known, [Z @ Z.T, S @ S.T, np.eye(n)],
+#                     names=["tau_d2", "tau_s2", "tau_u2"], **kw)
+
+
+def summarise_reml_fit(fit: dict, ratio_units: bool = True) -> str:
+    """Human-readable one-block summary of a fit.
+
+    With ``ratio_units`` the effect and each tau are also shown as exp(.), the
+    multiplicative scale an engineer can use: exp(tau_d) is "the typical
+    multiplicative spread of the correction factor across designs". Prefer this
+    over reporting tau^2, and over I^2, which is a proportion and becomes
+    doubly unhelpful once there is more than one tau.
+    """
+    lines = []
+    b, se = fit["beta"][0], fit["se_beta"][0]
+    lines.append(f"m1          = {b:+.5f}   (se {se:.5f}, model-based)")
+    if ratio_units:
+        lines.append(f"  ratio     = {np.exp(b):.4f}"
+                     f"   [{np.exp(b - 1.96 * se):.4f}, {np.exp(b + 1.96 * se):.4f}]")
+    total = float(np.sum(fit["tau2"]))
+    for nm, t2, zero in zip(fit["names"], fit["tau2"], fit["at_zero_boundary"]):
+        share = t2 / total if total > 0 else np.nan
+        flag = "  <- AT ZERO BOUNDARY" if zero else ""
+        line = f"{nm:<10} = {t2:.6f}   tau = {np.sqrt(t2):.5f}   share = {share:6.1%}"
+        if ratio_units:
+            line += f"   exp(tau) = {np.exp(np.sqrt(t2)):.4f}"
+        lines.append(line + flag)
+    lines.append(f"converged   = {fit['converged']}   "
+                 f"start spread = {fit['start_spread']:.2e}   "
+                 f"-2logL/2 = {fit['nll']:.4f}")
+    return "\n".join(lines)
