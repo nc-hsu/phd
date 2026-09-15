@@ -97,11 +97,20 @@ proc_data:
   # (group, stripe_iml) x record table of 0/1 flags, one CSV per IM - this stem plus
   # _{im}, exactly as for the IDA collapse IMLs above.
   wp1_groups_msa_femap695_collapse_flags: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_collapse_flags.csv
+  # Per-record collapse outcomes behind the site-specific MSA fragilities (nb 060):
+  # a (site, n_storeys, stripe_iml) x record table of 0/1 flags, one CSV per IM -
+  # this stem plus _{im}, as for the group MSA flags above. NOTE the records differ
+  # at every stripe and every site (GCIM selects per site/IML), so column k is NOT a
+  # stable record identity: the table must never be joined across stripes on it.
+  wp1_sites_msa_collapse_flags: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_msa_collapse_flags.csv
   # Extra MSA-FEMAP695 stripes nb 061 asks for, one row per (group, tail); read back
   # by nb 054, which adds exactly these to each group's stripe list.
   wp1_groups_msa_femap695_additional_stripes: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_additional_stripes.csv
   # boostrapping stuff
   bootstrapping: data_processed/10_fragility_curve_statistical_analysis/bootstrapping
+  # fragility curve dataset for regression
+  fragility_curve_dataset: data_processed\10_fragility_curve_statistical_analysis\fragility_regression_dataset_AvgSA_03.csv
+  
   # SDOF stuff is kinda of irrelevant now. It will probably crash
   sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
   sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
