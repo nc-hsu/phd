@@ -445,6 +445,12 @@ def stripe_resample_p(n_collapses: np.ndarray, n_records: int) -> np.ndarray:
     Those stripes get the Jeffreys posterior mean ``(z + 0.5) / (n + 1)`` instead, which
     is enough to let them vary.
 
+    Superseded on the site-MSA path by
+    :func:`bootstrap_site_msa_fragilities_from_flags`, which resamples records rather than
+    counts and so has no parametric step to correct - a degenerate stripe there is
+    genuinely frozen. Still used by :func:`bootstrap_site_msa_fragilities`, kept alongside
+    it for comparison.
+
     The correction is deliberately confined to the extremes. Everywhere else ``z / n`` is
     already a non-degenerate empirical distribution, and shrinking it toward 0.5 would
     bias ``beta`` upward at every site rather than only where the plain bootstrap fails.
@@ -487,6 +493,294 @@ def bootstrap_site_msa_fragilities(
         rng = np.random.default_rng(site_msa_seed(site, n_storeys))
         counts = rng.binomial(n_records, stripe_resample_p(z, n_records),
                               size=(k_samples, len(z)))
+
+        fits = np.array([lognorm_mle_fit(imls, c, n_records) for c in counts])
+        theta, beta = fits[:, 0], fits[:, 1]
+
+        ok = ~msa_counts_degenerate(counts) & msa_fit_ok(
+            theta, beta, fc["median"], fc["dispersion"])
+
+        thetas[site] = np.where(ok, theta, np.nan)
+        betas[site] = np.where(ok, beta, np.nan)
+        oks[site] = ok
+
+    theta, beta, fit_ok = (pd.DataFrame(d) for d in (thetas, betas, oks))
+    for df in (theta, beta, fit_ok):
+        df.index.name = "k"
+        df.columns.name = "site"
+
+    return theta, beta, fit_ok
+
+
+# -----------------------------------------------------------------------------
+# Site-specific MSA: the non-parametric record resample (nb 060 section 6 -> nb 070)
+# -----------------------------------------------------------------------------
+# The count resample above needs only the collapse fractions, which is why it was written
+# first - nb 060 exported nothing else. It is now superseded by a record resample over the
+# per-record collapse flags, the same estimator the MSA-FEMAP695 arm uses.
+#
+# What that does and does not change. Drawing 30 record indices with replacement from one
+# stripe's 30 flags and summing is *exactly* Binomial(30, z/30), so at an informative
+# stripe the two are the same draw. What changes is the extremes - a 0/30 or 30/30 stripe
+# is genuinely frozen, with no Jeffreys nudge to unfreeze it - and that the indices are
+# written to disk, so a replicate is auditable rather than reconstructed from a seed.
+#
+# The coherence that makes the MSA-FEMAP695 arm correlate across stripes is NOT available
+# here: GCIM re-selects 30 different records at every site and IML, so there is no shared
+# record identity to propagate and each stripe is resampled on its own. Column k of the
+# flag table is a record *slot*, not a record - never join it across stripes.
+
+_IML_DECIMALS = 6
+
+
+def _iml_key(iml: float) -> float:
+    """Hashable, round-trip-stable key for a stripe IML.
+
+    The IMLs reach here twice - through nb 060's CSV and through the fragility's ``efc`` -
+    and have to agree to the bit for the two to be matched up. They come from the same
+    stripe log, so rounding well past the 4 dp the stripe filenames encode is enough.
+    """
+    return round(float(iml), _IML_DECIMALS)
+
+
+def site_msa_stripe_seed(site: int, stripe_number: int) -> int:
+    """Seed for one ``(site, stripe)`` record resample: ``1000 + site * 10 + stripe_number``.
+
+    The resample is per **(site, stripe IML)**, not per structure: the record selection is
+    keyed ``site_{i}__stripe_iml_{...}`` with no storey count, so the 3s and 5s structures
+    at one site run the same 30 recordings at a shared IML and must be handed the same
+    resampled slots. ``stripe_number`` is the position of the IML in that site's sorted
+    unique IML list, so ``n_storeys`` has no place in the seed.
+
+    The formula is **not injective** - site 1 / stripe 0 and site 0 / stripe 10 both give
+    1010 - so :func:`draw_site_msa_index_samples` asserts the seeds it derives are
+    distinct. At the time of writing the worst site carries exactly 10 stripes, i.e.
+    ``stripe_number`` reaches 9 and the guard passes with nothing to spare; one more
+    stripe at that site trips it. The collision-free form is ``1000 + site * 100 + ...``.
+    """
+    return 1000 + site * 10 + stripe_number
+
+
+def load_site_msa_collapse_flags(
+    path: Path | str,
+    n_storeys: Sequence[int],
+    n_records: int,
+) -> pd.DataFrame:
+    """Load nb 060's per-record collapse flags for the site-specific MSA arm.
+
+    The file is ``site_msa_collapse_flags_{im}.csv``: one row per ``(site, n_storeys,
+    stripe_iml)``, columns ``"0"`` ... ``"{n_records - 1}"`` carrying 1 for a record that
+    collapsed and 0 for one that did not. A blank means that record was not run, which
+    this arm cannot resample around - the sample is an index into a full ensemble - so it
+    is raised rather than tolerated.
+
+    Returns one frame indexed by ``(site, n_storeys, stripe_iml)``, sorted, restricted to
+    ``n_storeys``. The analogue of :func:`load_group_collapse_flags` for the SS arm; the
+    index carries the storey count because this arm has no design groups.
+    """
+    columns = [str(i) for i in range(n_records)]
+    df = pd.read_csv(path)
+
+    missing = [c for c in ("site", "n_storeys", "stripe_iml", *columns)
+               if c not in df.columns]
+    if missing:
+        raise ValueError(f"{path} is missing columns {missing}")
+
+    table = df[df["n_storeys"].isin(list(n_storeys))].copy()
+    if table.empty:
+        raise ValueError(f"no rows for storey counts {list(n_storeys)} in {path}")
+    if not table[columns].isin([0, 1]).all(axis=None):
+        raise ValueError(f"missing or non-binary collapse flags in {path} - every record "
+                         "of every stripe must have run for a record resample")
+
+    table["stripe_iml"] = table["stripe_iml"].map(_iml_key)
+    return (table.set_index(["site", "n_storeys", "stripe_iml"])[columns]
+                 .astype(int).sort_index())
+
+
+def site_msa_stripe_numbers(flags: pd.DataFrame) -> pd.DataFrame:
+    """One row per resampled record set: ``site, stripe_iml, stripe_number``.
+
+    ``stripe_number`` is the position of the IML in that site's ascending list of unique
+    stripe IMLs, **unioned over the storey counts present**, so the two structures at a
+    site agree on it. It is stable as long as the site's IML set is; adding a stripe
+    renumbers everything above it, which re-seeds those resamples.
+    """
+    pairs = (flags.index.to_frame(index=False)[["site", "stripe_iml"]]
+             .drop_duplicates().sort_values(["site", "stripe_iml"]))
+    pairs["stripe_number"] = pairs.groupby("site").cumcount()
+    return pairs.reset_index(drop=True)
+
+
+def draw_site_msa_index_samples(
+    flags: pd.DataFrame,
+    k_samples: int,
+    n_records: int,
+) -> pd.DataFrame:
+    """Draw ``k_samples`` record resamples for every ``(site, stripe_iml)`` record set.
+
+    Each pair gets its own generator, seeded by :func:`site_msa_stripe_seed`, and draws a
+    ``k_samples x n_records`` array of indices into ``0 .. n_records - 1`` with
+    replacement. One array per *record set*, not per structure, so the 3s and 5s
+    structures at a shared stripe are resampled identically - they ran the same records.
+
+    Returns the long form saved to disk: ``site, stripe_iml, stripe_number, k`` and then
+    ``"0"`` ... ``"{n_records - 1}"``, the drawn slots. ``k_samples`` rows per pair.
+    """
+    pairs = site_msa_stripe_numbers(flags)
+
+    seeds = {}
+    for r in pairs.itertuples():
+        seed = site_msa_stripe_seed(int(r.site), int(r.stripe_number))
+        if seed in seeds:
+            other = seeds[seed]
+            raise ValueError(
+                f"seed collision: site {r.site} stripe {r.stripe_number} and site "
+                f"{other[0]} stripe {other[1]} both seed {seed}. site_msa_stripe_seed is "
+                "not injective past 10 stripes at a site - switch it to "
+                "1000 + site * 100 + stripe_number and redraw.")
+        seeds[seed] = (int(r.site), int(r.stripe_number))
+
+    columns = [str(i) for i in range(n_records)]
+    blocks = []
+    for r in pairs.itertuples():
+        rng = np.random.default_rng(site_msa_stripe_seed(int(r.site), int(r.stripe_number)))
+        idx = rng.integers(0, n_records, size=(k_samples, n_records))
+        block = pd.DataFrame(idx, columns=columns)
+        block.insert(0, "k", np.arange(k_samples))
+        block.insert(0, "stripe_number", int(r.stripe_number))
+        block.insert(0, "stripe_iml", _iml_key(r.stripe_iml))
+        block.insert(0, "site", int(r.site))
+        blocks.append(block)
+
+    return pd.concat(blocks, ignore_index=True)
+
+
+def load_site_msa_index_samples(
+    path: Path | str,
+    k_samples: int,
+    n_records: int,
+) -> pd.DataFrame:
+    """Read back :func:`draw_site_msa_index_samples`' table, with the checks that matter.
+
+    Guards against the file on disk having been drawn for a different replicate count or
+    a different ensemble size - the mirror of the assertions nb 070 puts around the
+    FEMAP695 sample.
+    """
+    columns = [str(i) for i in range(n_records)]
+    df = pd.read_csv(path)
+
+    if not df[columns].isin(range(n_records)).all(axis=None):
+        raise ValueError(f"{path} holds indices outside 0..{n_records - 1}")
+    per_pair = df.groupby(["site", "stripe_iml"]).size()
+    if not (per_pair == k_samples).all():
+        bad = per_pair[per_pair != k_samples]
+        raise ValueError(f"{path} was drawn for a different k_samples: expected "
+                         f"{k_samples} rows per (site, stripe), got {bad.unique()} at "
+                         f"{len(bad)} pair(s)")
+
+    df["stripe_iml"] = df["stripe_iml"].map(_iml_key)
+    return df
+
+
+def site_msa_index_arrays(
+    index_samples: pd.DataFrame,
+    n_records: int,
+) -> dict[tuple[int, float], np.ndarray]:
+    """``{(site, stripe_iml): (k_samples, n_records) index array}``, ordered by ``k``."""
+    columns = [str(i) for i in range(n_records)]
+    arrays = {}
+    for (site, iml), block in index_samples.groupby(["site", "stripe_iml"]):
+        arrays[(int(site), _iml_key(iml))] = (block.sort_values("k")[columns]
+                                              .to_numpy(dtype=int))
+    return arrays
+
+
+def site_msa_stripe_alignment(
+    flags: pd.DataFrame,
+    fragilities: dict[int, dict],
+    n_storeys: int,
+) -> pd.DataFrame:
+    """Compare each structure's flag stripes against the stripes its fragility was fitted to.
+
+    The fragility JSON is the only source of the published ``median`` / ``dispersion``,
+    which the bootstrap is screened against and which nb 070 section 2 measures the bias
+    relative to. So the resample has to be fitted to **the same stripes**, and a stripe
+    present in one and not the other is a disagreement worth naming rather than silently
+    reconciling.
+
+    Returns one row per structure with ``n_fitted``, ``n_flagged``, ``extra`` (stripes
+    analysed since the fragility was fitted - dropped by
+    :func:`bootstrap_site_msa_fragilities_from_flags`) and ``absent`` (fitted stripes with
+    no flags, which that function raises on).
+    """
+    rows = []
+    for site in sorted(fragilities):
+        fitted = {_iml_key(v) for v in np.asarray(fragilities[site]["efc"])[0, :]}
+        try:
+            flagged = set(flags.loc[(site, n_storeys)].index)
+        except KeyError:
+            flagged = set()
+        rows.append({"site": site, "n_storeys": n_storeys,
+                     "n_fitted": len(fitted), "n_flagged": len(flagged),
+                     "extra": sorted(flagged - fitted),
+                     "absent": sorted(fitted - flagged)})
+    return pd.DataFrame(rows)
+
+
+def bootstrap_site_msa_fragilities_from_flags(
+    flags: pd.DataFrame,
+    index_samples: pd.DataFrame,
+    fragilities: dict[int, dict],
+    n_records: int,
+    n_storeys: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Resample records within each stripe and refit, for every site of one storey count.
+
+    The record analogue of :func:`bootstrap_site_msa_fragilities`, and the SS counterpart
+    of :func:`bootstrap_msa_group_fragilities`. Per structure: take the stripes its
+    fragility was fitted to, index each stripe's flags by that stripe's ``(k_samples,
+    n_records)`` sample, sum over the record axis for ``(k_samples, n_stripes)`` collapse
+    counts, and refit every replicate with :func:`standes.fitting.lognorm_mle_fit` - the
+    fit :func:`standes.fragility_curves.fragility_from_msa` performs.
+
+    Only the stripes in ``efc`` are used, so the cloud and the published point estimate
+    are fitted to the same data; :func:`site_msa_stripe_alignment` reports any stripe this
+    drops. A *fitted* stripe with no flags is raised - that structure cannot be bootstrapped.
+
+    Unlike the group arm there is no single ``samples`` array: each stripe carries its own,
+    because its 30 records are its own (see the note above).
+
+    Screening matches both other MSA paths - not :func:`msa_counts_degenerate`, and
+    :func:`msa_fit_ok` against that site's published fit - with rejects returned as ``NaN``
+    beside the boolean mask.
+
+    Returns ``(theta, beta, fit_ok)``, all ``k_samples x n_sites`` with the replicate
+    number as the index and **integer** site numbers as the columns.
+    """
+    arrays = site_msa_index_arrays(index_samples, n_records)
+    k_samples = len(next(iter(arrays.values())))
+
+    thetas, betas, oks = {}, {}, {}
+    for site in sorted(fragilities):
+        fc = fragilities[site]
+        imls, _ = site_msa_stripe_counts(fc, n_records)
+        imls = np.sort(np.asarray([_iml_key(v) for v in imls]))
+
+        try:
+            stripes = flags.loc[(site, n_storeys)]
+        except KeyError as err:
+            raise KeyError(f"site {site} {n_storeys}s has a fragility but no collapse "
+                           f"flags - re-run nb 060 section 6") from err
+
+        counts = np.empty((k_samples, len(imls)), dtype=int)
+        for j, iml in enumerate(imls):
+            if iml not in stripes.index:
+                raise KeyError(f"site {site} {n_storeys}s: the fragility was fitted to a "
+                               f"stripe at {iml} g with no collapse flags - re-run nb 060 "
+                               "section 6, or nb 060 section 3 with FORCE_RECOMPUTE")
+            idx = arrays[(site, iml)]
+            counts[:, j] = stripes.loc[iml].to_numpy()[idx].sum(axis=1)
 
         fits = np.array([lognorm_mle_fit(imls, c, n_records) for c in counts])
         theta, beta = fits[:, 0], fits[:, 1]
@@ -1319,67 +1613,123 @@ def summary_variance_re(Wis_re: pd.Series|np.ndarray) -> pd.Series|np.ndarray:
     return 1 / np.sum(Wis_re)
 
 
-def drop_incomplete_studies(
+def _align_studies(
         Vis: pd.Series|np.ndarray,
         Yis: pd.Series|np.ndarray,
         ) -> tuple[pd.Series, pd.Series]:
-    """Keep only the studies that carry a usable (variance, effect) pair.
+    """Put the two inputs on one shared index as float Series, without filtering.
 
-    A screened-out replicate (see :func:`msa_fit_ok`) arrives here as ``NaN``, and a
-    zero or negative variance would divide by zero in Eq. 11.2. Neither raises on its
-    own: ``np.sum`` on a pandas Series skips ``NaN`` silently, so an unfiltered frame
-    would compute Q and C over the surviving studies while the caller's ``n_studies``
-    still counted the missing ones - a degrees-of-freedom mismatch that biases T_sq
-    upward with no warning. Dropping the pairs here is what lets the study count be
-    taken from what actually survives.
+    A bare array takes the other argument's labels so the two stay aligned; two
+    labelled inputs must already agree, because silently re-labelling one of them is
+    how a variance ends up against the wrong study. With no labels on either side the
+    position is the label, so a plain ndarray comes back on a ``RangeIndex`` and any
+    index reported downstream is its numpy index.
     """
     if len(Vis) != len(Yis):
         raise ValueError(f"Vis has {len(Vis)} studies but Yis has {len(Yis)}")
 
-    # A bare array takes the other argument's labels so the two stay aligned; two
-    # labelled inputs must already agree, because silently re-labelling one of them
-    # is how a variance ends up against the wrong study.
     index = Vis.index if isinstance(Vis, pd.Series) else (
         Yis.index if isinstance(Yis, pd.Series) else pd.RangeIndex(len(Vis)))
-    if isinstance(Vis, pd.Series) and isinstance(Yis, pd.Series) \
-            and not Vis.index.equals(Yis.index):
+    if (isinstance(Vis, pd.Series) and isinstance(Yis, pd.Series)
+            and not Vis.index.equals(Yis.index)):
         raise ValueError("Vis and Yis are both labelled but their indexes differ")
 
-    Vis = pd.Series(np.asarray(Vis, dtype=float), index=index)
-    Yis = pd.Series(np.asarray(Yis, dtype=float), index=index)
+    return (pd.Series(np.asarray(Vis, dtype=float), index=index),
+            pd.Series(np.asarray(Yis, dtype=float), index=index))
+
+
+def _label_list(index: pd.Index, limit: int = 10) -> str:
+    """Render offending labels for an error message, truncated so it stays readable."""
+    shown = ", ".join(repr(label) for label in index[:limit])
+    return shown if len(index) <= limit else f"{shown}, ... (+{len(index) - limit} more)"
+
+
+def validate_studies(
+        Vis: pd.Series|np.ndarray,
+        Yis: pd.Series|np.ndarray,
+        ) -> tuple[pd.Series, pd.Series]:
+    """Refuse a study set that is not fit to be summed, naming what is wrong with it.
+
+    A screened-out replicate (see :func:`msa_fit_ok`) arrives here as ``NaN``, and a
+    zero or negative variance would divide by zero in Eq. 11.2. Neither fails on its
+    own: ``np.sum`` over a pandas Series skips ``NaN`` silently, so an unvalidated
+    frame quietly computes Q and C over a different set of studies than the caller
+    believes it passed in. Deciding which studies to exclude is a data-cleaning
+    judgement that belongs to the analysis, not to the estimator, so the estimators
+    raise here instead of repairing the input. Run :func:`drop_incomplete_studies`
+    first, explicitly, when studies really do need removing.
+    """
+    Vis, Yis = _align_studies(Vis, Yis)
+
+    bad_Y = Yis.index[~np.isfinite(Yis)]
+    if len(bad_Y):
+        raise ValueError(
+            f"Yis is not finite for {len(bad_Y)} of {len(Yis)} studies: "
+            f"{_label_list(bad_Y)}. Filter the input explicitly "
+            f"(see drop_incomplete_studies) before fitting.")
+
+    bad_V = Vis.index[~np.isfinite(Vis)]
+    if len(bad_V):
+        raise ValueError(
+            f"Vis is not finite for {len(bad_V)} of {len(Vis)} studies: "
+            f"{_label_list(bad_V)}. Filter the input explicitly "
+            f"(see drop_incomplete_studies) before fitting.")
+
+    non_positive = Vis.index[Vis <= 0]
+    if len(non_positive):
+        raise ValueError(
+            f"Vis must be strictly positive; {len(non_positive)} of {len(Vis)} "
+            f"studies are <= 0: {_label_list(non_positive)}. A non-positive sampling "
+            f"variance divides by zero in the inverse-variance weights.")
+
+    if len(Vis) < 2:
+        raise ValueError(
+            f"a random-effects fit needs at least 2 studies, got {len(Vis)}")
+
+    return Vis, Yis
+
+
+def drop_incomplete_studies(
+        Vis: pd.Series|np.ndarray,
+        Yis: pd.Series|np.ndarray,
+        ) -> tuple[pd.Series, pd.Series, pd.Index]:
+    """Keep only the studies that carry a usable (variance, effect) pair.
+
+    This is the explicit pre-filter to run *before* the estimators, which validate
+    rather than clean (see :func:`validate_studies`). The third return value is the
+    index of everything it took out, so the exclusion is visible to the caller and can
+    be reported or checked rather than happening invisibly inside a fit.
+
+    Returns ``(Vis_kept, Yis_kept, dropped_index)``. For labelled input the dropped
+    index carries the Series labels; for a bare ndarray it carries the positional
+    numpy indices of the rows that were removed.
+    """
+    Vis, Yis = _align_studies(Vis, Yis)
 
     keep = np.isfinite(Vis) & np.isfinite(Yis) & (Vis > 0)
-    return Vis[keep], Yis[keep]
+    return Vis[keep], Yis[keep], Vis.index[~keep]
 
 
 def compute_re_summary_effect(
         Vis: pd.Series|np.ndarray,
         Yis: pd.Series|np.ndarray,
-        n_studies: int | None = None,
         ) -> pd.Series|np.ndarray:
     """ The estimated between-group variance.
 
     follows Borenstein et al. "Introduction to Meta-Analysis"
     Eq. 12.7, 12.8, 12.9
 
-    Studies without a usable (variance, effect) pair are dropped first and the study
-    count is taken from what is left, so the degrees of freedom behind T_sq always
-    match the studies that were actually summed. ``n_studies`` is therefore optional
-    and kept only so existing callers keep working; a value that disagrees with the
-    surviving count is warned about and ignored, because the surviving count is the
-    one that is right.
+    Every study passed in is used. A ``NaN`` effect or variance, or a variance that is
+    not strictly positive, raises: which studies to exclude is a decision for the
+    analysis to make explicitly, up front, with :func:`drop_incomplete_studies`. That
+    way the degrees of freedom behind T_sq always match the frame the caller thinks it
+    handed over.
 
     returns the mean effects, the variance of the mean effect, standard error,
     the between study variance (T_sq) and the weights
     """
-    Vis, Yis = drop_incomplete_studies(Vis, Yis)
+    Vis, Yis = validate_studies(Vis, Yis)
     k = len(Vis)
-    if k < 2:
-        raise ValueError(f"a random-effects fit needs at least 2 usable studies, got {k}")
-    if n_studies is not None and n_studies != k:
-        warnings.warn(f"n_studies={n_studies} was passed but only {k} studies have a "
-                      f"usable (variance, effect) pair; using {k} for the degrees of "
-                      f"freedom behind T_sq", RuntimeWarning, stacklevel=2)
 
     Wis_fe = get_fe_weights(Vis)
     T_sq = compute_Tsquared(Wis_fe, Yis, k)
@@ -1424,6 +1774,7 @@ def compute_heterogeneity_stats(
         Vis: pd.Series|np.ndarray, Yis: pd.Series|np.ndarray) -> dict[str, float]:
 
     # TODO::
+    Vis, Yis = validate_studies(Vis, Yis)
     n_studies = len(Vis)
     Wis_fe = get_fe_weights(Vis)
 
