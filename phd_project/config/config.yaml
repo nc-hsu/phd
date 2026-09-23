@@ -138,6 +138,9 @@ results:
   group_ida_femap695: "results/06_group_ida_femap695"
   # Per-design-group MSA-FEMAP695 runs (nb 054): the fragility figures written by nb 061.
   group_msa_femap695: "results/07_group_msa_femap695"
+  # Per-design-group cyclic-pushover figures (nb 056): one curve+envelope+backbone
+  # plot per design, plus the per-storey overview sheets used for manual review.
+  group_cpo: "results/08_group_cpo"
   site_fragility_curves: "results/05_site_fragility_curves"
 
 hazard_models:
