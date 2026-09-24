@@ -223,3 +223,186 @@ def test_floor_node_tags_match_the_model_convention():
     assert cpp.floor_node_tags(6) == [
         101010200, 101010300, 101010400, 101010500, 101010600,
     ]
+
+
+# ---------------------------------------------------------------------------
+# Preparing the envelope for fitting
+# ---------------------------------------------------------------------------
+
+
+def _envelope(points):
+    return np.asarray(points, dtype=float)
+
+
+def test_truncate_cuts_at_the_interpolated_zero_crossing():
+    # Falls 100 -> -100 over 10 mm, so it crosses zero exactly half way.
+    env = _envelope([[0, 0], [10, 100], [20, -100], [30, -150]])
+    out = cpp.truncate_envelope_at_zero(env)
+    assert out[-1, 1] == 0.0
+    assert out[-1, 0] == pytest.approx(15.0)
+    # Everything before the crossing is kept untouched.
+    np.testing.assert_array_equal(out[:-1], env[:2])
+
+
+def test_truncate_leaves_an_always_positive_envelope_alone():
+    env = _envelope([[0, 0], [10, 100], [20, 80], [30, 60]])
+    np.testing.assert_array_equal(cpp.truncate_envelope_at_zero(env), env)
+
+
+def test_truncate_ignores_the_zero_at_the_start():
+    # The origin is non-positive but precedes the peak, so it must not trigger
+    # the cut -- only the post-peak crossing counts.
+    env = _envelope([[0, 0], [10, 100], [20, 50], [30, -10]])
+    out = cpp.truncate_envelope_at_zero(env)
+    assert len(out) == 4 and out[-1, 1] == 0.0
+
+
+def test_resample_preserves_the_curve_exactly():
+    env = _envelope([[0, 0], [10, 100], [50, 90], [60, 10], [100, 5]])
+    dense = cpp.resample_envelope(env, df_tol=1.0, dd_tol=1.0)
+    assert len(dense) > len(env)
+    # Same area, and the same force at every original abscissa.
+    assert np.trapezoid(dense[:, 1], dense[:, 0]) == pytest.approx(
+        np.trapezoid(env[:, 1], env[:, 0]), rel=1e-12)
+    np.testing.assert_allclose(
+        np.interp(env[:, 0], dense[:, 0], dense[:, 1]), env[:, 1], atol=1e-9)
+
+
+def test_resample_keeps_every_original_vertex():
+    env = _envelope([[0, 0], [10, 100], [50, 90], [60, 10], [100, 5]])
+    dense = cpp.resample_envelope(env, df_tol=3.0, dd_tol=7.0)
+    for d, f in env:
+        assert np.any(np.isclose(dense[:, 0], d) & np.isclose(dense[:, 1], f))
+
+
+def test_resample_honours_both_tolerances():
+    env = _envelope([[0, 0], [100, 1000], [200, 0]])
+    dense = cpp.resample_envelope(env, df_tol=50.0, dd_tol=1e9)
+    assert np.max(np.abs(np.diff(dense[:, 1]))) <= 50.0 + 1e-9
+    dense = cpp.resample_envelope(env, df_tol=1e9, dd_tol=5.0)
+    assert np.max(np.diff(dense[:, 0])) <= 5.0 + 1e-9
+
+
+def test_resample_rejects_non_positive_tolerances():
+    with pytest.raises(ValueError, match="positive"):
+        cpp.resample_envelope(_envelope([[0, 0], [1, 1]]), 0.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Scoring window and area error
+# ---------------------------------------------------------------------------
+
+
+def test_fit_window_uses_the_half_strength_crossing():
+    # Peak 1000 at d = 10, linear to 0 at d = 30, so 0.5 * Fmax is at d = 20.
+    env = _envelope([[0, 0], [10, 1000], [30, 0]])
+    d_hi, rule = cpp.fit_window(env, 0.5)
+    assert d_hi == pytest.approx(20.0)
+    assert rule == "0.5*Fmax"
+
+
+def test_fit_window_falls_back_to_the_end_of_a_truncated_curve():
+    # Never drops to half strength: the fallback must be reported, not hidden.
+    env = _envelope([[0, 0], [10, 1000], [30, 900]])
+    d_hi, rule = cpp.fit_window(env, 0.5)
+    assert d_hi == pytest.approx(30.0)
+    assert rule == "end-of-envelope"
+
+
+def test_area_error_of_a_curve_against_itself_is_zero():
+    env = _envelope([[0, 0], [10, 100], [20, 60], [30, 20], [40, 20]])
+    assert cpp.backbone_area_error(env, env, 40.0) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_area_error_matches_a_hand_computed_rectangle():
+    # Backbone sits a constant 10 above the envelope over [0, 20] -> area 200.
+    env = _envelope([[0, 0], [20, 0]])
+    bb = _envelope([[0, 10], [20, 10]])
+    assert cpp.backbone_area_error(env, bb, 20.0) == pytest.approx(200.0)
+
+
+def test_area_error_respects_the_window():
+    # The discrepancy lives entirely beyond d = 10, so a window of 10 sees none.
+    env = _envelope([[0, 0], [10, 0], [20, 0]])
+    bb = _envelope([[0, 0], [10, 0], [20, 100]])
+    assert cpp.backbone_area_error(env, bb, 10.0) == pytest.approx(0.0, abs=1e-9)
+    assert cpp.backbone_area_error(env, bb, 20.0) == pytest.approx(500.0)
+
+
+# ---------------------------------------------------------------------------
+# The knot search
+# ---------------------------------------------------------------------------
+
+
+def _tetralinear_envelope(d_y=20.0, f_y=1000.0, d_f=100.0, f_f=900.0,
+                          d_r=120.0, f_r=150.0, d_max=200.0, n=401):
+    xs = np.asarray([0.0, d_y, d_f, d_r, d_max])
+    ys = np.asarray([0.0, f_y, f_f, f_r, f_r])
+    d = np.linspace(0.0, d_max, n)
+    return np.column_stack([d, np.interp(d, xs, ys)])
+
+
+def test_search_recovers_the_knots_of_a_known_tetralinear_curve():
+    env = _tetralinear_envelope()
+    d_hi, _ = cpp.fit_window(env, 0.5)
+    fit = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=20)
+    # d_f is inside the scored window and so is tightly identified; d_r sits
+    # beyond it and is pinned only through the slope of the cliff, so it is
+    # allowed more slack.
+    assert fit["d_f_mm"] == pytest.approx(100.0, abs=2.0)
+    assert fit["d_r_mm"] == pytest.approx(120.0, abs=8.0)
+    assert fit["fit_area_error_norm"] < 0.01
+    m = cpp.backbone_metrics(fit["backbone"])
+    assert m["d_y_mm"] == pytest.approx(20.0, abs=1.0)
+
+
+def test_search_reports_the_equivalent_force_fractions():
+    env = _tetralinear_envelope()
+    d_hi, _ = cpp.fit_window(env, 0.5)
+    fit = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=12)
+    # Derived from the envelope at the chosen knots, so they must bracket
+    # sensibly: the joint is high on the curve, the residual low.
+    assert 0.0 < fit["residual_force_fraction"] < fit["joint_force_fraction"] <= 1.0
+
+
+def test_pinned_knots_skip_the_search():
+    env = _tetralinear_envelope()
+    d_hi, _ = cpp.fit_window(env, 0.5)
+    fit = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, knots=(95.0, 130.0))
+    assert fit["fit_stage"] == "pinned"
+    assert fit["d_f_mm"] == pytest.approx(95.0)
+    assert fit["d_r_mm"] == pytest.approx(130.0)
+    assert fit["n_knot_candidates"] == 1
+
+
+def test_refinement_never_worsens_the_grid_result():
+    env = _tetralinear_envelope()
+    d_hi, _ = cpp.fit_window(env, 0.5)
+    coarse = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=8, refine=False)
+    fine = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=8, refine=True)
+    assert fine["fit_area_error"] <= coarse["fit_area_error"] * (1 + 1e-12)
+
+
+def test_search_is_monotone_in_grid_resolution():
+    # The property the displacement parameterisation exists for: a finer search
+    # can only improve the fit. The force-fraction interface does not have it.
+    env = _tetralinear_envelope()
+    d_hi, _ = cpp.fit_window(env, 0.5)
+    coarse = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=6, refine=False)
+    finer = cpp.fit_tetralinear_optimised(env, d_hi=d_hi, grid_n=24, refine=False)
+    assert finer["fit_area_error"] <= coarse["fit_area_error"] * (1 + 1e-12)
+
+
+def test_search_raises_when_the_curve_never_descends():
+    # group_3s_00's failure mode: the peak is the last point, so there is no
+    # backbone to fit. It must raise so the notebook flags it.
+    d = np.linspace(0.0, 100.0, 50)
+    rising = np.column_stack([d, d * 10.0])
+    with pytest.raises(ValueError):
+        cpp.fit_tetralinear_optimised(rising, d_hi=100.0, grid_n=8)
+
+
+def test_search_flags_pinned_knots_that_cannot_be_fitted():
+    env = _tetralinear_envelope()
+    with pytest.raises(ValueError, match="no valid fit"):
+        cpp.fit_tetralinear_optimised(env, d_hi=100.0, knots=(150.0, 120.0))

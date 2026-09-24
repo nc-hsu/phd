@@ -41,6 +41,8 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
+from fitpo import fit_tetralinear_backbone
+from scipy.optimize import minimize
 
 from standes.utils import generate_type_1_tag
 
@@ -486,4 +488,289 @@ def cpo_completeness(
         "max_abs_d_mm": max_abs_d,
         "U_max_mm": u_max,
         "frac_of_Umax": max_abs_d / u_max,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Preparing the envelope for fitting
+# ---------------------------------------------------------------------------
+
+
+def truncate_envelope_at_zero(envelope: npt.ArrayLike) -> FloatArr:
+    """Cut the envelope's post-peak tail at the first non-positive force.
+
+    Every usable sample envelope runs on past the point where the braces have
+    gone and into negative force -- down to -16 % of Fmax on the 3-storeys and
+    **-56 %** on ``group_5s_06``. That tail is not part of a backbone, and
+    leaving it in gives the area-minimising fit a long stretch of meaningless
+    curve to chase, which drags the residual branch down with it.
+
+    The cut point is interpolated, so the returned curve ends exactly at
+    ``(d, 0)`` rather than at whichever sample happened to be first below zero.
+    An envelope that never goes non-positive is returned unchanged.
+    """
+    env = np.asarray(envelope, dtype=np.float64)
+    if env.ndim != 2 or env.shape[1] != 2:
+        raise ValueError(f"envelope must be shape (M, 2); got {env.shape}")
+
+    d, f = env[:, 0], env[:, 1]
+    i_peak = int(np.argmax(f))
+    below = np.flatnonzero(f[i_peak:] <= 0.0)
+    if below.size == 0:
+        return env.copy()
+
+    j = int(below[0]) + i_peak
+    if j == 0:
+        raise ValueError("envelope is non-positive at its peak")
+    f0, f1 = f[j - 1], f[j]
+    d_zero = d[j - 1] + (d[j] - d[j - 1]) * f0 / (f0 - f1)
+    return np.vstack([env[:j], [[d_zero, 0.0]]])
+
+
+def resample_envelope(
+    envelope: npt.ArrayLike, df_tol: float, dd_tol: float
+) -> FloatArr:
+    """Subdivide the envelope's segments without changing its shape.
+
+    Points are inserted *along* each segment, so the piecewise-linear curve is
+    mathematically identical -- the area under it is unchanged to machine
+    precision (measured 4.5e-16) and every original vertex survives in the
+    output. What changes is only the resolution available to whatever is
+    choosing knots on it.
+
+    Each segment is split into enough pieces that it spans no more than
+    ``df_tol`` in force and no more than ``dd_tol`` in displacement.
+
+    Parameters
+    ----------
+    envelope
+        ``(M, 2)`` piecewise-linear curve.
+    df_tol
+        Maximum force span of a segment, in force units (the caller normally
+        passes a fraction of Fmax).
+    dd_tol
+        Maximum displacement span of a segment [mm].
+    """
+    env = np.asarray(envelope, dtype=np.float64)
+    if env.ndim != 2 or env.shape[1] != 2:
+        raise ValueError(f"envelope must be shape (M, 2); got {env.shape}")
+    if df_tol <= 0.0 or dd_tol <= 0.0:
+        raise ValueError(f"tolerances must be positive; got {df_tol}, {dd_tol}")
+
+    out = [env[0]]
+    for i in range(len(env) - 1):
+        d0, f0 = env[i]
+        d1, f1 = env[i + 1]
+        n = int(max(abs(f1 - f0) / df_tol, abs(d1 - d0) / dd_tol, 1))
+        for k in range(1, n + 1):
+            t = k / n
+            out.append([d0 + t * (d1 - d0), f0 + t * (f1 - f0)])
+    return np.asarray(out, dtype=np.float64)
+
+
+def fit_window(envelope: npt.ArrayLike, fraction: float = 0.5) -> tuple[float, str]:
+    """Upper limit of the window the backbone fit is scored over.
+
+    The area error is measured from 0 up to the post-peak displacement at
+    ``fraction * Fmax``. Where a truncated analysis never gets that far, the
+    end of the envelope is used instead and the rule is reported, so a window
+    that does not mean what it usually means is visible in the results table
+    rather than silently different.
+
+    Returns ``(d_hi, rule)`` with ``rule`` either ``"<fraction>*Fmax"`` or
+    ``"end-of-envelope"``.
+    """
+    env = np.asarray(envelope, dtype=np.float64)
+    v_max, _ = envelope_peak_force(env)
+    d_hi = displacement_at_strength_loss(env, v_max, fraction)
+    if np.isfinite(d_hi):
+        return float(d_hi), f"{fraction:g}*Fmax"
+    return float(env[-1, 0]), "end-of-envelope"
+
+
+def backbone_area_error(
+    envelope: npt.ArrayLike, backbone: npt.ArrayLike, d_hi: float
+) -> float:
+    """Absolute area between envelope and backbone over ``[0, d_hi]``.
+
+    Both curves are piecewise linear, so integrating on the union of their
+    abscissae (plus the window ends) is exact rather than an approximation:
+    between consecutive breakpoints of either curve the difference is linear,
+    which the trapezoid rule integrates without error. The one caveat is a
+    crossing *inside* a panel, where the absolute difference has a kink the
+    rule rounds off; with both curves sampled this finely the effect is
+    negligible.
+    """
+    env = np.asarray(envelope, dtype=np.float64)
+    bb = np.asarray(backbone, dtype=np.float64)
+    if d_hi <= 0.0:
+        raise ValueError(f"d_hi must be positive; got {d_hi}")
+
+    d_e, f_e = env[:, 0], env[:, 1]
+    d_b, f_b = bb[:, 0], bb[:, 1]
+    grid = np.unique(np.concatenate([
+        d_e[(d_e >= 0.0) & (d_e <= d_hi)],
+        d_b[(d_b >= 0.0) & (d_b <= d_hi)],
+        [0.0, d_hi],
+    ]))
+    diff = np.abs(np.interp(grid, d_e, f_e) - np.interp(grid, d_b, f_b))
+    return float(np.trapezoid(diff, grid))
+
+
+# ---------------------------------------------------------------------------
+# Choosing the backbone's two interior knots
+# ---------------------------------------------------------------------------
+
+
+def fit_tetralinear_optimised(
+    envelope: npt.ArrayLike,
+    *,
+    d_hi: float,
+    grid_n: int = 20,
+    refine: bool = True,
+    knots: tuple[float, float] | None = None,
+    collapse_residual: bool = False,
+) -> dict:
+    """Fit a tetralinear backbone, choosing its two knots to minimise area error.
+
+    ``fitpo.fit_tetralinear_backbone`` fixes the two interior knots and then
+    fits the three forces. This chooses those knots: it searches over the knot
+    *displacements* ``(d_f, d_r)`` for the pair whose fitted backbone departs
+    least, by absolute area over ``[0, d_hi]``, from the envelope.
+
+    Knots are addressed by displacement rather than by force fraction
+    deliberately. The fraction interface resolves a fraction through
+    "first data point at or below ``fraction * Fmax``", which is not monotone
+    in the sampling of the curve, so a finer search could return a *worse* fit.
+    By displacement the objective is continuous and a finer search can only
+    help -- which is what makes the coarse-grid-then-refine strategy below
+    sound.
+
+    Parameters
+    ----------
+    envelope
+        ``(M, 2)`` fit-ready envelope: already truncated at zero force and, if
+        wanted, resampled. The backbone is fitted over the whole of it, not
+        only over ``[0, d_hi]`` -- see the note below.
+    d_hi
+        Upper limit of the scoring window, from :func:`fit_window`.
+    grid_n
+        Number of candidate displacements per axis in the coarse stage; that
+        stage costs about ``grid_n * (grid_n - 1) / 2`` fits.
+    refine
+        Run a Nelder-Mead polish from the coarse winner.
+    knots
+        Pin ``(d_f, d_r)`` instead of searching, for a curve whose automatic
+        fit has been rejected on review.
+    collapse_residual
+        Passed through to ``fit_tetralinear_backbone``.
+
+    Returns
+    -------
+    dict with the backbone, the chosen knots, the equivalent force fractions
+    (derived, for the record), the absolute and normalised area error, the
+    number of candidates evaluated, and whether the optimum sits on a search
+    bound.
+
+    Notes
+    -----
+    The backbone is fitted over the full envelope while the score covers only
+    ``[0, d_hi]``. That is deliberate: on every sample curve the optimal
+    ``d_r`` lies *beyond* ``d(0.5*Fmax)``, so truncating the curve at the
+    scoring window would delete the knot. The window still identifies ``d_r``
+    well, because the cliff segment leading to it crosses the window. One
+    consequence to carry into any interpretation: ``f_r`` acts as a control on
+    the cliff's slope rather than as a physical residual strength, and sits
+    well below the envelope at ``d_r``.
+
+    Raises
+    ------
+    ValueError
+        If no candidate knot pair yields a valid fit -- typically a curve with
+        no descending branch, which must be flagged rather than fitted.
+    """
+    env = np.asarray(envelope, dtype=np.float64)
+    if env.ndim != 2 or env.shape[1] != 2:
+        raise ValueError(f"envelope must be shape (M, 2); got {env.shape}")
+
+    d, f = env[:, 0], env[:, 1]
+    v_max, d_at_v_max = envelope_peak_force(env)
+    d_max = float(d[-1])
+    n_eval = 0
+
+    def attempt(d_f: float, d_r: float):
+        # One candidate: fit at these knots and score it. Invalid geometry and
+        # fitpo's own rejections both come back as None so the search can move
+        # on rather than abort.
+        nonlocal n_eval
+        if not 0.0 < d_f < d_r <= d_max:
+            return None
+        try:
+            bb = fit_tetralinear_backbone(
+                env, d_f=float(d_f), d_r=float(d_r),
+                collapse_residual=collapse_residual)
+        except ValueError:
+            return None
+        n_eval += 1
+        return backbone_area_error(env, bb, d_hi), float(d_f), float(d_r), bb
+
+    if knots is not None:
+        best = attempt(*knots)
+        if best is None:
+            raise ValueError(f"pinned knots {knots} give no valid fit")
+        stage = "pinned"
+    else:
+        # --- coarse stage: a grid over the descending branch -------------------
+        # The joint cannot precede the peak, and both knots must fit between it
+        # and the end of the curve.
+        lo = d_at_v_max + (d_max - d_at_v_max) / (grid_n + 1)
+        candidates = np.linspace(lo, d_max, grid_n)
+        best = None
+        for i, d_f in enumerate(candidates):
+            for d_r in candidates[i + 1:]:
+                got = attempt(d_f, d_r)
+                if got is not None and (best is None or got[0] < best[0]):
+                    best = got
+        if best is None:
+            raise ValueError(
+                "no valid tetralinear fit for any candidate knot pair "
+                "(no usable descending branch?)")
+        stage = "grid"
+
+        # --- refinement: the objective is continuous in (d_f, d_r) -------------
+        if refine:
+            span = (d_max - d_at_v_max) / grid_n
+
+            def objective(x):
+                got = attempt(x[0], x[1])
+                # A large finite penalty keeps Nelder-Mead inside the feasible
+                # region without it having to handle NaN or inf.
+                return got[0] if got is not None else 1e18
+
+            res = minimize(objective, x0=[best[1], best[2]], method="Nelder-Mead",
+                           options={"xatol": span * 1e-3, "fatol": best[0] * 1e-6,
+                                    "maxiter": 200, "disp": False})
+            polished = attempt(res.x[0], res.x[1])
+            if polished is not None and polished[0] < best[0]:
+                best, stage = polished, "grid+refine"
+
+    area, d_f, d_r, bb = best
+    return {
+        "backbone": bb,
+        "d_f_mm": d_f,
+        "d_r_mm": d_r,
+        # Derived, so the fit can still be described the way fitpo's other
+        # entry point would, and cross-checked against a hand-picked pair.
+        "joint_force_fraction": float(np.interp(d_f, d, f)) / v_max,
+        "residual_force_fraction": float(np.interp(d_r, d, f)) / v_max,
+        "fit_area_error": area,
+        # Normalised by the box the window spans, so designs of very different
+        # strength are comparable and one threshold can flag bad fits.
+        "fit_area_error_norm": area / (v_max * d_hi),
+        "fit_window_d_hi_mm": float(d_hi),
+        "n_knot_candidates": n_eval,
+        "fit_stage": stage,
+        # The grid's outer edge is the end of the curve, so a winner sitting on
+        # it means the search wanted to go further than the curve allows.
+        "knot_on_bound": bool(abs(d_r - d_max) < 1e-9),
     }
