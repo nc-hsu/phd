@@ -9,8 +9,7 @@ import pandas as pd
 from collections.abc import Sequence
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
-from scipy.special import psi
-from scipy.stats import kurtosis, skew
+from scipy.stats import chi2, kurtosis, skew
 
 from standes.fitting import lognorm_mle_fit, lognorm_moment_fit
 
@@ -1125,16 +1124,6 @@ def bootstrap_bias_frame(boot_df: pd.DataFrame,
     return bias
 
 
-def ida_beta_bias_correction(n_records: int) -> float:
-    """Return the closed-form log-scale bias of the IDA dispersion estimator.
-
-    The moment fit gives an unbiased ``beta ** 2``, but the square root and the log are
-    both concave, so ``ln beta`` comes out low by a fixed amount that depends only on the
-    record count. The result is negative (-0.0242 at 22 records).
-    """
-    return 0.5 * (psi((n_records - 1) / 2) - np.log((n_records - 1) / 2))
-
-
 def add_bias_correction(bias_df: pd.DataFrame,
                         correction: float | pd.Series) -> pd.DataFrame:
     """Subtract a bias correction in place and add the residual diagnostics.
@@ -1377,13 +1366,53 @@ def style_legend(ax, **kwargs) -> None:
     leg.get_frame().set_edgecolor("k")
 
 
+def shared_figure_legend(fig, ax, y: float, ncol: int, **kwargs) -> None:
+    """Attach one figure-level legend as a band across the top of the axes.
+
+    Every panel of a multi-panel figure draws the same set of series, so a legend per
+    panel is several copies of the same key competing with the data for space. This takes
+    the handles off ``ax`` - whichever panel carries the full set - drops any repeated
+    label (matplotlib keeps the first occurrence, so the drawing order is preserved) and
+    puts the result above the axes, under the figure's suptitle.
+
+    ``y`` is the legend's top edge in figure coordinates and must sit inside the strip the
+    caller reserved with ``tight_layout(rect=...)``, between the axes and the suptitle;
+    anchoring outside the canvas leaves a legend that survives only a
+    ``bbox_inches="tight"`` save.
+    """
+    handles, labels = ax.get_legend_handles_labels()
+    seen, unique = set(), []
+    for handle, label in zip(handles, labels):
+        if label not in seen:
+            seen.add(label)
+            unique.append((handle, label))
+
+    leg = fig.legend(*zip(*unique), loc="upper center", bbox_to_anchor=(0.5, y),
+                     ncol=ncol, **kwargs)
+    leg.get_frame().set_edgecolor("k")
+
+
+def storey_suptitle(fig, text: str, n_storeys: int | None) -> None:
+    """Title the whole figure, naming the storey count it was drawn for.
+
+    Both diagnostic figures put the site number on the x axis and so show one storey
+    count at a time. Drawn side by side in a notebook they are otherwise identical, so
+    the suptitle is the only thing telling the reader which is which.
+    """
+    if n_storeys is not None:
+        text = f"{text} - {n_storeys}-storey structures"
+    fig.suptitle(text, fontsize="large", fontweight="bold")
+
+
 def _plot_arm_series(ax, series_by_arm: dict[str, pd.Series], ylabel: str,
                      means: bool = False, se_bands: bool = False,
-                     mcse_line: bool = False) -> None:
+                     mcse_line: bool = False, legend: bool = True) -> None:
     """Scatter one diagnostic against the site number, one series per arm.
 
     ``means`` adds each arm's across-site mean as a dashed line of its own colour;
-    ``se_bands`` and ``mcse_line`` add the two materiality thresholds.
+    ``se_bands`` and ``mcse_line`` add the two materiality thresholds. ``legend=False``
+    suppresses the per-panel key, for a grid that carries one shared legend instead - the
+    labels are still set on the artists, so :func:`shared_figure_legend` can collect them.
     """
     if not (se_bands or mcse_line):
         ax.axhline(0, ls="-", color="k", lw=0.75)
@@ -1411,7 +1440,8 @@ def _plot_arm_series(ax, series_by_arm: dict[str, pd.Series], ylabel: str,
     ax.set_xlabel("Site No.")
     ax.set_ylabel(ylabel)
 
-    style_legend(ax, fontsize="small", ncol=2 if means else 1)
+    if legend:
+        style_legend(ax, fontsize="small", ncol=2 if means else 1)
 
 
 def plot_bias_assessment(
@@ -1423,14 +1453,15 @@ def plot_bias_assessment(
     """Chart the per-site bias of every arm, before and after correction.
 
     ``bias_data`` is keyed ``[arm]["theta"|"beta"]`` and every frame must already carry the
-    ``bias_corrected`` columns :func:`add_bias_correction` adds. The 3x3 grid is arranged
-    as columns ``ln theta`` / ``ln beta`` / corrected ``ln beta``, and rows raw bias /
-    bias-to-se / bias-to-mcse.
+    ``bias_corrected`` columns :func:`add_bias_correction` adds. The 3x2 grid is arranged
+    as columns ``ln theta`` / ``ln beta``, and rows raw bias / bias-to-se / bias-to-mcse.
 
     Both figures put the site number on the x axis, so they show one storey count at a
-    time: pass ``n_storeys`` to pick it out of frames that still carry the level. Plotting
-    every storey count together would stack two structures on each x position, which is why
-    a merged frame with no selection raises rather than drawing something misleading.
+    time: pass ``n_storeys`` to pick it out of frames that still carry the level, and to
+    name it in the suptitles - the two figures are otherwise indistinguishable when the
+    storey counts are drawn one after the other. Plotting every storey count together
+    would stack two structures on each x position, which is why a merged frame with no
+    selection raises rather than drawing something misleading.
 
     The second figure shows what survives on the quantity the comparison is actually about:
     the net bias on each pairwise difference of ``ln beta``, uncorrected against corrected.
@@ -1458,29 +1489,34 @@ def plot_bias_assessment(
                            for q, df in quantities.items()}
                      for arm, quantities in bias_data.items()}
 
-    fig1, axs1 = plt.subplots(3, 3, figsize=(15, 11))
+    fig1, axs1 = plt.subplots(3, 2, figsize=(11, 11))
 
-    columns = [("theta", "bias", r"Bias in $\ln{\theta}$", r"Bias [$\ln{\theta}$ units]"),
-               ("beta", "bias", r"Bias in $\ln{\beta}$", r"Bias [$\ln{\beta}$ units]"),
-               ("beta", "bias_corrected", r"Corrected Bias in $\ln{\beta}$",
-                r"Bias [$\ln{\beta}$ units]")]
+    # the corrected ln(beta) column was dropped: every arm now subtracts its own bias, so
+    # its residual is zero by construction and the panel carried no information
+    columns = [("theta", r"Bias in $\ln{\theta}$", r"Bias [$\ln{\theta}$ units]"),
+               ("beta", r"Bias in $\ln{\beta}$", r"Bias [$\ln{\beta}$ units]")]
 
-    for j, (quantity, key, title, ylabel) in enumerate(columns):
-        suffix = "_corrected" if key == "bias_corrected" else ""
+    for j, (quantity, title, ylabel) in enumerate(columns):
         _plot_arm_series(axs1[0, j],
-                         {a: bias_data[a][quantity][key] for a in arms},
-                         ylabel, means=True)
+                         {a: bias_data[a][quantity]["bias"] for a in arms},
+                         ylabel, means=True, legend=False)
         _plot_arm_series(axs1[1, j],
-                         {a: bias_data[a][quantity][f"bias/se{suffix}"] for a in arms},
-                         "Bias / S.E. [-]", se_bands=True)
+                         {a: bias_data[a][quantity]["bias/se"] for a in arms},
+                         "Bias / S.E. [-]", se_bands=True, legend=False)
         _plot_arm_series(axs1[2, j],
-                         {a: bias_data[a][quantity][f"bias{suffix}/mcse"] for a in arms},
-                         "Bias / MCSE [-]", mcse_line=True)
+                         {a: bias_data[a][quantity]["bias/mcse"] for a in arms},
+                         "Bias / MCSE [-]", mcse_line=True, legend=False)
         axs1[0, j].set_title(title)
 
-    fig1.tight_layout()
+    # every panel draws the same arms, and the top-left one additionally carries the
+    # dashed across-site means, so it holds the full key for the whole grid
+    storey_suptitle(fig1, "Estimator bias diagnostics", n_storeys)
+    fig1.tight_layout(rect=(0, 0, 1, 0.90))
+    shared_figure_legend(fig1, axs1[0, 0], 0.945, ncol=3, fontsize="small")
 
-    fig2, axs2 = plt.subplots(figsize=(9, 5))
+    # wider than the panel it used to be: the contrast labels are long and the legend
+    # now takes a strip of the figure to the right of the axes
+    fig2, axs2 = plt.subplots(figsize=(12, 6))
     axs2.axhline(0, ls="-", color="k", lw=0.75)
 
     n_sites = len(bias_data[arms[0]]["beta"])
@@ -1516,10 +1552,10 @@ def plot_bias_assessment(
     axs2.grid(ls="-.", color="0.8")
     axs2.set_xlabel("Site No.")
     axs2.set_ylabel(r"Net bias on $\ln{\beta}$")
-    axs2.set_title(r"Total bias on the $\ln{\beta}$ contrasts")
-    style_legend(axs2, fontsize="small", ncol=2)
 
-    fig2.tight_layout()
+    storey_suptitle(fig2, r"Total bias on the $\ln{\beta}$ contrasts", n_storeys)
+    fig2.tight_layout(rect=(0, 0, 1, 0.80))
+    shared_figure_legend(fig2, axs2, 0.915, ncol=2, fontsize="small")
 
     return fig1, axs1, fig2, axs2
 
@@ -1596,6 +1632,59 @@ def compute_I_sq(
     I_sq = max((Q - df) / Q * 100, 0)
 
     return I_sq
+
+
+def compute_Q_pvalue(Q: float, df: int) -> float:
+    """p-value of the test of homogeneity: P(chi^2_df >= Q).
+
+    follows Borenstein et al. "Introduction to Meta-Analysis" Ch. 16 (~p. 112)
+
+    Under the null that every study shares one true effect, Q is distributed as
+    chi-square on df = k - 1. That null reference is exact only when the sampling
+    errors are independent - Q is built from the diagonal variances alone. When rows
+    share sampling error (in this project, every row in a design group subtracting
+    the same b_j or c_j) Q is inflated and this p-value is optimistic; treat it as
+    nominal.
+    """
+    return float(chi2.sf(Q, df))
+
+
+def compute_typical_within_variance(Wis: pd.Series|np.ndarray) -> float:
+    """The "typical" within-study variance s^2 of Higgins & Thompson (2002).
+
+        s^2 = (k - 1) sum(w_i) / ((sum w_i)^2 - sum(w_i^2)) = (k - 1) / C
+
+    with fixed-effect weights w_i = 1 / v_i and C from Borenstein Eq. 12.5.
+
+    It is the single sampling variance that stands in for the k different v_i, which
+    is what lets I^2 be written for ANY estimate of the between-study variance as
+    T^2 / (s^2 + T^2) - see :func:`compute_I_sq_from_tau`.
+
+    Higgins, J.P.T. & Thompson, S.G. (2002) "Quantifying heterogeneity in a
+    meta-analysis", Statistics in Medicine 21:1539-1558.
+    """
+    k = len(Wis)
+    return float((k - 1) / compute_C(Wis))
+
+
+def compute_I_sq_from_tau(T_sq: float, s_sq: float) -> float:
+    """I^2 (in percent) from a between-study variance and the typical within variance.
+
+        I^2 = T^2 / (s^2 + T^2)
+
+    The proportion of the total variance that is between-study rather than sampling
+    error. Unlike the Q-based :func:`compute_I_sq` it does not tie I^2 to the
+    DerSimonian-Laird moment estimator, so it can be used with a REML T^2.
+
+    For the DL estimate it reproduces :func:`compute_I_sq` exactly: T^2_DL =
+    (Q - df) / C and s^2 = df / C, so T^2 / (s^2 + T^2) = (Q - df) / Q - and both give
+    0 when T^2 is truncated at zero.
+
+    Returned in percent, to match :func:`compute_I_sq`.
+    """
+    if T_sq < 0:
+        raise ValueError(f"T_sq must be non-negative, got {T_sq}")
+    return float(100.0 * T_sq / (s_sq + T_sq))
 
 
 def summary_effect_re(
@@ -1771,33 +1860,76 @@ def compute_prediction_interval():
 
 
 def compute_heterogeneity_stats(
-        Vis: pd.Series|np.ndarray, Yis: pd.Series|np.ndarray) -> dict[str, float]:
+        Vis: pd.Series|np.ndarray, Yis: pd.Series|np.ndarray,
+        T_sq: float | None = None) -> dict[str, float]:
+    """Heterogeneity statistics for an intercept-only random-effects fit.
 
-    # TODO::
+    Q, its degrees of freedom and its p-value depend only on the data and the
+    fixed-effect weights w_i = 1 / v_i, so they are the SAME whichever estimator
+    produced the between-study variance. Only T^2 (and hence T and I^2) differ.
+
+    Parameters
+    ----------
+    Vis, Yis : Series or ndarray
+        Within-study variances and effect sizes.
+    T_sq : float, optional
+        Between-study variance to report. ``None`` (default) computes the
+        DerSimonian-Laird estimate (Borenstein Eq. 12.2) and the Q-based I^2
+        (Eq. 16.9) - the previous behaviour, unchanged. Pass an estimate from
+        another method (e.g. the REML total) to get T and I^2 for that estimate;
+        I^2 is then T^2 / (s^2 + T^2) with the Higgins & Thompson typical
+        within-study variance s^2, which reduces to Eq. 16.9 when T^2 is DL's.
+
+    Returns
+    -------
+    dict with keys
+        Q      weighted sum of squared deviations (Eq. 16.3)
+        df     k - 1
+        Q_df   Q - df. NOTE: the EXCESS of Q over its null expectation, NOT the
+               degrees of freedom - the name is kept for existing callers. A
+               negative value means less dispersion than sampling error alone
+               predicts, and DL then truncates T^2 at zero.
+        p      P(chi^2_df >= Q), Borenstein Ch. 16 (~p. 112)
+        s_sq   typical within-study variance (Higgins & Thompson 2002)
+        T_sq   between-study variance (DL, or as passed in)
+        T      sqrt(T_sq)
+        I_sq   percent
+
+    Caveats
+    -------
+    Q and s^2 use the DIAGONAL variances only. The chi-square null for Q holds
+    for independent sampling errors; where rows share sampling error (every row
+    in a design group subtracting the same b_j or c_j) Q is inflated and ``p`` is
+    optimistic - read it as nominal. And these are the intercept-only forms: for a
+    meta-regression the residual Q_E has k - p degrees of freedom instead.
+    """
     Vis, Yis = validate_studies(Vis, Yis)
     n_studies = len(Vis)
+    df = n_studies - 1
     Wis_fe = get_fe_weights(Vis)
 
-    # Q
+    # Q, and its excess over the null expectation df
     Q = compute_Q(Wis_fe, Yis)
+    Q_df = Q - df
 
-    # Q-df
-    Q_df = Q - (n_studies - 1)
+    # p-value from the chi-square null
+    p = compute_Q_pvalue(Q, df)
 
-    # p-value
-    # todo:: compute p-value from Q using the chi-sq distribution. 
-    # todo:: s. pg. 112 of Borenstein et al.
+    # typical within-study variance - estimator-independent
+    s_sq = compute_typical_within_variance(Wis_fe)
 
-    # T²
-    T_sq = compute_Tsquared(Wis_fe, Yis, n_studies)
+    # T^2 and I^2: DL's own if none was supplied, otherwise from the given T^2
+    if T_sq is None:
+        T_sq = compute_Tsquared(Wis_fe, Yis, n_studies)
+        I_sq = compute_I_sq(Wis_fe, Yis)
+    else:
+        T_sq = float(T_sq)
+        I_sq = compute_I_sq_from_tau(T_sq, s_sq)
 
-    # T
     T = np.sqrt(T_sq)
-    
-    # I²
-    I_sq = compute_I_sq(Wis_fe, Yis)
 
-    return {"Q": Q, "Q_df": Q_df, "T_sq": T_sq, "T": T, "I_sq": I_sq}
+    return {"Q": Q, "df": df, "Q_df": Q_df, "p": p, "s_sq": s_sq,
+            "T_sq": T_sq, "T": T, "I_sq": I_sq}
 
 
 # ===========================================================================
@@ -1809,7 +1941,7 @@ def compute_heterogeneity_stats(
 #     A1b  y_i = m1 + d_{g[i]}                 + u_i + eps_i
 #     A1c  y_i = m1 + d_{g[i]} + s_{sigma[i]}  + u_i + eps_i
 #
-#     Sigma = C_known + tau_d^2 Z Z' + tau_s^2 S S' + tau_u^2 I
+#     Sigma = V_known + tau_d^2 Z Z' + tau_s^2 S S' + tau_u^2 I
 #
 # All three are the same model with a different number of variance components,
 # so one routine (fit_reml) serves them all: it takes a LIST of known n x n
@@ -1818,9 +1950,9 @@ def compute_heterogeneity_stats(
 # (one site for everybody makes S S' a matrix of ones, confounded with the
 # fixed intercept; one site per row makes S S' = I, aliased with tau_u^2 I).
 #
-#     A1a   Gs = [I]                  C_known = diag(v1)
-#     A1b   Gs = [ZZt, I]             C_known = diag(v_a) + Z V_bb Z'
-#     A1c   Gs = [ZZt, SSt, I]        C_known = diag(v_a) + Z V_bb Z'
+#     A1a   Gs = [I]                  V_known = diag(v1)
+#     A1b   Gs = [ZZt, I]             V_known = diag(v_a) + Z V_bb Z'
+#     A1c   Gs = [ZZt, SSt, I]        V_known = diag(v_a) + Z V_bb Z'
 #
 # where
 #     v1[i]      = Var_r(a_i^(r) - b_{g[i]}^(r))   combined, per ROW
@@ -1835,18 +1967,24 @@ def compute_heterogeneity_stats(
 # presupposes a DIAGONAL sampling covariance, so once Z V_bb Z' enters Sigma
 # there is no Q to write down. REML's objective is stated directly in terms of
 # Sigma and is indifferent to both issues. Keep the DL functions above as the
-# regression test: fit_reml with Gs = [I] and a diagonal C_known must reproduce
+# regression test: fit_reml with Gs = [I] and a diagonal V_known must reproduce
 # them.
 #
 # IDENTIFIABILITY WARNING. Every row in design group j subtracts the SAME
 # estimate b_j, so the sampling error contributes v^b_j to every within-group
 # off-diagonal cell of Sigma - the same block pattern as tau_d^2 Z Z'. The two
 # are aliased, separable only through the variation of v^b_j across j. There is
-# no analogous shared term on the site side, so with a diagonal C_known the
-# contamination biases the design/site comparison ENTIRELY in favour of the
-# design. Always pass the full C_known for A1b/A1c, and treat
-# tau_d^2 ~ mean(diag(V_bb)) as a sign you have found noise, not a design
-# effect.
+# a shared term on the site side too: the 3-storey and 5-storey structures at a
+# site share records wherever they are analysed at the same stripe IML, which
+# does happen, so V_aa is block-diagonal by site rather than diagonal. Do not
+# assume the two grouping factors are treated asymmetrically by the sampling
+# covariance. Always pass the full V_known for A1b/A1c, built as the complete
+# sample covariance of the replicate matrices,
+#     V_known = Cov_r(a) + Z Cov_r(b) Z'
+# rather than from their diagonals; and note that np.cov can only report the
+# covariance the RESAMPLING SCHEME generates -- the replicates must share record
+# draws wherever the underlying analyses shared records, or the coupling reads as
+# zero however the covariance is computed.
 #
 # Borenstein et al. (2009) Ch. 12 pp. 69-75; Ch. 14 pp. 87-95.
 # Gelman & Hill (2007) Ch. 13.5 ~pp. 289-291 (crossed / non-nested);
@@ -2043,7 +2181,7 @@ def check_V_bb(V_bb: np.ndarray, n_replicates: int | None = None,
     return out
 
 
-# def build_C_known(v_a: np.ndarray, Z: np.ndarray | None = None,
+# def build_V_known(v_a: np.ndarray, Z: np.ndarray | None = None,
 #                   V_bb: np.ndarray | None = None) -> np.ndarray:
 #     """Assemble the known (parameter-free) part of Sigma.
 
@@ -2108,17 +2246,17 @@ def check_variance_split(v_a: np.ndarray, V_bb: np.ndarray,
 # REML objective and fitting
 # ---------------------------------------------------------------------------
 
-def _build_sigma(C_known: np.ndarray, tau2: np.ndarray,
+def _build_sigma(V_known: np.ndarray, tau2: np.ndarray,
                  Gs: Sequence[np.ndarray]) -> np.ndarray:
-    """Sigma = C_known + sum_p tau2[p] * Gs[p]."""
-    Sigma = C_known.copy()
+    """Sigma = V_known + sum_p tau2[p] * Gs[p]."""
+    Sigma = V_known.copy()
     for t, G in zip(tau2, Gs):
         Sigma = Sigma + t * G
     return Sigma
 
 
 def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
-             C_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
+             V_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
     """Negative restricted log-likelihood, written in Viechtbauer's (2005) form.
 
     THE EQUATION
@@ -2142,9 +2280,9 @@ def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
 
     In this module
 
-        V = C_known + sum_p exp(logpar[p]) * Gs[p]
+        V = V_known + sum_p exp(logpar[p]) * Gs[p]
 
-    so C_known holds the known sampling covariance and each Gs[p] is the known
+    so V_known holds the known sampling covariance and each Gs[p] is the known
     0/1 pattern (Z Z', S S', I) through which one variance component acts.
 
     WHAT P DOES
@@ -2196,7 +2334,7 @@ def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
     y : ndarray, shape (n,)
     X : ndarray, shape (n, q)
         Fixed-effects design. Intercept-only for A1: ``np.ones((n, 1))``.
-    C_known : ndarray, shape (n, n)
+    V_known : ndarray, shape (n, n)
     Gs : sequence of p arrays, each (n, n)
 
     Returns
@@ -2205,8 +2343,8 @@ def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
     """
     tau2 = np.exp(logpar)
 
-    # V = C_known + sum_p tau2[p] * Gs[p]
-    V = _build_sigma(C_known, tau2, Gs)
+    # V = V_known + sum_p tau2[p] * Gs[p]
+    V = _build_sigma(V_known, tau2, Gs)
 
     # --- log|V| ------------------------------------------------------------
     # slogdet returns (sign, log|det|); sign must be +1 for a positive-definite
@@ -2244,7 +2382,7 @@ def reml_nll(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
 
 
 def reml_nll_chol(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
-                  C_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
+                  V_known: np.ndarray, Gs: Sequence[np.ndarray]) -> float:
     """Same objective as ``reml_nll``, via Cholesky factorisation.
 
     Mathematically identical -- it evaluates y' P y in its equivalent residual
@@ -2260,7 +2398,7 @@ def reml_nll_chol(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
     The two must agree to ~1e-13. ``tests/`` should assert that.
     """
     tau2 = np.exp(logpar)
-    Sigma = _build_sigma(C_known, tau2, Gs)
+    Sigma = _build_sigma(V_known, tau2, Gs)
 
     try:
         cf = cho_factor(Sigma, lower=True, check_finite=False)
@@ -2290,7 +2428,7 @@ def reml_nll_chol(logpar: np.ndarray, y: np.ndarray, X: np.ndarray,
     return val if np.isfinite(val) else 1e10
 
 
-def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
+def fit_reml(y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
              Gs: Sequence[np.ndarray], names: Sequence[str] | None = None,
              n_starts: int = 4, seed: int = 0,
              zero_tol: float = _REML_ZERO_TOL, verbose: bool = False,
@@ -2303,8 +2441,8 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
         Effect sizes (log-ratios).
     X : ndarray, shape (n, q)
         Fixed-effects design; ``np.ones((n, 1))`` for an intercept-only fit.
-    C_known : ndarray, shape (n, n)
-        Parameter-free part of Sigma -- see ``build_C_known``.
+    V_known : ndarray, shape (n, n)
+        Parameter-free part of Sigma -- see ``build_V_known``.
     Gs : sequence of (n, n) arrays
         One known matrix per variance component, e.g. ``[ZZt, SSt, I]``.
     names : sequence of str, optional
@@ -2360,15 +2498,15 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
     X = np.asarray(X, dtype=float)
     if X.ndim == 1:
         X = X[:, None]
-    C_known = np.asarray(C_known, dtype=float)
+    V_known = np.asarray(V_known, dtype=float)
     Gs = [np.asarray(G, dtype=float) for G in Gs]
 
     n = y.size
     p = len(Gs)
     if X.shape[0] != n:
         raise ValueError(f"X has {X.shape[0]} rows but y has {n}")
-    if C_known.shape != (n, n):
-        raise ValueError(f"C_known must be {n} x {n}, got {C_known.shape}")
+    if V_known.shape != (n, n):
+        raise ValueError(f"V_known must be {n} x {n}, got {V_known.shape}")
     for idx, G in enumerate(Gs):
         if G.shape != (n, n):
             raise ValueError(f"Gs[{idx}] must be {n} x {n}, got {G.shape}")
@@ -2392,7 +2530,7 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
 
     results = []
     for x0 in starts:
-        res = minimize(objective, x0, args=(y, X, C_known, Gs),
+        res = minimize(objective, x0, args=(y, X, V_known, Gs),
                        method="Nelder-Mead",
                        options={"xatol": 1e-9, "fatol": 1e-11, "maxiter": 20000,
                                 "maxfev": 20000})
@@ -2410,7 +2548,7 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
     tau2 = np.where(at_zero, 0.0, tau2)
 
     # Final quantities at the optimum.
-    Sigma = _build_sigma(C_known, tau2, Gs)
+    Sigma = _build_sigma(V_known, tau2, Gs)
     cf = cho_factor(Sigma, lower=True, check_finite=False)
     Si_X = cho_solve(cf, X, check_finite=False)
     XtSiX = X.T @ Si_X
@@ -2434,7 +2572,7 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
 
 
 # ---------------------------------------------------------------------------
-# Convenience wrappers -- these just choose the right Gs and C_known
+# Convenience wrappers -- these just choose the right Gs and V_known
 # ---------------------------------------------------------------------------
 
 # def fit_A1a(y, v1, **kw) -> dict:
@@ -2453,13 +2591,13 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
 #                     [np.eye(n)], names=["tau_u2"], **kw)
 
 
-# def fit_A1b(y, C_known, design_codes, n_designs=None, **kw) -> dict:
+# def fit_A1b(y, V_known, design_codes, n_designs=None, **kw) -> dict:
 #     """Three-level model: rows nested in design groups.
 
 #         y_i = m1 + d_{g[i]} + u_i + eps_i
 
-#     Adds tau_d^2. Pass the FULL ``C_known`` (with Z V_bb Z') -- with a diagonal
-#     C_known, tau_d^2 will absorb the shared-b sampling covariance and read too
+#     Adds tau_d^2. Pass the FULL ``V_known`` (with Z V_bb Z') -- with a diagonal
+#     V_known, tau_d^2 will absorb the shared-b sampling covariance and read too
 #     high.
 
 #     Note that A1b alone does NOT answer "does the building or the site matter
@@ -2470,11 +2608,11 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
 #     y = np.asarray(y, float).ravel()
 #     n = y.size
 #     Z = make_indicator(design_codes, n_designs)
-#     return fit_reml(y, np.ones((n, 1)), C_known, [Z @ Z.T, np.eye(n)],
+#     return fit_reml(y, np.ones((n, 1)), V_known, [Z @ Z.T, np.eye(n)],
 #                     names=["tau_d2", "tau_u2"], **kw)
 
 
-# def fit_A1c(y, C_known, design_codes, site_codes,
+# def fit_A1c(y, V_known, design_codes, site_codes,
 #             n_designs=None, n_sites=None, X=None, **kw) -> dict:
 #     """Crossed design x site model -- the reportable A1 fit.
 
@@ -2498,7 +2636,7 @@ def fit_reml(y: np.ndarray, X: np.ndarray, C_known: np.ndarray,
 #     S = make_indicator(site_codes, n_sites)
 #     if X is None:
 #         X = np.ones((n, 1))
-#     return fit_reml(y, X, C_known, [Z @ Z.T, S @ S.T, np.eye(n)],
+#     return fit_reml(y, X, V_known, [Z @ Z.T, S @ S.T, np.eye(n)],
 #                     names=["tau_d2", "tau_s2", "tau_u2"], **kw)
 
 
