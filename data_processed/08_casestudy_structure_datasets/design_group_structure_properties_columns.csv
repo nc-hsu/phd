@@ -1,0 +1,11 @@
+file,column,description,units
+design_group_structure_properties.csv,design_group_id,"design group, group_{n}s_{gid:02d}",-
+design_group_structure_properties.csv,T1_modal_s,first-mode period from the modal analysis,s
+design_group_structure_properties.csv,V_max_N,peak base shear of the cyclic-pushover envelope,N
+design_group_structure_properties.csv,W_N,seismic weight of the frame (seismic_mass * 9.81),N
+design_group_structure_properties.csv,Vb_design_N,design base shear of the frame,N
+design_group_structure_properties.csv,delta_y_eff_mm,yield roof displacement used by DUCTILITY_DEF=mu_u_p695 (delta_y_eff_mm),mm
+design_group_structure_properties.csv,delta_u_mm,target roof displacement used by DUCTILITY_DEF=mu_u_p695 (delta_u_mm),mm
+design_group_structure_properties.csv,roof_height_mm,roof height,mm
+design_group_structure_properties.csv,overstrength,Omega = V_max / Vb_design (FEMA P695 Eq. 6-5),-
+design_group_structure_properties.csv,ductility,mu = delta_u / delta_y_eff (FEMA P695 Eq. 6-6); definition mu_u_p695,-
