@@ -1,0 +1,41 @@
+{
+  "inputs": {
+    "po_curve": {
+      "hash": "5f17dbd72f0922a43ec7b232be7911b5acd77f4e2b625a88b45fe36bc1ea9216",
+      "summary": "file po_curve.csv (4506884 bytes)"
+    },
+    "envelope_mode": {
+      "hash": "90319fe0ef4c5f131c7ce54c26f92147ee4b099591c95bd84d63b109c9ee9328",
+      "summary": "str 'adjusted-peak-to-peak'"
+    },
+    "truncate": {
+      "hash": "3cbc87c7681f34db4617feaa2c8801931bc5e42d8d0f560e756dd4cd92885f18",
+      "summary": "bool=True"
+    },
+    "resample": {
+      "hash": "e2877d259dfd6eddb9998299f023eb2ed080d96567c8fb3224e6b75e7ff3c5a4",
+      "summary": "tuple"
+    },
+    "window_fraction": {
+      "hash": "d2cbad71ff333de67d07ec676e352ab7f38248eb69c942950157220607c55e84",
+      "summary": "float=0.5"
+    },
+    "search": {
+      "hash": "340ce81dabe6604b1871ddd1a51207fa279885a19ba2ed2d47ab9e8bd0304d86",
+      "summary": "tuple"
+    },
+    "knots": {
+      "hash": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91",
+      "summary": "NoneType=None"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    }
+  },
+  "_meta": {
+    "artifact": "group_3s_24_fit.pickle",
+    "git_commit": "bf21f8fa",
+    "written_at": "2026-09-24T09:33:09.782543+00:00"
+  }
+}

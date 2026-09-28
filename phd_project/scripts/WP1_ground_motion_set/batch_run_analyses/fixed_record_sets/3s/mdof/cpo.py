@@ -50,21 +50,21 @@ scripts_and_configs = [
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_04/3s/mdof/config_cyclic_pushover.py')],
     #     "name": ['group_3s_04_cpo']
     # },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_05/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_05/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_05_cpo']
-    },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_05/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_05/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_05_cpo']
+    # },
     # {
     #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_06/3s/mdof/run_cyclic_pushover.py"),
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_06/3s/mdof/config_cyclic_pushover.py')],
     #     "name": ['group_3s_06_cpo']
     # },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_07/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_07/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_07_cpo']
-    },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_07/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_07/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_07_cpo']
+    # },
     # {
     #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_08/3s/mdof/run_cyclic_pushover.py"),
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_08/3s/mdof/config_cyclic_pushover.py')],
@@ -95,31 +95,31 @@ scripts_and_configs = [
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_13/3s/mdof/config_cyclic_pushover.py')],
     #     "name": ['group_3s_13_cpo']
     # },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_14/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_14/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_14_cpo']
-    },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_15/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_15/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_15_cpo']
-    },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_14/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_14/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_14_cpo']
+    # },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_15/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_15/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_15_cpo']
+    # },
     # {
     #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_16/3s/mdof/run_cyclic_pushover.py"),
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_16/3s/mdof/config_cyclic_pushover.py')],
     #     "name": ['group_3s_16_cpo']
     # },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_17/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_17/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_17_cpo']
-    },
-    {
-        "script": Path("D:/08_wp1_fixed_record_sets/group_3s_18/3s/mdof/run_cyclic_pushover.py"),
-        "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_18/3s/mdof/config_cyclic_pushover.py')],
-        "name": ['group_3s_18_cpo']
-    },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_17/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_17/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_17_cpo']
+    # },
+    # {
+    #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_18/3s/mdof/run_cyclic_pushover.py"),
+    #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_18/3s/mdof/config_cyclic_pushover.py')],
+    #     "name": ['group_3s_18_cpo']
+    # },
     # {
     #     "script": Path("D:/08_wp1_fixed_record_sets/group_3s_19/3s/mdof/run_cyclic_pushover.py"),
     #     "config": [Path('D:/08_wp1_fixed_record_sets/group_3s_19/3s/mdof/config_cyclic_pushover.py')],
