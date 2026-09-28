@@ -1,0 +1,77 @@
+file,column,description,units
+dataset,d_ln_saratio_mean_rtp475,E[ln SaRatio(T1)|AvgSA] (GCIM) - mean ln SaRatio(T1) over FEMA records at AvgSA_03 = 475-yr level,-
+dataset,d_ln_saratio_sigma_rtp475,SD[ln SaRatio(T1)|AvgSA] (GCIM) - SD of ln SaRatio(T1) over FEMA records at AvgSA_03 = 475-yr level,-
+dataset,d_ln_ds595_mean_rtp475,E[ln Ds5-95|AvgSA] (GCIM) - mean ln Ds5-95 over FEMA records at AvgSA_03 = 475-yr level,ln s
+dataset,d_ln_ds595_sigma_rtp475,SD[ln Ds5-95|AvgSA] (GCIM) - SD of ln Ds5-95 over FEMA records at AvgSA_03 = 475-yr level,ln s
+dataset,ln_cs_over_avgsa_rtp475,ln(C_s / AvgSA_03) at AvgSA_03 = 475-yr level,-
+dataset,d_ln_saratio_mean_rtp2500,E[ln SaRatio(T1)|AvgSA] (GCIM) - mean ln SaRatio(T1) over FEMA records at AvgSA_03 = 2500-yr level,-
+dataset,d_ln_saratio_sigma_rtp2500,SD[ln SaRatio(T1)|AvgSA] (GCIM) - SD of ln SaRatio(T1) over FEMA records at AvgSA_03 = 2500-yr level,-
+dataset,d_ln_ds595_mean_rtp2500,E[ln Ds5-95|AvgSA] (GCIM) - mean ln Ds5-95 over FEMA records at AvgSA_03 = 2500-yr level,ln s
+dataset,d_ln_ds595_sigma_rtp2500,SD[ln Ds5-95|AvgSA] (GCIM) - SD of ln Ds5-95 over FEMA records at AvgSA_03 = 2500-yr level,ln s
+dataset,ln_cs_over_avgsa_rtp2500,ln(C_s / AvgSA_03) at AvgSA_03 = 2500-yr level,-
+dataset,d_ln_saratio_mean_rtp5000,E[ln SaRatio(T1)|AvgSA] (GCIM) - mean ln SaRatio(T1) over FEMA records at AvgSA_03 = 5000-yr level,-
+dataset,d_ln_saratio_sigma_rtp5000,SD[ln SaRatio(T1)|AvgSA] (GCIM) - SD of ln SaRatio(T1) over FEMA records at AvgSA_03 = 5000-yr level,-
+dataset,d_ln_ds595_mean_rtp5000,E[ln Ds5-95|AvgSA] (GCIM) - mean ln Ds5-95 over FEMA records at AvgSA_03 = 5000-yr level,ln s
+dataset,d_ln_ds595_sigma_rtp5000,SD[ln Ds5-95|AvgSA] (GCIM) - SD of ln Ds5-95 over FEMA records at AvgSA_03 = 5000-yr level,ln s
+dataset,ln_cs_over_avgsa_rtp5000,ln(C_s / AvgSA_03) at AvgSA_03 = 5000-yr level,-
+dataset,d_ln_saratio_mean_rtp10000,E[ln SaRatio(T1)|AvgSA] (GCIM) - mean ln SaRatio(T1) over FEMA records at AvgSA_03 = 10000-yr level,-
+dataset,d_ln_saratio_sigma_rtp10000,SD[ln SaRatio(T1)|AvgSA] (GCIM) - SD of ln SaRatio(T1) over FEMA records at AvgSA_03 = 10000-yr level,-
+dataset,d_ln_ds595_mean_rtp10000,E[ln Ds5-95|AvgSA] (GCIM) - mean ln Ds5-95 over FEMA records at AvgSA_03 = 10000-yr level,ln s
+dataset,d_ln_ds595_sigma_rtp10000,SD[ln Ds5-95|AvgSA] (GCIM) - SD of ln Ds5-95 over FEMA records at AvgSA_03 = 10000-yr level,ln s
+dataset,ln_cs_over_avgsa_rtp10000,ln(C_s / AvgSA_03) at AvgSA_03 = 10000-yr level,-
+dataset,ln_T1,ln of the modal first-mode period (OpenSees model),ln s
+dataset,ln_overstrength,ln(V_max / V_design) from the pushover (DUMMY if pushover_is_dummy),-
+dataset,ln_ductility,"ln(delta_u / delta_y,eff) from the pushover (DUMMY if pushover_is_dummy)",-
+dataset,msa_ss_stale,MSA-SS fragility not refitted after an extra stripe (sites 1/33/59 5s),-
+dataset,pushover_is_dummy,True while overstrength/ductility are placeholders,-
+components,site,identifier / factor,-
+components,n_storeys,identifier / factor,-
+components,tag,identifier / factor,-
+components,design_group_id,identifier / factor,-
+components,structure_id,identifier / factor,-
+components,msa_ss_stale,MSA-SS fragility not refitted after an extra stripe (sites 1/33/59 5s),-
+components,T1,modal first-mode period,s
+components,T1_design,design-model period,s
+components,C_s,design base-shear coefficient Vb/Wt,-
+components,avgsa03_rtp475,AvgSA_03 mean-hazard level (log-log reading) at AvgSA_03 = 475-yr level,g
+components,ln_avgsa03_rtp475,ln AvgSA_03 level (hazard diagnostic) at AvgSA_03 = 475-yr level,ln g
+components,iml_oq_rtp475,level at which OpenQuake disaggregated (hmap3) at AvgSA_03 = 475-yr level,g
+components,avgsa03_rtp2500,AvgSA_03 mean-hazard level (log-log reading) at AvgSA_03 = 2500-yr level,g
+components,ln_avgsa03_rtp2500,ln AvgSA_03 level (hazard diagnostic) at AvgSA_03 = 2500-yr level,ln g
+components,iml_oq_rtp2500,level at which OpenQuake disaggregated (hmap3) at AvgSA_03 = 2500-yr level,g
+components,avgsa03_rtp5000,AvgSA_03 mean-hazard level (log-log reading) at AvgSA_03 = 5000-yr level,g
+components,ln_avgsa03_rtp5000,ln AvgSA_03 level (hazard diagnostic) at AvgSA_03 = 5000-yr level,ln g
+components,iml_oq_rtp5000,level at which OpenQuake disaggregated (hmap3) at AvgSA_03 = 5000-yr level,g
+components,avgsa03_rtp10000,AvgSA_03 mean-hazard level (log-log reading) at AvgSA_03 = 10000-yr level,g
+components,ln_avgsa03_rtp10000,ln AvgSA_03 level (hazard diagnostic) at AvgSA_03 = 10000-yr level,ln g
+components,iml_oq_rtp10000,level at which OpenQuake disaggregated (hmap3) at AvgSA_03 = 10000-yr level,g
+components,ss_ln_saratio_mean_rtp475,GCIM E[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 475-yr level,-
+components,ss_ln_saratio_sigma_rtp475,GCIM SD[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 475-yr level,-
+components,ss_ln_ds595_mean_rtp475,GCIM E[ln Ds5-95|AvgSA] at AvgSA_03 = 475-yr level,ln s
+components,ss_ln_ds595_sigma_rtp475,GCIM SD[ln Ds5-95|AvgSA] at AvgSA_03 = 475-yr level,ln s
+components,ss_ln_saratio_mean_rtp2500,GCIM E[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 2500-yr level,-
+components,ss_ln_saratio_sigma_rtp2500,GCIM SD[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 2500-yr level,-
+components,ss_ln_ds595_mean_rtp2500,GCIM E[ln Ds5-95|AvgSA] at AvgSA_03 = 2500-yr level,ln s
+components,ss_ln_ds595_sigma_rtp2500,GCIM SD[ln Ds5-95|AvgSA] at AvgSA_03 = 2500-yr level,ln s
+components,ss_ln_saratio_mean_rtp5000,GCIM E[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 5000-yr level,-
+components,ss_ln_saratio_sigma_rtp5000,GCIM SD[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 5000-yr level,-
+components,ss_ln_ds595_mean_rtp5000,GCIM E[ln Ds5-95|AvgSA] at AvgSA_03 = 5000-yr level,ln s
+components,ss_ln_ds595_sigma_rtp5000,GCIM SD[ln Ds5-95|AvgSA] at AvgSA_03 = 5000-yr level,ln s
+components,ss_ln_saratio_mean_rtp10000,GCIM E[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 10000-yr level,-
+components,ss_ln_saratio_sigma_rtp10000,GCIM SD[ln SaRatio(T1)|AvgSA] at AvgSA_03 = 10000-yr level,-
+components,ss_ln_ds595_mean_rtp10000,GCIM E[ln Ds5-95|AvgSA] at AvgSA_03 = 10000-yr level,ln s
+components,ss_ln_ds595_sigma_rtp10000,GCIM SD[ln Ds5-95|AvgSA] at AvgSA_03 = 10000-yr level,ln s
+components,fema_ln_saratio_mean,mean over the 22 FEMA records of ln SaRatio(T1),-
+components,fema_ln_saratio_sigma,SD (ddof=1) over the 22 FEMA records of ln SaRatio(T1),-
+components,fema_ln_ds595_mean,mean over the 22 FEMA records of ln Ds5-95,ln s
+components,fema_ln_ds595_sigma,SD (ddof=1) over the 22 FEMA records of ln Ds5-95,ln s
+components,T1_modal_s,modal T1 from nb 056,s
+components,V_max_N,pushover peak base shear,N
+components,W_N,seismic weight per frame,N
+components,Vb_design_N,design base shear per frame,N
+components,delta_y_eff_mm,effective yield roof displacement,mm
+components,delta_u_mm,roof displacement at 0.8 V_max post-peak,mm
+components,roof_height_mm,roof height,mm
+components,overstrength,V_max / V_design,-
+components,ductility,"delta_u / delta_y,eff",-
+components,pushover_is_dummy,True while overstrength/ductility are placeholders,-
