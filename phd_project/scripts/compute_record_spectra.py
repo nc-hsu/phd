@@ -78,9 +78,9 @@ from scipy.signal import lfilter
 # 1. Defaults
 # ---------------------------------------------------------------------------------------------
 
-T_MIN, T_MAX, T_STEP = 0.02, 4.00, 0.01     # period grid [s], both ends included
+T_MIN, T_MAX, T_STEP = 0.02, 6.00, 0.01     # period grid [s], both ends included
 DAMPING = 0.05                              # ratio of critical damping
-OUTPUT_NAME = "record_spectra_psa_T0.02-4.00_dT0.01.pickle"
+OUTPUT_NAME = f"record_spectra_psa_T{T_MIN}-{T_MAX}_dT{T_STEP}.pickle"
 CHECKPOINT_EVERY = 100                      # records between partial saves
 
 
