@@ -29,12 +29,27 @@ each migration only where it can prove the underlying data is unchanged.
     i.e. BEFORE pulling a rebuilt one -- and after backfilling its
     ``_content_hashes.json`` (``disagg_shards.write_content_hashes``).
 
+``--to network-code`` (one-off, 2026-09-30)
+    nb 030 added a ``network_code`` column (the LAST metadata column) to the selection
+    database ``ESM-NGAsub_combined.csv``, so the converter can tell apart two networks
+    that share a station code (e.g. GE.KTHA / HL.KTHA). Every stripe and batch manifest
+    records the database's whole-file SHA-256 as ``gm_db_file``, so they all went stale,
+    although the selection never reads that column and nothing else changed. This
+    re-stamps ``gm_db_file`` with the hash of the new file. Honest because the database
+    is first read as text, the network_code column is removed, and the rest is written
+    back (``manage_flatfiles.gm_db_sha256_without_network_code``). Only manifests whose
+    recorded hash equals the hash of THAT reconstruction are re-stamped. So every row,
+    their order and every other value must be byte-identical to the database the stripe
+    was selected from. Any other manifest is genuinely stale and is left alone.
+
 The stripe pickles and their ``.manifest.json`` sidecars are git-tracked, so
 ``git diff`` shows exactly what changed and ``git checkout`` undoes it.
 
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --write
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to shards
+    python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to network-code
+    python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to network-code --write
 """
 
 from __future__ import annotations
@@ -62,6 +77,9 @@ from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
 from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
     DISAGG_IMT,
     wanted_stripe_keys,
+)
+from phd_project.scripts.WP1_ground_motion_set.manage_flatfiles import (
+    gm_db_sha256_without_network_code,
 )
 
 STRIPE_RE = re.compile(r"^site_(\d+)__stripe_iml_.*__gm_selection\.pickle\.manifest\.json$")
@@ -294,15 +312,107 @@ def migrate_to_content_hashes(*, write: bool = False) -> int:
     return 0
 
 
+# --- network_code migration (one-off, 2026-09-30) ----------------------------
+NC_DONE = "gm_db_file already the current database (nothing to do)"
+NC_NO_KEY = "no gm_db_file entry (nothing to migrate)"
+NC_OTHER = ("gm_db_file hash is neither the current database nor it without network_code "
+            "-- genuinely stale, left alone")
+NC_MIGRATE = "re-stamp: selected from the current database minus network_code"
+
+
+def migrate_to_network_code_db(*, write: bool = False) -> int:
+    """Re-stamp ``gm_db_file`` after nb 030 added the ``network_code`` column.
+
+    A manifest is re-stamped only when its recorded ``gm_db_file`` hash equals the hash of the
+    current database with the network_code column removed (see the module docstring). The new
+    entry is built with ``fingerprint()``, so it is byte-identical to what
+    ``stripe_input_fingerprint`` and nb 032/033's ``verify`` compute on the next run.
+    """
+    cfg = load_config()
+    db_fp = Path(cfg["proc_data"]["gm_database"])
+
+    # The two hashes this migration is about:
+    #   current  - the database file on disk (with network_code): what the pipeline now expects
+    #   stripped - that file with network_code removed: what the stripes were selected from
+    current = fingerprint(gm_db_file=db_fp)["gm_db_file"]
+    print(f"database : {db_fp}")
+    print("hashing the database without network_code (reads and rewrites ~120 MB) ...")
+    stripped = gm_db_sha256_without_network_code(db_fp)
+    print(f"  current                 sha256 {current['hash']}")
+    print(f"  without network_code    sha256 {stripped}\n")
+    if stripped == current["hash"]:
+        print("ERROR: the database has no network_code column yet -- run nb 030 first.")
+        return 1
+
+    roots = [cfg["results"]["AvgSA_03_record_selection"], cfg["proc_data"]["gm_selection"]]
+    counts: dict[str, int] = {}
+    changed = []
+
+    for root in roots:
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        for mf in sorted(root.glob("*.manifest.json")):
+            manifest = json.loads(mf.read_text())
+            inputs = manifest.get("inputs", {})
+            entry = inputs.get("gm_db_file")
+            if entry is None:
+                kind = NC_NO_KEY
+            elif entry.get("hash") == current["hash"]:
+                kind = NC_DONE
+            elif entry.get("hash") == stripped:
+                kind = NC_MIGRATE
+            else:
+                kind = NC_OTHER
+                print(f"  [left alone] {root.name}/{mf.name}: {NC_OTHER}")
+            counts[f"{root.name}: {kind}"] = counts.get(f"{root.name}: {kind}", 0) + 1
+            if kind != NC_MIGRATE:
+                continue
+
+            # Assigning to an existing key keeps the key order of the manifest.
+            inputs["gm_db_file"] = current
+            # Own _meta keys, so the record of the earlier migrations is not overwritten.
+            manifest.setdefault("_meta", {}).update({
+                "network_code_restamped_at": datetime.now(timezone.utc).isoformat(),
+                "network_code_restamped_from": (
+                    "gm_db_file: database before the network_code column was added "
+                    f"(sha256 {stripped}) -> with it (sha256 {current['hash']}); all other "
+                    "text in the file byte-identical"),
+            })
+            # The old hash must not survive anywhere else in the manifest.
+            if json.dumps(manifest["inputs"]).count(stripped):
+                print(f"ERROR: {mf.name} holds the old database hash in another entry too; "
+                      f"nothing written.")
+                return 1
+            changed.append((mf, manifest))
+
+    print("\nclassification:")
+    for k, n in sorted(counts.items()):
+        print(f"  {n:>4}  {k}")
+    print(f"\n{len(changed)} manifest(s) to re-stamp.")
+
+    if not write:
+        print("\n-- dry run; nothing written. Re-run with --write to apply.")
+        return 0
+
+    for mf, manifest in changed:
+        mf.write_text(json.dumps(manifest, indent=2))
+    print(f"re-stamped {len(changed)} manifest(s).")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write", action="store_true", help="actually rewrite the manifests")
-    ap.add_argument("--to", choices=("content-hashes", "shards"), default="content-hashes",
+    ap.add_argument("--to", choices=("content-hashes", "shards", "network-code"),
+                    default="content-hashes",
                     help="which re-stamp to run (default: content-hashes)")
     args = ap.parse_args(argv)
     if args.to == "shards":
         return migrate(write=args.write)
+    if args.to == "network-code":
+        return migrate_to_network_code_db(write=args.write)
     return migrate_to_content_hashes(write=args.write)
 
 

@@ -36,9 +36,12 @@ SELECTION_CONFIG = {
 }
 
 
-# Records that were SELECTED but cannot be obtained from their source database
-# (the download crashes / the waveform is missing upstream). Each entry names one
-# physical record by the identity its database uses in the combined selection DB:
+# Records that were SELECTED but cannot be used: either they cannot be obtained from
+# their source database (the download crashes / the waveform is missing upstream), or
+# the waveform that was obtained does not match the flatfile the selection was made
+# from (so scaling it by the flatfile-based factor would give the wrong intensity).
+# Each entry names one physical record by the identity its database uses in the
+# combined selection DB:
 #
 #   NGA-Sub : ("index" == NGAsubRSN) or ("event_id", "station_code") ==
 #             (NGAsubEQID, NGAsubSSN); the download unit is the whole
@@ -48,8 +51,9 @@ SELECTION_CONFIG = {
 #             (U, V) must go.
 #
 # An identity value may be a single value (equality) or a list (membership), which
-# is how a whole network is excluded: the combined DB carries no "Network" column,
-# so the network is expressed as its list of RSNs.
+# is how a whole network is excluded: the ONA entry below predates the DB's
+# "network_code" column (added 2026-09-30), so that network is expressed as its list
+# of RSNs.
 #
 # This is documentation + input to the one-off reselection cell at the end of nb
 # 032. "label" is a human tag for the console output; the row match is only ever on
@@ -83,6 +87,31 @@ UNAVAILABLE_RECORDS = [
         # Only one ONA record was ever selected: RSN 4040498 (Fukushimaoki 2011,
         # Mw 6.34), in this stripe.
         "affected_stripes": [(31, 1.15)],
+    },
+    {
+        "database": "NGASub",
+        "label": "NGA-Sub RSN 6003695, 6003748, 6003796 (waveform ~3-4.5e4 x flatfile SA)",
+        # Three distant records (Rjb ~1,570-1,970 km, Mw 6.4-6.7):
+        #   RSN 6003695  EQID 6000158  SSN 6000279  DB rows 72851 (H1) / 116928 (H2)
+        #   RSN 6003748  EQID 6000161  SSN 6000269  DB rows 72874 (H1) / 116951 (H2)
+        #   RSN 6003796  EQID 6000035  SSN 6000691  DB rows 72907 (H1) / 116984 (H2)
+        # The response spectra of their converted H1 JSONs are ~3-4.5e4 times the
+        # flatfile SA that the GCIM selection and the scale factors alpha were computed
+        # from (found 2026-09-29, record-spectra check / nb 043). The MSA applies alpha
+        # to the JSON, so these records ran at an intensity ~4 orders of magnitude too
+        # high. Whether the AT2 files or the flatfile are at fault is not established;
+        # either way the waveform cannot be used with the flatfile-based alpha. Both
+        # components are excluded, because the record (the RSN) is the unit.
+        "identity": {"index": ["6003695", "6003748", "6003796"]},
+        "reason": "converted H1 waveform spectra are ~3-4.5e4 x the flatfile SA the "
+                  "selection and alpha were computed from, so the MSA ran them at the "
+                  "wrong intensity",
+        "date": "2026-09-30",
+        # Selected (H1 in every case) in these stripes, slot in brackets:
+        #   (41, 0.65): 6003695 [29]   -- run in the MSA, site 41, 3s and 5s
+        #   (41, 0.95): 6003748 [26], 6003695 [29]   -- not in either structure's MSA
+        #   (44, 1.15): 6003796 [29]   -- not in either structure's MSA
+        "affected_stripes": [(41, 0.65), (41, 0.95), (44, 1.15)],
     },
 ]
 

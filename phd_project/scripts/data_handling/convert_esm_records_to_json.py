@@ -23,19 +23,34 @@ files on the share, nb 043 / 2026-09-30). Anything that rule or the channel map
 cannot resolve uniquely is NOT guessed: the record is skipped with the reason,
 and listed at the end of the run.
 
+WHICH NETWORK (added 2026-09-30)
+--------------------------------
+The download request names only the event and the station code, so when two
+networks run a station with the same code (278 GE/HL pairs in ESM, plus 2 FR/RA
+and 1 AC/IT) ESM puts BOTH into one file: ``/Waveforms/GE.KTHA`` and
+``/Waveforms/HL.KTHA``. They are different recordings, and they are two different
+rows of the selection database. The record identifier
+``{event}_{station}_{location}`` cannot tell them apart. So the selection CSV now
+carries an optional ``network_code`` column (from the selection database, via
+nb 033 / 040). When it is given, only the ``{network_code}.{station_code}`` group
+is read. If that group is not in the file, the record fails; there is no fallback
+to another network. Without a network code the old behaviour is kept, and a file
+holding two networks fails with "2 instruments".
+
 Given a selection CSV of ``(record_identifier, component)`` rows -- where
 ``record_identifier`` is ``{event_id}_{station_code}_{location_code}`` -- this
 script writes one JSON record per row, using the same schema and filename
 convention as the NGA-Sub converter (``record`` field last;
-``{record_identifier}__{component}.json``), plus three traceability fields:
-``channel``, ``instrument_location`` and ``source_file``.
+``{record_identifier}__{component}.json``), plus four traceability fields:
+``network_code``, ``channel``, ``instrument_location`` and ``source_file``.
 
 Usage:
     python convert_esm_records_to_json.py <src> <selection_csv> <dst>
         [--overwrite] [--backup-dir DIR] [--dry-run] [--max-workers N]
 
     src           Folder containing the ESM ``*.h5`` files.
-    selection_csv CSV with ``record_identifier, component`` columns.
+    selection_csv CSV with ``record_identifier, component`` columns and, optionally,
+                  ``network_code``.
     dst           Output folder for JSON files.
     --overwrite   Reconvert records whose JSON already exists.
     --backup-dir  With --overwrite: copy an existing JSON here first if its data
@@ -122,12 +137,16 @@ def _to_g(values, units):
 
 
 def read_selection(path):
-    """Yield ``(record_identifier, component)`` tuples from the selection CSV.
+    """Yield ``(record_identifier, component, network_code)`` tuples from the selection CSV.
 
     Detects the header row containing ``record_identifier`` so that both a
     plain single-header CSV and the 2-row MultiIndex header produced by
     ``DataFrame.to_csv`` (columns like ``("metadata", "record_identifier")``)
     are handled.
+
+    ``network_code`` is read from an optional ``network_code`` column (see "WHICH
+    NETWORK" at the top). It is ``None`` if the column is absent or the cell is
+    empty, and then the record is resolved as before.
     """
     path = Path(path)
     with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
@@ -150,6 +169,9 @@ def read_selection(path):
                   if _normalise(c) == "record_identifier")
     comp_col = next(i for i, c in enumerate(header)
                     if _normalise(c) in ("component", "comp"))
+    # optional: absent in selection CSVs written before 2026-09-30
+    net_col = next((i for i, c in enumerate(header)
+                    if _normalise(c) == "network_code"), None)
 
     for row in rows[header_idx + 1:]:
         if len(row) <= max(id_col, comp_col):
@@ -158,7 +180,10 @@ def read_selection(path):
         component = str(row[comp_col]).strip().upper()
         if not record_identifier:
             continue
-        yield record_identifier, component
+        network_code = None
+        if net_col is not None and net_col < len(row):
+            network_code = str(row[net_col]).strip() or None
+        yield record_identifier, component, network_code
 
 
 def resolve_hdf5_path(src, event_id, station_code, location_code):
@@ -228,16 +253,27 @@ def _location_from_filename(h5_path):
     return Path(h5_path).stem.rsplit("__", 1)[-1]
 
 
-def _station_datasets(h5, station_code):
+def _station_datasets(h5, station_code, network_code=None):
     """Every dataset of this station, over ALL its station groups: [(dataset, net, loc, cha)].
 
     A station group is named "NET.STA"; groups whose STA equals ``station_code`` are used. If
     none matches by name but there is exactly one group, that group is used (as before).
+
+    With ``network_code`` only the group "{network_code}.{station_code}" is used. This is what
+    separates two networks that share a station code in one file (e.g. GE.KTHA / HL.KTHA). If
+    that group is missing the record fails (``KeyError``); another network's group is never
+    used in its place, since it is a different recording.
     """
     if "Waveforms" not in h5:
         raise KeyError("HDF5 missing /Waveforms")
     wf = h5["Waveforms"]
-    groups = [g for g in wf if str(g).split(".", 1)[-1] == station_code]
+    if network_code is not None:
+        wanted = f"{network_code}.{station_code}"
+        if wanted not in wf:
+            raise KeyError(f"no station group {wanted}; groups: {list(wf)[:10]}")
+        groups = [wanted]
+    else:
+        groups = [g for g in wf if str(g).split(".", 1)[-1] == station_code]
     if not groups:
         if len(wf) != 1:
             raise KeyError(f"no station group for {station_code}; groups: {list(wf)[:10]}")
@@ -252,9 +288,10 @@ def _station_datasets(h5, station_code):
     return out
 
 
-def select_component_dataset(h5, station_code, component, file_location):
+def select_component_dataset(h5, station_code, component, file_location, network_code=None):
     """The one dataset that holds ``component`` (U/V/W): returns ``(dataset, net, loc, cha)``.
 
+    0. With ``network_code``, look only at that network's station group (``_station_datasets``).
     1. Keep the datasets whose location matches the file-name location (``_norm_location``).
     2. They must belong to ONE instrument, i.e. one (network, location, band+instrument code).
     3. Its channels are mapped with ``CHANNEL_TO_COMPONENT`` (full codes); exactly one must be
@@ -263,7 +300,7 @@ def select_component_dataset(h5, station_code, component, file_location):
     """
     if component not in COMPONENTS:
         raise ValueError(f"unknown component {component!r}")
-    all_ds = _station_datasets(h5, station_code)
+    all_ds = _station_datasets(h5, station_code, network_code)
     available = sorted({f"{net}.{loc!r}.{cha}" for _, net, loc, cha in all_ds})
 
     keep = [d for d in all_ds if _norm_location(d[2]) == _norm_location(file_location)]
@@ -285,6 +322,16 @@ def select_component_dataset(h5, station_code, component, file_location):
         raise ValueError(f"{len(hits)} channels map to {component} "
                          f"({[d[3] for d in keep]}); expected exactly one")
     return hits[0]
+
+
+def _positional_network(h5, station_code):
+    """The network whose group the OLD rule read (dry-run comparison only).
+
+    The old rule took the shortest matching "NET.STA" group name, which for two networks of
+    equal-length codes is the first in key order (GE before HL).
+    """
+    grp = _find_station_group(h5, station_code)
+    return str(grp.name).rsplit("/", 1)[-1].split(".", 1)[0]
 
 
 def _positional_channel(h5, station_code, component):
@@ -313,20 +360,27 @@ def _same_data(old_fp, new_record_dict):
                                np.asarray(new_record_dict["record"], dtype=float)))
 
 
-def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_run=False):
+def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_run=False,
+                   network_code=None):
     """Convert one (record_identifier, component) selection into a JSON file.
+
+    ``network_code`` (optional) picks the station group when the file holds the same station
+    code for more than one network (see "WHICH NETWORK" at the top).
 
     Returns a dict:
       reason               None if converted (or resolved, in a dry run), else why it was skipped
       source_file          the HDF5 file name
+      network_code         network of the dataset used (e.g. "HL")
       channel              channel code used (e.g. "HN3")
       instrument_location  that dataset's SEED location code ("" if blank)
+      old_network          the network whose group the old rule read (always the first, e.g. "GE")
       old_channel          the channel the old positional rule would have used
       backed_up            True if an existing JSON was copied to ``backup_dir`` first
     In a dry run only the file KEYS are read and nothing is written.
     """
-    info = {"reason": None, "source_file": "", "channel": "", "instrument_location": "",
-            "old_channel": "", "backed_up": False}
+    info = {"reason": None, "source_file": "", "network_code": "", "channel": "",
+            "instrument_location": "", "old_network": "", "old_channel": "",
+            "backed_up": False}
     try:
         event_id, station_code, location_code = parse_esm_record_identifier(record_identifier)
     except ValueError:
@@ -345,12 +399,13 @@ def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_
     try:
         with h5py.File(h5_path, "r") as h5:
             try:
+                info["old_network"] = _positional_network(h5, station_code)
                 info["old_channel"] = _positional_channel(h5, station_code, component)
             except (KeyError, ValueError):
-                info["old_channel"] = ""
+                info["old_network"], info["old_channel"] = "", ""
             ds, net, loc, cha = select_component_dataset(
-                h5, station_code, component, _location_from_filename(h5_path))
-            info["channel"], info["instrument_location"] = cha, loc
+                h5, station_code, component, _location_from_filename(h5_path), network_code)
+            info["network_code"], info["channel"], info["instrument_location"] = net, cha, loc
             if dry_run:
                 return info
             sr = ds.attrs.get("sampling_rate", None)
@@ -375,6 +430,7 @@ def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_
         "station_code": station_code,
         "location_code": location_code,
         # traceability: exactly which dataset of which file this is
+        "network_code": net,
         "channel": cha,
         "instrument_location": loc,
         "source_file": h5_path.name,
@@ -395,7 +451,7 @@ def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_
 
 def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=False,
                         backup_dir=None, dry_run=False):
-    """Convert all ``(record_identifier, component)`` rows of the selection CSV.
+    """Convert all ``(record_identifier, component[, network_code])`` rows of the selection CSV.
 
     ``src``, ``selection_csv`` and ``dst`` may be paths or strings. Records are
     read from the (often network-mounted) source in parallel using a thread
@@ -410,8 +466,10 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=Fal
 
     ``dry_run=True``: writes nothing and returns a list of dicts, one per row (existing JSON or
     not), with ``record_identifier, component, json_exists`` and the fields of
-    ``convert_record`` (``channel``, ``old_channel``, ``reason`` ...) plus
-    ``changes = old_channel != channel``.
+    ``convert_record`` (``network_code``, ``channel``, ``old_network``, ``old_channel``,
+    ``reason`` ...) plus ``requested_network`` (the CSV's network code) and
+    ``changes = (old_network, old_channel) != (network_code, channel)``. A change of network
+    counts: GE.KTHA..HNN and HL.KTHA..HNN are different recordings with the same channel code.
     """
     if max_workers is None:
         max_workers = max((os.cpu_count() or 1) - 3, 1)
@@ -421,19 +479,23 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=Fal
 
     if dry_run:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [(rid, comp, executor.submit(convert_record, rid, comp, src, dst,
-                                                   None, True)) for rid, comp in rows]
+            futures = [(rid, comp, net, executor.submit(convert_record, rid, comp, src, dst,
+                                                        None, True, net))
+                       for rid, comp, net in rows]
             report = []
-            for rid, comp, fut in tqdm(futures, total=len(futures), desc="Dry run (ESM)"):
+            for rid, comp, net, fut in tqdm(futures, total=len(futures), desc="Dry run (ESM)"):
                 info = fut.result()
-                info.update(record_identifier=rid, component=comp,
+                # requested_network: from the CSV (None if not given); network_code: the one used
+                info.update(record_identifier=rid, component=comp, requested_network=net,
                             json_exists=(dst / record_json_filename(rid, comp)).exists())
-                info["changes"] = bool(info["reason"] is None
-                                       and info["old_channel"] != info["channel"])
+                info["changes"] = bool(
+                    info["reason"] is None
+                    and (info["old_network"], info["old_channel"])
+                    != (info["network_code"], info["channel"]))
                 report.append(info)
         n_fail = sum(r["reason"] is not None for r in report)
         n_change = sum(r["changes"] for r in report)
-        print(f"\nDry run: {len(report)} rows, {n_change} would change channel, "
+        print(f"\nDry run: {len(report)} rows, {n_change} would change network or channel, "
               f"{n_fail} cannot be resolved.")
         return report
 
@@ -444,14 +506,15 @@ def convert_esm_records(src, selection_csv, dst, max_workers=None, overwrite=Fal
     skipped_records = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
-        for record_identifier, component in rows:
+        for record_identifier, component, network_code in rows:
             out_path = dst / record_json_filename(record_identifier, component)
             if out_path.exists() and not overwrite:
                 skipped_existing += 1
                 continue
             futures.append((record_identifier, component,
                             executor.submit(convert_record, record_identifier,
-                                            component, src, dst, backup_dir)))
+                                            component, src, dst, backup_dir, False,
+                                            network_code)))
         for record_identifier, component, future in tqdm(
                 futures, total=len(futures), desc="Converting ESM records"):
             info = future.result()
@@ -481,7 +544,8 @@ def main(argv=None):
         description="Convert selected ESM records (HDF5) to project JSON format."
     )
     parser.add_argument("src", help="Folder containing the ESM *.h5 files.")
-    parser.add_argument("selection_csv", help="CSV with record_identifier, component columns.")
+    parser.add_argument("selection_csv", help="CSV with record_identifier, component columns "
+                                              "(and optionally network_code).")
     parser.add_argument("dst", help="Output folder for JSON files.")
     parser.add_argument("--max-workers", type=int, default=None,
                         help="Number of parallel workers (default: max(cpu_count - 3, 1)).")
@@ -500,7 +564,8 @@ def main(argv=None):
         for r in report:
             if r["changes"] or r["reason"] is not None:
                 print(f"  {r['record_identifier']} {r['component']}: "
-                      f"{r['old_channel'] or '-'} -> {r['channel'] or '-'}"
+                      f"{r['old_network'] or '-'}.{r['old_channel'] or '-'} -> "
+                      f"{r['network_code'] or '-'}.{r['channel'] or '-'}"
                       f"{'' if r['reason'] is None else '  FAILS: ' + r['reason']}")
         return 0
 

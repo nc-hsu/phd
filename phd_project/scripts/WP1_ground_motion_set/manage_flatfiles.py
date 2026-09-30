@@ -541,6 +541,105 @@ def get_SA_periods_from_headers(df: pd.DataFrame):
     periods = np.array([float(pattern.search(c).group(1)) for c in cols])
     return periods
 
+
+# ---------------------------------------------------------------------------------------------
+# network_code in the selection database (added 2026-09-30)
+# ---------------------------------------------------------------------------------------------
+# Why this exists: ESM has 281 (event, station, location) combinations recorded by TWO networks
+# with the same station code (278 GE/HL, 2 FR/RA, 1 AC/IT). Until 2026-09-30 nb 030 dropped the
+# network code, so each such pair became two DB rows that differed only by `index`, and the ESM
+# converter could not tell which NET.STA group of the downloaded HDF5 file the selected row was.
+# nb 030 now keeps the network code as the LAST metadata column.
+#
+# The selection results (stripe pickles, batch pickles) were made from the database WITHOUT that
+# column, and every one of their manifests stores the SHA-256 of the database file. Adding the
+# column changes that hash, so the manifests have to be re-stamped. That is only honest if the
+# new file is the old file plus one column: same rows, same order, same text in every other
+# column. The helpers below check exactly that, byte for byte.
+
+NETWORK_CODE_COL = ("metadata", "network_code")
+
+
+def read_gm_db_as_text(fp) -> pd.DataFrame:
+    """Read the selection database with every cell kept as its literal CSV text.
+
+    ``dtype=str`` stops pandas turning e.g. location code "00" into 0, and ``na_filter=False``
+    stops empty cells becoming NaN. So nothing is re-formatted, and writing the frame back with
+    ``to_csv(fp, sep=",", index=False)`` reproduces the original file byte for byte (checked on
+    the 2026-09-30 database: identical SHA-256). This is the basis of the comparison below.
+    """
+    return pd.read_csv(fp, header=[0, 1], dtype=str, keep_default_na=False, na_filter=False)
+
+
+def gm_db_sha256_without_network_code(fp) -> str:
+    """SHA-256 of the selection database as it would be WITHOUT the network_code column.
+
+    The file is read as text, the network_code column is dropped (if there is one), and the rest
+    is written to a temporary file in the same way nb 030 writes the database (same separator,
+    no index, the platform's default line ending). The hash of that temporary file is returned.
+
+    - For a database without the column this is simply the hash of the file itself.
+    - For a database with the column it is the hash the file WOULD have had if nb 030 had not
+      added the column. So if it equals the hash recorded in the selection manifests, the new
+      database differs from the one the selection used only by the extra column.
+    """
+    import hashlib
+    import tempfile
+
+    df = read_gm_db_as_text(fp)
+    if NETWORK_CODE_COL in df.columns:
+        df = df.drop(columns=[NETWORK_CODE_COL])
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_fp = Path(tmp) / "gm_db_without_network_code.csv"
+        df.to_csv(tmp_fp, sep=",", index=False)
+        with open(tmp_fp, "rb") as f:
+            return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def network_code_lookup(gm_db_fp, recs: pd.DataFrame) -> pd.Series:
+    """The network code of each selected record, looked up from the selection database.
+
+    ``recs`` is a stripe's (or several stripes') ``recs`` frame. Its index is the database ROW
+    LABEL, the positional RangeIndex the selection works with (see
+    ``gm_selection.greedy_optimise_ensemble``). This is the only thing that tells the two rows of
+    a cross-network pair apart, so it is what we join on.
+
+    The ensembles selected before 2026-09-30 carry no network_code column themselves, and they
+    are deliberately NOT rewritten (their pickles feed other fingerprints). Looking the code up
+    here works for old and new ensembles alike.
+
+    As a safety check the event, station and component of every selected row must equal those of
+    the database row with the same label, so a database whose rows had moved would fail loudly
+    here instead of silently attaching the wrong network.
+
+    Returns a Series aligned with ``recs`` (same index, same order). NGA-Sub rows without a
+    network code are NaN.
+    """
+    db = read_gm_db_as_text(gm_db_fp)
+    if NETWORK_CODE_COL not in db.columns:
+        raise KeyError(f"{Path(gm_db_fp).name} has no network_code column: re-run nb 030")
+    db_meta = db["metadata"]
+
+    labels = recs.index.to_numpy()
+    if labels.min() < 0 or labels.max() >= len(db_meta):
+        raise IndexError("recs index labels fall outside the selection database")
+    matched = db_meta.iloc[labels]
+
+    # identity check: the text read of the DB and the parsed recs must describe the same record
+    for col in ("database", "event_id", "station_code", "component"):
+        a = matched[col].astype(str).to_numpy()
+        b = recs[("metadata", col)].astype(str).to_numpy()
+        bad = a != b
+        if bad.any():
+            raise ValueError(f"{bad.sum()} selected record(s) do not match the database row "
+                             f"with the same label in column {col!r}, e.g. label "
+                             f"{labels[bad][0]}: DB {a[bad][0]!r} vs selection {b[bad][0]!r}")
+
+    # empty text means "no network code" (NGA-Sub rows whose flatfile value was -999)
+    net = matched["network_code"].replace("", np.nan).to_numpy()
+    return pd.Series(net, index=recs.index, name="network_code")
+
+
 if __name__ == "__main__":
     ...
     
