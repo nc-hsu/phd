@@ -1,0 +1,65 @@
+{
+  "inputs": {
+    "site": {
+      "hash": "9f14025af0065b30e47e23ebb3b491d39ae8ed17d33739e5ff3827ffb3634953",
+      "summary": "int=35"
+    },
+    "levels": {
+      "hash": "273fe5e49713c07a021b2b00287a484adfefd790684f2f0aca79e58c0946fc41",
+      "summary": "pandas shape=(31, 3)"
+    },
+    "grid_disagg": {
+      "hash": "0a750921acdff15e8d1124ce56f00e84c3b256df6de6c375876175e41018c2d6",
+      "summary": "dict"
+    },
+    "rtp_disagg": {
+      "hash": "2b0a1e645ed142c266419313d06d538ff04be6a06bbc88e6cd073416ac463f32",
+      "summary": "file AvgSA_03_disagg_rtps_eps4.pickle (2544855 bytes)"
+    },
+    "T_grid": {
+      "hash": "0e22faaf313d6a5608fbaa6d9313ec4bade4f4be8e9c18f8b259750031f79ef0",
+      "summary": "ndarray shape=(38,) dtype=float64"
+    },
+    "structure_T1": {
+      "hash": "85d347243f97f8439c2df75a1089656292fbceba1636ef80f2721fa511915136",
+      "summary": "dict"
+    },
+    "site_model": {
+      "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+      "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+    },
+    "gmm_lt": {
+      "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+      "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+    },
+    "saratio": {
+      "hash": "e52d37c4f74edef85d26122d228dc3cc38d9b0de47cd8ee432a0e840e3e418be",
+      "summary": "tuple"
+    },
+    "library": {
+      "hash": "4c32043c103455d664c148080774eeadc7d9c73808bcdbcfb18fa53fd108506e",
+      "summary": "file gcim_saratio.py (27144 bytes)"
+    },
+    "gcim_stripes": {
+      "hash": "f83c64f3084eba3563f367b31628c65ec4f4806367e1e27263a716e9fc93a1d7",
+      "summary": "file gcim_dist_AvgSA_03.pickle (76075443 bytes)"
+    },
+    "gcim_rtps": {
+      "hash": "729c243482541505564ff24898dc6a6392c38e770bdd83524c76d2d09e13bcfc",
+      "summary": "file gcim_AvgSA_03_rtps.pickle (34721485 bytes)"
+    },
+    "selection_config": {
+      "hash": "b0fb2e80e8761be849adffd1e67beaf784314f2c0f11bc27fe97ebc2874a590c",
+      "summary": "dict"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    }
+  },
+  "_meta": {
+    "artifact": "site_covariates.pickle",
+    "git_commit": "360dc648",
+    "written_at": "2026-09-29T09:11:53.107866+00:00"
+  }
+}
