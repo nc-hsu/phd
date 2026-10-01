@@ -42,6 +42,30 @@ of the record is never used. The same is done here (u[0] = 0) so that the two ma
 
 PSA = w^2 max|displacement|, exactly as standes defines it.
 
+TWO METHODS: "fft" (DEFAULT) AND "zoh"
+--------------------------------------
+The recursion above is exact for an input that is held CONSTANT over each time step (a "zero-order
+hold", hence "zoh"). A real record is a sampled version of a smooth signal, not a staircase, so the
+error depends on how coarse the sampling is compared with the oscillator period:
+
+* ``method="zoh"`` (the original). The recursion is run directly on the record at its own dt.
+  Accurate when dt is small compared with T (the 200 Hz ESM records, dt = 0.005 s: typically ~1 %
+  or less). For coarse records it is biased: the staircase smears the high frequencies and adds a
+  half-step delay, so PSA is LOW at short and moderate periods, and erratic once T approaches dt.
+  At dt = 0.05 s (some NGA-Sub records) PSA was ~13 % low at T = 0.2 s and ~60 % low at
+  T = 0.05 s, which made 47 NGA-Sub records look like poor matches to the database (nb 043 §9).
+  This is also what standes.groundmotion.response_spectrum does.
+* ``method="fft"`` (the default). Before the same recursion, the record is first resampled to a finer
+  step with band-limited (FFT, i.e. sinc) interpolation. This is the interpolation implied by the
+  sampling theorem, so no content is added or removed below the original Nyquist frequency. The
+  record is upsampled by the smallest integer factor k with dt / k <= ``fft_max_dt`` (default
+  0.002 s = T_min / 10 for the 0.02 s shortest period), so records already that fine are unchanged.
+  It is zero-padded before the FFT, so that the FFT's implied wrap-around does not join the end of
+  the record to its start. Checked 2026-10-01 against the NGA-Sub flatfile on 254 records at dt =
+  0.005-0.05 s: median MSLE ~1e-6 (agreement to ~0.1 %) at every dt, against 0.04 for "zoh" at dt =
+  0.05 s. So the flatfile spectra were evidently computed this way. For the 200 Hz ESM records the
+  two methods differ by about 1 % (at most ~9 % at one period).
+
 PARALLELISM AND RESTARTS
 ------------------------
 Records are independent, so they are shared out over ``--n-cores`` worker processes. Every
@@ -70,8 +94,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.fft import next_fast_len
 from scipy.linalg import expm
-from scipy.signal import lfilter
+from scipy.signal import lfilter, resample
 
 
 # ---------------------------------------------------------------------------------------------
@@ -82,6 +107,9 @@ T_MIN, T_MAX, T_STEP = 0.02, 6.00, 0.01     # period grid [s], both ends include
 DAMPING = 0.05                              # ratio of critical damping
 OUTPUT_NAME = f"record_spectra_psa_T{T_MIN}-{T_MAX}_dT{T_STEP}.pickle"
 CHECKPOINT_EVERY = 100                      # records between partial saves
+METHODS = ("fft", "zoh")                    # see "TWO METHODS" in the module docstring
+DEFAULT_METHOD = "fft"
+FFT_MAX_DT = 0.002                          # [s] "fft" upsamples until dt <= this (T_MIN / 10)
 
 
 def period_grid(t_min: float, t_max: float, t_step: float) -> np.ndarray:
@@ -119,10 +147,53 @@ def filter_coefficients(period: float, dt: float, damping: float) -> tuple[np.nd
     return numerator, denominator
 
 
-def psa_spectrum(acc: np.ndarray, dt: float, periods: np.ndarray, damping: float) -> np.ndarray:
-    """Pseudo-spectral acceleration at every period: w^2 * max |relative displacement|."""
+def fft_upsample(acc: np.ndarray, dt: float, max_dt: float = FFT_MAX_DT) -> tuple[np.ndarray, float]:
+    """Band-limited (FFT) resampling of a record to a step of at most ``max_dt``.
+
+    The record is upsampled by the smallest integer factor k with dt / k <= max_dt. An integer
+    factor keeps every original sample where it was (the new series passes through them) and
+    keeps the same start time. k = 1 returns the record unchanged.
+
+    Before the FFT the record is padded with zeros: by at least 10 % of its length (and at least
+    64 samples), up to a length the FFT handles fast. Without the padding the FFT treats the record
+    as periodic and joins its last sample to its first, which rings at both ends if they differ.
+    The padding is cut off again afterwards, so the output has (n - 1) k + 1 samples and spans the
+    same duration as the input.
+    """
+    acc = np.asarray(acc, dtype=float)
+    k = int(np.ceil(dt / max_dt - 1e-9))        # 1e-9: dt = 0.004, max_dt = 0.002 -> k = 2, not 3
+    if k <= 1:
+        return acc, dt
+    n = len(acc)
+    n_pad = next_fast_len(n + max(n // 10, 64))
+    padded = np.zeros(n_pad)
+    padded[:n] = acc
+    fine = resample(padded, n_pad * k)          # sinc interpolation, done in the frequency domain
+    return fine[:(n - 1) * k + 1], dt / k
+
+
+def psa_spectrum(acc: np.ndarray, dt: float, periods: np.ndarray, damping: float,
+                 method: str = DEFAULT_METHOD, fft_max_dt: float = FFT_MAX_DT) -> np.ndarray:
+    """Pseudo-spectral acceleration at every period: w^2 * max |relative displacement|.
+
+    method
+        "fft" (default): resample the record with ``fft_upsample`` to a step of at most
+              ``fft_max_dt`` (band-limited / sinc interpolation), then run the exact recursion.
+              Accurate at any record dt; matches the NGA-Sub flatfile spectra to ~0.1 %.
+        "zoh": the original. Run the exact recursion on the record at its own dt, which treats
+              the input as constant over each step. Identical to standes.groundmotion.
+              response_spectrum. Accurate only when dt << T: biased low at short and moderate
+              periods for coarse records (e.g. ~13 % at T = 0.2 s and ~60 % at T = 0.05 s when
+              dt = 0.05 s).
+    See "TWO METHODS" in the module docstring for the details and the check against the flatfile.
+    """
+    if method not in METHODS:
+        raise ValueError(f"method must be one of {METHODS}, got {method!r}")
     u = np.asarray(acc, dtype=float).copy()
-    u[0] = 0.0                     # standes' loop starts at k = 1: the first sample is unused
+    if method == "fft":
+        u, dt = fft_upsample(u, dt, fft_max_dt)
+    else:
+        u[0] = 0.0                 # standes' loop starts at k = 1: the first sample is unused
     psa = np.empty(len(periods))
     for i, T in enumerate(periods):
         num, den = filter_coefficients(T, dt, damping)
@@ -155,16 +226,22 @@ def load_record(fp: Path) -> tuple[np.ndarray, float, dict]:
     return acc, dt, {"units": rec.get("units"), "dt": dt, "n_steps": len(acc)}
 
 
-def process_record(fp: str, periods: np.ndarray, damping: float):
+def process_record(fp: str, periods: np.ndarray, damping: float,
+                   method: str = DEFAULT_METHOD, fft_max_dt: float = FFT_MAX_DT):
     """Worker entry point. Returns (record_id, psa, meta, error); psa is None on failure.
 
     Errors are caught and returned rather than raised, so that one bad file cannot stop an
     overnight run. They are listed at the end and stored in df.attrs["failed"].
+
+    meta also holds the JSON's modification time (``json_mtime_ns``), so that ``update_spectra``
+    can tell later whether the JSON was rewritten (e.g. by a reconversion) after its spectrum was
+    computed.
     """
     fp = Path(fp)
     try:
         acc, dt, meta = load_record(fp)
-        return fp.stem, psa_spectrum(acc, dt, periods, damping), meta, None
+        meta["json_mtime_ns"] = fp.stat().st_mtime_ns
+        return fp.stem, psa_spectrum(acc, dt, periods, damping, method, fft_max_dt), meta, None
     except Exception as exc:                                  # noqa: BLE001 - reported below
         return fp.stem, None, None, f"{type(exc).__name__}: {exc}"
 
@@ -197,14 +274,16 @@ def write_pickle(df: pd.DataFrame, fp: Path) -> None:
 def verify_against_standes(fp: Path, damping: float) -> None:
     """Compare this script's PSA with standes.groundmotion.response_spectrum on one record.
 
-    standes is slow, so only a handful of periods spread over the grid are compared.
+    standes is slow, so only a handful of periods spread over the grid are compared. standes uses
+    the "zoh" scheme, so that is the method checked here: it confirms the filter reproduces the
+    recursion. "fft" runs the same filter on the resampled record, so it is covered as well.
     """
     from standes.groundmotion import response_spectrum
 
     check_periods = np.array([0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 4.0])
     acc, dt, _ = load_record(fp)
     t0 = time.perf_counter()
-    ours = psa_spectrum(acc, dt, check_periods, damping)
+    ours = psa_spectrum(acc, dt, check_periods, damping, method="zoh")
     t_ours = time.perf_counter() - t0
     t0 = time.perf_counter()
     theirs, _, _ = response_spectrum(acc, dt, check_periods, xi=damping)
@@ -218,7 +297,136 @@ def verify_against_standes(fp: Path, damping: float) -> None:
 
 
 # ---------------------------------------------------------------------------------------------
-# 6. Command line
+# 6. Incremental update of an existing spectra file (used by nb 042)
+# ---------------------------------------------------------------------------------------------
+
+def _method_label(method: str, fft_max_dt: float) -> str:
+    """Human-readable description of the method, stored in df.attrs["method"]."""
+    if method == "fft":
+        return (f"band-limited (FFT) resampling to dt <= {fft_max_dt} s, then the exact "
+                "piecewise-constant-excitation recursion, run as a scipy.signal.lfilter IIR filter")
+    return ("exact piecewise-constant-excitation recursion (as standes.groundmotion."
+            "response_spectrum), run as a scipy.signal.lfilter IIR filter")
+
+
+def _stored_method(attrs: dict) -> str:
+    """The method a spectra file was made with. Files written before the method option existed
+    have no "psa_method" attribute; they were all made with the original "zoh" scheme."""
+    if "psa_method" in attrs:
+        return attrs["psa_method"]
+    return "zoh" if "piecewise-constant" in str(attrs.get("method", "")) else "unknown"
+
+
+def update_spectra(records_dir: str | Path, spectra_fp: str | Path,
+                   method: str = DEFAULT_METHOD, n_cores: int = 1, damping: float = DAMPING,
+                   t_min: float = T_MIN, t_max: float = T_MAX, t_step: float = T_STEP,
+                   fft_max_dt: float = FFT_MAX_DT) -> pd.DataFrame:
+    """Bring the spectra file in line with the record JSONs in ``records_dir``, and return it.
+
+    The record JSONs are the ``*.json`` files directly in ``records_dir`` (subfolders, such as a
+    backup folder of superseded JSONs, are ignored). Spectra and JSONs are matched by name:
+    record_id = JSON file stem.
+
+    1. If ``spectra_fp`` exists it is read. Its spectra are reused only if they were made with the
+       SAME settings (method, fft_max_dt for "fft", damping and period grid). Otherwise they are
+       not comparable to new ones: the reason is printed and every spectrum is recomputed.
+    2. Spectra without a JSON are removed, and their record_ids are printed.
+    3. Spectra whose JSON has changed since the spectrum was computed (its modification time
+       differs from the one stored with the spectrum, or none was stored) are recomputed. This is
+       what makes a reconversion of existing JSONs (e.g. the ESM U/V fix) reach the spectra, even
+       though the names are unchanged. They are reported as "stale".
+    4. Every JSON without a spectrum is computed and added.
+
+    The file is then written back (atomically). df.attrs["record_meta"] holds dt, n_steps, units
+    and json_mtime_ns per record; df.attrs["failed"] lists records whose JSON could not be used.
+    Records that fail are not added; they are reported and retried on the next call.
+    """
+    if method not in METHODS:
+        raise ValueError(f"method must be one of {METHODS}, got {method!r}")
+    records_dir, spectra_fp = Path(records_dir), Path(spectra_fp)
+    if not records_dir.is_dir():
+        raise FileNotFoundError(f"record folder not found: {records_dir}")
+    periods = period_grid(t_min, t_max, t_step)
+    files = {fp.stem: fp for fp in sorted(records_dir.glob("*.json"))}
+
+    # ---- 1. the existing file, if its spectra are comparable with new ones -------------------
+    results, meta = {}, {}
+    if spectra_fp.is_file():
+        prev = pd.read_pickle(spectra_fp)
+        prev_method = _stored_method(prev.attrs)
+        mismatch = []
+        if prev_method != method:
+            mismatch.append(f"method {prev_method!r} (requested {method!r})")
+        if method == "fft" and prev.attrs.get("fft_max_dt") != fft_max_dt:
+            mismatch.append(f"fft_max_dt {prev.attrs.get('fft_max_dt')} (requested {fft_max_dt})")
+        if prev.attrs.get("damping") != damping:
+            mismatch.append(f"damping {prev.attrs.get('damping')} (requested {damping})")
+        if not np.array_equal(prev.columns.to_numpy(dtype=float), periods):
+            mismatch.append("a different period grid")
+        if mismatch:
+            print(f"{spectra_fp.name} was made with {', '.join(mismatch)}: "
+                  f"all {len(prev)} spectra are discarded and recomputed")
+        else:
+            results = {rid: row.to_numpy() for rid, row in prev.iterrows()}
+            meta = dict(prev.attrs.get("record_meta", {}))
+            print(f"read {spectra_fp.name}: {len(results)} spectra ({method})")
+    else:
+        print(f"{spectra_fp} does not exist yet: all spectra are computed")
+
+    # ---- 2. spectra without a JSON are removed ----------------------------------------------
+    removed = sorted(set(results) - set(files))
+    for rid in removed:
+        results.pop(rid)
+        meta.pop(rid, None)
+    print(f"\nspectra removed (no JSON): {len(removed)}")
+    for rid in removed:
+        print(f"  {rid}")
+
+    # ---- 3. + 4. stale spectra and JSONs without a spectrum ---------------------------------
+    stale = sorted(rid for rid in results
+                   if meta.get(rid, {}).get("json_mtime_ns") != files[rid].stat().st_mtime_ns)
+    for rid in stale:
+        results.pop(rid)
+    missing = sorted(set(files) - set(results))          # includes the stale ones
+    print(f"spectra recomputed because the JSON changed (stale): {len(stale)}")
+    print(f"spectra to compute (new + stale): {len(missing)}", flush=True)
+
+    failed = {}
+    if missing:
+        t_start = time.perf_counter()
+        with ProcessPoolExecutor(max_workers=n_cores) as pool:
+            futures = [pool.submit(process_record, str(files[rid]), periods, damping, method,
+                                   fft_max_dt) for rid in missing]
+            for n_done, fut in enumerate(as_completed(futures), start=1):
+                rid, psa, rec_meta, err = fut.result()
+                if err is None:
+                    results[rid], meta[rid] = psa, rec_meta
+                else:
+                    failed[rid] = err
+                    print(f"  FAILED {rid}: {err}", flush=True)
+                if n_done % 250 == 0 or n_done == len(missing):
+                    print(f"  {n_done}/{len(missing)} computed, "
+                          f"{(time.perf_counter() - t_start) / 60:.1f} min", flush=True)
+
+    # ---- save --------------------------------------------------------------------------------
+    attrs = {"quantity": "PSA (pseudo-spectral acceleration), units of the input record",
+             "damping": damping, "periods_s": periods.tolist(),
+             "psa_method": method, "method": _method_label(method, fft_max_dt),
+             "source_dir": str(records_dir.resolve()),
+             "updated": datetime.now().isoformat(timespec="seconds"),
+             "record_meta": meta, "failed": failed}
+    if method == "fft":
+        attrs["fft_max_dt"] = fft_max_dt
+    df = to_frame(results, periods, attrs)
+    spectra_fp.parent.mkdir(parents=True, exist_ok=True)
+    write_pickle(df, spectra_fp)
+    print(f"\nwrote {spectra_fp}: {df.shape[0]} records x {df.shape[1]} periods "
+          f"({len(files)} JSONs, {len(failed)} failed)")
+    return df
+
+
+# ---------------------------------------------------------------------------------------------
+# 7. Command line
 # ---------------------------------------------------------------------------------------------
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -229,6 +437,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("output_dir", type=Path, help="folder the DataFrame pickle is written to")
     p.add_argument("--n-cores", type=int, default=1,
                    help="number of worker processes (default 1)")
+    p.add_argument("--method", choices=METHODS, default=DEFAULT_METHOD,
+                   help=f"'fft' (default): FFT-resample to dt <= --fft-max-dt first; 'zoh': the "
+                        f"original, on the record's own dt (see the module docstring)")
+    p.add_argument("--fft-max-dt", type=float, default=FFT_MAX_DT,
+                   help=f"largest time step [s] after FFT resampling (default {FFT_MAX_DT})")
     p.add_argument("--damping", type=float, default=DAMPING,
                    help=f"damping ratio (default {DAMPING})")
     p.add_argument("--t-min", type=float, default=T_MIN, help=f"first period [s] (default {T_MIN})")
@@ -278,9 +491,11 @@ def main(argv=None) -> int:
         prev = pd.read_pickle(partial_fp)
         same_grid = np.array_equal(prev.columns.to_numpy(dtype=float), periods)
         same_damping = prev.attrs.get("damping") == args.damping
-        if not (same_grid and same_damping):
-            raise SystemExit(f"{partial_fp.name} was made with a different period grid or damping; "
-                             "delete it or run without --resume")
+        same_method = (_stored_method(prev.attrs) == args.method
+                       and (args.method != "fft" or prev.attrs.get("fft_max_dt") == args.fft_max_dt))
+        if not (same_grid and same_damping and same_method):
+            raise SystemExit(f"{partial_fp.name} was made with a different period grid, damping or "
+                             "method; delete it or run without --resume")
         results = {rid: row.to_numpy() for rid, row in prev.iterrows()}
         meta = dict(prev.attrs.get("record_meta", {}))
         print(f"resuming: {len(results)} records already done in {partial_fp.name}")
@@ -289,13 +504,14 @@ def main(argv=None) -> int:
     attrs = {"quantity": "PSA (pseudo-spectral acceleration), units of the input record",
              "damping": args.damping, "periods_s": periods.tolist(),
              "source_dir": str(args.input_dir.resolve()),
-             "method": "exact piecewise-constant-excitation recursion (as standes."
-                       "groundmotion.response_spectrum), run as a scipy.signal.lfilter IIR filter",
+             "psa_method": args.method, "method": _method_label(args.method, args.fft_max_dt),
              "started": datetime.now().isoformat(timespec="seconds")}
+    if args.method == "fft":
+        attrs["fft_max_dt"] = args.fft_max_dt
 
     print(f"{len(files)} records in {args.input_dir}, {len(todo)} to compute, "
           f"{len(periods)} periods ({periods[0]}-{periods[-1]} s), damping {args.damping}, "
-          f"{args.n_cores} core(s)")
+          f"method {args.method}, {args.n_cores} core(s)")
     print(f"output: {out_fp}", flush=True)
 
     def checkpoint():
@@ -306,7 +522,8 @@ def main(argv=None) -> int:
     t_start = time.perf_counter()
     done_since_ckpt = 0
     with ProcessPoolExecutor(max_workers=args.n_cores) as pool:
-        futures = [pool.submit(process_record, str(fp), periods, args.damping) for fp in todo]
+        futures = [pool.submit(process_record, str(fp), periods, args.damping, args.method,
+                               args.fft_max_dt) for fp in todo]
         for n_done, fut in enumerate(as_completed(futures), start=1):
             rid, psa, rec_meta, err = fut.result()
             if err is None:
