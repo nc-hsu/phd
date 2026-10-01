@@ -9,8 +9,8 @@
       "summary": "pandas shape=(1, 18)"
     },
     "gm_db_file": {
-      "hash": "4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e",
-      "summary": "file ESM-NGAsub_combined.csv (119815913 bytes)"
+      "hash": "7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d",
+      "summary": "file ESM-NGAsub_combined.csv (120401781 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -94,6 +94,8 @@
     "git_commit": "eefd21aa",
     "written_at": "2026-08-26T12:40:23.154509+00:00",
     "migrated_at": "2026-08-31T07:50:34.400106+00:00",
-    "migrated_from": "whole-file disagg hashes -> per-stripe content hashes; shard sha256 6b550a4feee5cefb249a600e60bb9afb0eb744a88af953d85add4ea15e7723e8, stats sha256 e6c19bb3ebaa4f61b0e7d5cfaf099a7f162cbddb7ec3c9a0f1a23a26175d4423"
+    "migrated_from": "whole-file disagg hashes -> per-stripe content hashes; shard sha256 6b550a4feee5cefb249a600e60bb9afb0eb744a88af953d85add4ea15e7723e8, stats sha256 e6c19bb3ebaa4f61b0e7d5cfaf099a7f162cbddb7ec3c9a0f1a23a26175d4423",
+    "network_code_restamped_at": "2026-09-30T12:15:53.946618+00:00",
+    "network_code_restamped_from": "gm_db_file: database before the network_code column was added (sha256 4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e) -> with it (sha256 7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d); all other text in the file byte-identical"
   }
 }
