@@ -33,16 +33,24 @@ rows of the selection database. The record identifier
 ``{event}_{station}_{location}`` cannot tell them apart. So the selection CSV now
 carries an optional ``network_code`` column (from the selection database, via
 nb 033 / 040). When it is given, only the ``{network_code}.{station_code}`` group
-is read. If that group is not in the file, the record fails; there is no fallback
-to another network. Without a network code the old behaviour is kept, and a file
-holding two networks fails with "2 instruments".
+is read. Without a network code the old behaviour is kept, and a file holding two
+networks fails with "2 instruments".
+
+NETWORK CODE ALIASES (added 2026-10-01): sometimes the flatfile names one network
+(e.g. IV) but the file stores the same recording under another code (e.g.
+``8P.T1201``, a temporary deployment). If the requested group is not in the file,
+the codes listed for it in ``NETWORK_CODE_ALIASES`` are tried. Exactly one must be
+present; if none or several are, the record fails. There is no fallback to a
+network that is not listed. The JSON's ``network_code`` is the code actually read,
+and ``requested_network_code`` is the one the CSV asked for.
 
 Given a selection CSV of ``(record_identifier, component)`` rows -- where
 ``record_identifier`` is ``{event_id}_{station_code}_{location_code}`` -- this
 script writes one JSON record per row, using the same schema and filename
 convention as the NGA-Sub converter (``record`` field last;
-``{record_identifier}__{component}.json``), plus four traceability fields:
-``network_code``, ``channel``, ``instrument_location`` and ``source_file``.
+``{record_identifier}__{component}.json``), plus five traceability fields:
+``network_code``, ``requested_network_code``, ``channel``, ``instrument_location``
+and ``source_file``.
 
 Usage:
     python convert_esm_records_to_json.py <src> <selection_csv> <dst>
@@ -104,6 +112,31 @@ CHANNEL_TO_COMPONENT = {
     "HN1": "U",
 }
 COMPONENTS = ("U", "V", "W")
+
+# ---------------------------------------------------------------------------------------------
+# Network code aliases: flatfile network code -> the codes the SAME recording may be stored under in
+# the HDF5 file. The flatfile (and so the selection CSV) sometimes names a permanent network (e.g.
+# IV) where the HDF5 file's station group carries the code of the temporary deployment or the
+# historical/virtual network the data was archived under (e.g. 8P.T1201, EU.GMN). It is one
+# recording relabelled, not a second instrument.
+#
+# Used only when the requested "{network_code}.{station}" group is NOT in the file; the aliases are
+# then tried and exactly one must be present (two or more is ambiguous and fails). Source: every
+# failure in dump/network_code_errors.txt (2026-10-01, 75 rows), each of which had exactly one
+# station group in the file:
+#   IV -> 8P (T12xx, 2016 Central Italy), 8H (RMxx, 2009 L'Aquila), 5G (T08xx, 2012 Emilia),
+#         9N (T0721), EU (GMN, 1976 Friuli)
+#   RO -> EU, CR -> EU, IP -> EU (historical records), SI -> SL (Slovenia, 1998)
+# GE and HL deliberately have NO entries: GE.KTHA and HL.KTHA are different recordings (see "WHICH
+# NETWORK" at the top), so neither may ever stand in for the other.
+# ---------------------------------------------------------------------------------------------
+NETWORK_CODE_ALIASES = {
+    "IV": ["8P", "8H", "5G", "9N", "EU"],
+    "RO": ["EU"],
+    "CR": ["EU"],
+    "IP": ["EU"],
+    "SI": ["SL"],
+}
 
 # The OLD positional rule (key-sorted 1st/2nd/3rd dataset = U/V/W). Kept ONLY so that the dry run
 # can report which records the channel map changes; it is not used to convert anything.
@@ -261,17 +294,30 @@ def _station_datasets(h5, station_code, network_code=None):
 
     With ``network_code`` only the group "{network_code}.{station_code}" is used. This is what
     separates two networks that share a station code in one file (e.g. GE.KTHA / HL.KTHA). If
-    that group is missing the record fails (``KeyError``); another network's group is never
-    used in its place, since it is a different recording.
+    that group is missing, the aliases of ``network_code`` in ``NETWORK_CODE_ALIASES`` are
+    tried (same recording stored under another code, e.g. IV -> 8P). Exactly one alias group
+    must be present; none, or more than one (ambiguous), fails with ``KeyError``. A network that
+    is not a listed alias is never used in its place, since it is a different recording.
     """
     if "Waveforms" not in h5:
         raise KeyError("HDF5 missing /Waveforms")
     wf = h5["Waveforms"]
     if network_code is not None:
         wanted = f"{network_code}.{station_code}"
-        if wanted not in wf:
-            raise KeyError(f"no station group {wanted}; groups: {list(wf)[:10]}")
-        groups = [wanted]
+        if wanted in wf:
+            # the requested code always wins; aliases are not even looked at
+            groups = [wanted]
+        else:
+            # check EVERY alias (not just the first hit) so that an ambiguous file is caught
+            aliases = NETWORK_CODE_ALIASES.get(network_code, [])
+            found = [f"{a}.{station_code}" for a in aliases if f"{a}.{station_code}" in wf]
+            if len(found) > 1:
+                raise KeyError(f"no station group {wanted} and {len(found)} alias groups match "
+                               f"({', '.join(found)}); ambiguous")
+            if not found:
+                tried = f" (aliases tried: {', '.join(aliases)})" if aliases else ""
+                raise KeyError(f"no station group {wanted}{tried}; groups: {list(wf)[:10]}")
+            groups = found
     else:
         groups = [g for g in wf if str(g).split(".", 1)[-1] == station_code]
     if not groups:
@@ -431,6 +477,9 @@ def convert_record(record_identifier, component, src, dst, backup_dir=None, dry_
         "location_code": location_code,
         # traceability: exactly which dataset of which file this is
         "network_code": net,
+        # the network the selection CSV asked for (None if not given). Differs from network_code
+        # only when an alias from NETWORK_CODE_ALIASES was used (e.g. requested IV, read 8P).
+        "requested_network_code": network_code,
         "channel": cha,
         "instrument_location": loc,
         "source_file": h5_path.name,
