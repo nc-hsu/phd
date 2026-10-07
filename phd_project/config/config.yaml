@@ -67,7 +67,18 @@ proc_data:
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
   gcim_dists: "data_processed/05_gcim_distributions"
   gm_selection: "data_processed/06_gm_selection"
+  # Second, "optimised" AvgSA_03 selection (nbs 032/033/040/042 -optimised copies): round 1
+  # bounds M + Vs30 but not distance, then optimises every stripe. Kept apart from the
+  # original selection above (which must stay unchanged) so the two can be compared.
+  gm_selection_optimised: "data_processed/06_gm_selection/AvgSA_03_optimised"
   gm_records: "data_processed/07_gm_records"
+  # Fine-grid (0.01 s) 5 %-damped PSA of every selected record, one row per record_id
+  # (written by scripts/compute_record_spectra.py). nb 072 §8.10 reads record-side SaRatio from it.
+  gm_record_spectra: "data_processed/07_gm_records/spectra/acc_spectra.pickle"
+  # ESM records whose JSON U/V labels are swapped (converter on HN2/HN3 HDF5 files, nb 043 §5),
+  # and every place the site-specific MSA used them: one row per (site, structure "3s"/"5s",
+  # stripe_iml token e.g. "00pt270", record_index 0-29), plus the record_tag.
+  swapped_esm_records_msa_usage_AvgSA_03: "data_processed/07_gm_records/swapped_esm_records_msa_usage_AvgSA_03.csv"
   # Building Datasets
   dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
   dc2_scA_reference_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_scA_reference_cbfs.pickle"
@@ -130,6 +141,8 @@ results:
   hazard_curve_plots: "results/03_psha/hc_plots"
   disaggregation_plots: "results/03_psha/disagg_plots"
   AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
+  # Stripe pickles of the second, "optimised" selection (see gm_selection_optimised).
+  AvgSA_03_record_selection_optimised: "results/04_record_selection/AvgSA_03_optimised"
   AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
   # MSA-FEMAP695 stripe selections (nb 054): the same 22 FEMA P695 records at every
   # stripe, one set per design group rather than per site.

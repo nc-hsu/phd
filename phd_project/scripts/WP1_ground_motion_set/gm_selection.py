@@ -893,6 +893,13 @@ def stripe_input_fingerprint(site, iml, source_fps: dict,
             sc["n_shuffles"], sc["shuffle_rng_seeds"], sc["rng_seed"],
         )),
         **_selection_ctx_fingerprint_inputs(basic_selection_ctx),
+        # Records filtered out of the database in memory (the "optimised"
+        # selection, see setup_AvgSA03_gm_selection.gm_db_for_selection_optimised).
+        # The gm_db_file hash cannot see such a filter, so it is stated here. Only
+        # added when the config carries the key: the original SELECTION_CONFIG does
+        # not, so the original stripes' fingerprints are unchanged.
+        **({"db_exclusions": repr(sc["db_exclusions"])}
+           if "db_exclusions" in sc else {}),
     )
 
 
@@ -2113,7 +2120,8 @@ def build_final_ensembles(
         n_shuffles: int = 5,
         shuffle_rng_seeds: list[int] | None = None,
         rng_seed: int = 1,
-        force_recompute: bool = False):
+        force_recompute: bool = False,
+        db_exclusions=None):
     """Run a configurable N-round selection + optimisation pipeline.
 
     This centralises the orchestration that previously lived in the AvgSA
@@ -2165,6 +2173,12 @@ def build_final_ensembles(
     force_recompute : bool
         Recompute and overwrite every stage + the final artifact, ignoring any
         existing cache (bypasses the staleness guard).
+    db_exclusions : hashable | None
+        Description of records removed from ``gm_db`` in memory before this call
+        (e.g. ``SELECTION_CONFIG_OPTIMISED["db_exclusions"]``). Added to every stage
+        fingerprint and the final manifest so the filter is part of the provenance;
+        ``None`` (the default) adds nothing, leaving existing fingerprints unchanged.
+        This argument only RECORDS the exclusion -- it does not filter ``gm_db``.
     """
     output_fp = Path(output_fp)
     n_rounds = len(round_unbounded)
@@ -2199,6 +2213,12 @@ def build_final_ensembles(
         "site_model_file": source_fps["site_model_file"],
         "rng_seed": rng_seed,
     }
+    # Records filtered out of ``gm_db`` in memory are invisible to the file-byte
+    # hash of ``gm_db_file``, so a caller that filtered states the exclusion here
+    # (the "optimised" selection does). Added ONLY when given: an absent key leaves
+    # the fingerprint of every existing, unfiltered artifact exactly as it was.
+    if db_exclusions is not None:
+        base_inputs["db_exclusions"] = repr(db_exclusions)
 
     def stage_fingerprint(ctx: dict, stage: str, only: list, **extra) -> dict:
         # Base inputs fully determine every stage's result; ``stage`` + ``only``

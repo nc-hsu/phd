@@ -121,7 +121,7 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
     """Return a COPY of ``gm_db`` with every row of each unavailable record removed.
 
     **Deliberately NOT called by :func:`setup_AvgSA03_gcim_gm_selection`.** The
-    default selection path must keep using the full database, because
+    ORIGINAL selection path must keep using the full database, because
     ``gm_selection.stripe_input_fingerprint`` hashes the database *file's bytes*:
     the ~510 stripes already on disk were selected from the complete DB and their
     manifests say so. Filtering by default would make every future selection
@@ -130,9 +130,16 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
     positional ``RangeIndex`` (see ``greedy_optimise_ensemble``), which every row
     below a deleted one would shift.
 
-    Use this ONLY from the one-off reselection cell in nb 032, which reselects a
-    single ``(site, iml)`` around a record that turned out to be undownloadable
-    and records the deviation in the stripe's ``db_exclusions`` key.
+    It has exactly two callers:
+
+    - the one-off reselection cell in the ORIGINAL nb 032, which reselects a
+      single ``(site, iml)`` around a record that turned out to be undownloadable
+      and records the deviation in the stripe's ``db_exclusions`` key;
+    - :func:`gm_db_for_selection_optimised`, which filters the database for the
+      WHOLE second ("optimised") selection, from the start. That selection writes
+      to its own folders, and the exclusion IS in its provenance fingerprint (via
+      ``SELECTION_CONFIG_OPTIMISED["db_exclusions"]``), so neither problem above
+      applies to it.
 
     Dropping is done with ``DataFrame.drop(index=...)`` so the surviving rows keep
     their original index labels -- that equivalence with the on-disk DB is the
@@ -164,6 +171,101 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
         print(f"gm_db: {len(gm_db)} -> {len(filtered)} rows "
               f"({len(to_drop)} dropped)")
     return filtered
+
+
+# =============================================================================
+# Second, "optimised" selection (nbs 032/033/040/042 "-optimised" copies)
+# =============================================================================
+# A complete second AvgSA([0,3]) record selection, run alongside the original so
+# the two record sets can be compared. The original (SELECTION_CONFIG above, the
+# folders cfg["proc_data"]["gm_selection"] and cfg["results"]["AvgSA_03_record_
+# selection"]) is NOT touched by any of this: the optimised selection has its own
+# config constant and writes to its own folders (cfg["proc_data"]
+# ["gm_selection_optimised"], cfg["results"]["AvgSA_03_record_selection_optimised"]).
+#
+# Why a separate constant rather than editing SELECTION_CONFIG: the per-stripe
+# fingerprint hashes the selection config, so editing SELECTION_CONFIG would make
+# all original stripes read as stale, and the next run of the original nb 032/033
+# would reselect and overwrite every one of them.
+
+def _exclusion_identities(records: list[dict]) -> tuple:
+    """The part of each ``UNAVAILABLE_RECORDS`` entry that decides WHICH rows go.
+
+    Only ``database`` + ``identity`` are kept, normalised to sorted tuples of
+    strings. This is what the optimised selection's fingerprint hashes, so the
+    stripes go stale when the set of excluded records changes, but NOT when a
+    free-text field (``label``, ``reason``, the comments) is edited.
+    """
+    out = []
+    for rec in records:
+        ident = []
+        for field, value in sorted(rec["identity"].items()):
+            if isinstance(value, (list, tuple, set)):
+                value = tuple(sorted(str(v) for v in value))
+            else:
+                value = str(value)
+            ident.append((field, value))
+        out.append((rec["database"], tuple(ident)))
+    return tuple(sorted(out))
+
+
+# Round scheme of the optimised selection (the engine is build_final_ensembles in
+# gm_selection.py; nothing in it changed for this):
+#
+#   round 1  select with M + Vs30 bounds, NO distance bound, then optimise EVERY
+#            stripe (force_optimisation=True), including ones that already pass
+#            straight after selection.
+#   round 2  stripes for which round 1 could not form a record set at all are
+#            reselected with NO bounds. Every stripe still failing is then
+#            optimised with no bounds (force=True: the newly reselected ones too,
+#            even if they already pass). A round-1 set that failed restarts from its
+#            round-1 SELECTION, not from its round-1 optimised set.
+#   round 3  no reselection; stripes still failing are re-optimised with no bounds
+#            over 5 shuffled database orderings, keeping the better of {new, old}.
+#            (force=True has no effect here, as every stripe in the round fails; it
+#            is set only so all three rounds read the same.)
+#
+# A stripe that passes after any round is never touched again.
+#
+# "db_exclusions" is NOT a round setting: it is here so stripe_input_fingerprint
+# hashes it (see gm_selection.stripe_input_fingerprint), which puts the exclusion
+# into every optimised stripe's manifest. The filtering itself happens in
+# gm_db_for_selection_optimised below -- the ONLY place it happens.
+SELECTION_CONFIG_OPTIMISED = {
+    "percentiles": SELECTION_CONFIG["percentiles"],   # same GCIM targets (nb 031 file shared)
+    "round_unbounded": [["d"], ["m", "d", "vs30"], ["m", "d", "vs30"]],
+    "force_optimisation": [True, True, True],
+    "shuffle": [False, False, True],
+    "n_shuffles": SELECTION_CONFIG["n_shuffles"],
+    "shuffle_rng_seeds": SELECTION_CONFIG["shuffle_rng_seeds"],
+    "rng_seed": SELECTION_CONFIG["rng_seed"],
+    "db_exclusions": _exclusion_identities(UNAVAILABLE_RECORDS),
+}
+
+
+def gm_db_for_selection_optimised(gm_db: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
+    """THE place where the optimised selection's database filtering happens.
+
+    Returns a copy of ``gm_db`` without every record listed in
+    ``UNAVAILABLE_RECORDS`` (the NGA-Sub ONA network, and NGA-Sub RSN 6003695 /
+    6003748 / 6003796 whose waveforms are ~3-4.5e4 x their flatfile SA). nb
+    032-optimised calls it once, straight after ``setup_AvgSA03_gcim_gm_selection``,
+    and passes ONLY the filtered frame to ``build_final_ensembles``, so these records
+    can never be selected in any round.
+
+    - The database file on disk is never edited; filtering is in memory with
+      ``DataFrame.drop(index=...)``, so the surviving rows keep their original
+      index labels and every selected record still points at the right row of the
+      canonical CSV (nb 033's network-code lookup relies on that).
+    - The file-byte hash of the database cannot see this filter, so the exclusion
+      is stated in the provenance explicitly: ``SELECTION_CONFIG_OPTIMISED
+      ["db_exclusions"]`` in every stripe manifest, and the ``db_exclusions``
+      argument of ``build_final_ensembles`` in the stage caches and the
+      final-ensembles manifest. Both are derived from the same
+      ``UNAVAILABLE_RECORDS`` list used here, so adding a record to that list makes
+      every optimised stripe stale and it is reselected without it.
+    """
+    return drop_unavailable_records(gm_db, UNAVAILABLE_RECORDS, verbose=verbose)
 
 
 def stripe_source_fps() -> dict:
