@@ -59,13 +59,13 @@ buildings: list[dict[str, str]] = [
 max_coordinators = 10          # how many building coordinators / windows at once
 window_name_index = 1         # the number of folder to go up in directory to get to unique folder name. e.g. 1 = parent folder of config
 runner_script_name = "run_batch_ida_per_record.py"
+# Machine-global cap on simultaneous IDA workers (the process_semaphore cap, NOT
+# the per-coordinator max_workers). None -> must be supplied via --n-cores.
+n_cores = None
 # Show a console window per record worker (default). Set to False (or pass
 # --quiet) to hide them and stream each worker's output to worker_logs/ instead --
 # useful when many workers run at once and the windows would be noise.
 show_worker_windows = True
-# Machine-global cap on simultaneous IDA workers (the process_semaphore cap, NOT
-# the per-coordinator max_workers). None -> must be supplied via --n-cores.
-n_cores = None
 # --------------------------------------------------------------------------
 
 
