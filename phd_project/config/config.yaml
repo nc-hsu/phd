@@ -71,6 +71,11 @@ proc_data:
   # bounds M + Vs30 but not distance, then optimises every stripe. Kept apart from the
   # original selection above (which must stay unchanged) so the two can be compared.
   gm_selection_optimised: "data_processed/06_gm_selection/AvgSA_03_optimised"
+  # Third and fourth AvgSA_03 selections, whose objectives target the set MOMENTS of ln IM
+  # (nbs 032/033/040/042 -optimised__mu_sigma / -optimised__ks_mu_sigma copies; scheme configs
+  # SELECTION_CONFIG_MU_SIGMA / SELECTION_CONFIG_KS_MU_SIGMA in setup_AvgSA03_gm_selection.py).
+  gm_selection_optimised__mu_sigma: "data_processed/06_gm_selection/AvgSA_03_optimised__mu_sigma"
+  gm_selection_optimised__ks_mu_sigma: "data_processed/06_gm_selection/AvgSA_03_optimised__ks_mu_sigma"
   gm_records: "data_processed/07_gm_records"
   # Fine-grid (0.01 s) 5 %-damped PSA of every selected record, one row per record_id
   # (written by scripts/compute_record_spectra.py). nb 072 §8.10 reads record-side SaRatio from it.
@@ -148,6 +153,9 @@ results:
   AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
   # Stripe pickles of the second, "optimised" selection (see gm_selection_optimised).
   AvgSA_03_record_selection_optimised: "results/04_record_selection/AvgSA_03_optimised"
+  # Stripe pickles of the moment-objective selections (see gm_selection_optimised__mu_sigma).
+  AvgSA_03_record_selection_optimised__mu_sigma: "results/04_record_selection/AvgSA_03_optimised__mu_sigma"
+  AvgSA_03_record_selection_optimised__ks_mu_sigma: "results/04_record_selection/AvgSA_03_optimised__ks_mu_sigma"
   AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
   # MSA-FEMAP695 stripe selections (nb 054): the same 22 FEMA P695 records at every
   # stripe, one set per design group rather than per site.

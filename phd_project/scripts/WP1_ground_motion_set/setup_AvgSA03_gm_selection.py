@@ -21,6 +21,7 @@ from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     _exclusion_identities,
     check_exclusion_versions,
     stripe_fingerprints_by_exclusion_version,
+    normalise_selection_scheme,
 )
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 
@@ -256,6 +257,115 @@ SELECTION_CONFIG_OPTIMISED = {
 }
 
 
+# =============================================================================
+# Third and fourth selections: objectives that target the MOMENTS
+# (nbs 032/033/040/042 "-optimised__mu_sigma" and "-optimised__ks_mu_sigma")
+# =============================================================================
+# Why: the KS-optimised selection minimised the weighted KS distance, which improved
+# KS but pushed the set MOMENTS of ln IM away from the GCIM target -- most of all
+# for Ds5-95, whose set SD rose to a median 1.44 x sigma_GCIM (nb 034). KS is nearly
+# blind to a few extreme records (each moves the ECDF by only 1/30), but those
+# records dominate the sample SD. The study uses the set mean and SD of ln Ds5-95 and
+# ln SaRatio as regression covariates, so these two selections target them directly.
+#
+# Per stripe and selection IM m (conditioning IM dropped), with the 30 records:
+#
+#     z_mu,m    = (mean_m ln IM - mu_GCIM,m) / sigma_GCIM,m
+#     r_sigma,m = s_m(ln IM) / sigma_GCIM,m              (sample SD, ddof=1)
+#
+#   __mu_sigma     J = sum_m w_m [ (1 - a_sigma) z_mu,m^2 + a_sigma (ln r_sigma,m)^2 ]
+#                  moments only; no KS term, no KS-band penalty; NOT required to
+#                  pass KS (acceptance "complete_set": a full 30-record set is enough;
+#                  ks_passed is still stored, as a diagnostic).
+#   __ks_mu_sigma  J' = c*V + ( l_KS sum w D + l_mu sum w z^2 + l_sigma sum w (ln r)^2 )
+#                  with l_k = lambda_k / (lambda_KS + lambda_mu + lambda_sigma) and the
+#                  KS-band penalty c*V (c = 10) outside the normalisation; still
+#                  required to pass KS (acceptance "ks", as before).
+#
+# The objective functions and the dispatch are in gm_selection.py
+# (weighted_moment_objective, weighted_ks_and_moment_objective, objective_and_kwargs).
+#
+# IM weights, BOTH selections: Ds5-95 0.40, each of the 21 spectral IMs 0.60/21
+# ("weight_rsd595" below). It applies throughout -- the SSE-based record picking, the
+# best-of-20 candidate choice, the optimiser and the round-3 keep-better -- because
+# all of them read the context's imt_weights. That these selections differ from the
+# KS-optimised one in the weight as well as the objective was accepted by the user.
+#
+# Scheme keys (read by setup_AvgSA03_gcim_gm_selection_for_scheme and the stale
+# check; validated by gm_selection.normalise_selection_scheme):
+#   "objective"       "ks" (default) | "mu_sigma" | "ks_mu_sigma"
+#   "a_sigma"         mu_sigma only: weight of the SD error, in [0, 1]; a_mu = 1 - a_sigma
+#   "lambda_ks/mu/sigma"  ks_mu_sigma only: importance weights, normalised to sum 1
+#   "acceptance"      "ks" (default) | "complete_set"
+#   "weight_rsd595"   the Ds5-95 IM weight the context is built with
+#
+# Fingerprints: the scheme enters every stripe / stage / final fingerprint through
+# the selection context (gm_selection._selection_ctx_fingerprint_inputs), and ONLY
+# because it is not the default -- the original and KS-optimised stripes are
+# unaffected. "weight_rsd595" is fingerprinted through imt_weights, as always.
+# Changing any value here therefore reselects the stripes of that selection only.
+#
+# Folders: cfg["proc_data"]["gm_selection_optimised__<scheme>"] and
+# cfg["results"]["AvgSA_03_record_selection_optimised__<scheme>"]. The GCIM file
+# (nb 031), the disaggregation inputs and the record JSON folder are shared and
+# read only, as for the KS-optimised selection.
+
+# __mu_sigma rounds (user decision D2 = (a), 2026-10-19):
+#
+#   round 1  select with M + Vs30 bounds, NO distance bound, then optimise EVERY
+#            stripe (force_optimisation=True) against J_mu_sigma.
+#   round 2  only stripes for which round 1 could not form a 30-record set at all:
+#            reselect with NO bounds and optimise them.
+#   (no round 3) Under acceptance "complete_set" every stripe with a set is already
+#            done after round 1, so a shuffled best-of-5 round would touch nothing
+#            -- round 1 already optimised every stripe against the moment objective.
+SELECTION_CONFIG_MU_SIGMA = {
+    "percentiles": SELECTION_CONFIG["percentiles"],   # same GCIM targets (nb 031 file shared)
+    "round_unbounded": [["d"], ["m", "d", "vs30"]],
+    "force_optimisation": [True, True],
+    "shuffle": [False, False],
+    "n_shuffles": SELECTION_CONFIG["n_shuffles"],         # unused (no shuffled round);
+    "shuffle_rng_seeds": SELECTION_CONFIG["shuffle_rng_seeds"],  # kept so the keys match
+    "rng_seed": SELECTION_CONFIG["rng_seed"],
+    "db_exclusions": _exclusion_identities(UNAVAILABLE_RECORDS),
+    "objective": "mu_sigma",
+    "a_sigma": 0.5,              # equal weight on mean and SD error (a_mu = 0.5)
+    "acceptance": "complete_set",
+    "weight_rsd595": 0.40,
+}
+
+# __ks_mu_sigma rounds: the same three rounds as SELECTION_CONFIG_OPTIMISED (see the
+# table there), all scored with J':
+#
+#   round 1  M + Vs30 bounds, no distance bound, force-optimise every stripe.
+#   round 2  stripes with no set reselected with no bounds; every stripe still
+#            failing KS optimised with no bounds.
+#   round 3  stripes still failing KS: shuffled best-of-5, keep the better of
+#            {new, old} (scored with J', the same objective as the optimiser).
+SELECTION_CONFIG_KS_MU_SIGMA = {
+    "percentiles": SELECTION_CONFIG["percentiles"],
+    "round_unbounded": SELECTION_CONFIG_OPTIMISED["round_unbounded"],
+    "force_optimisation": SELECTION_CONFIG_OPTIMISED["force_optimisation"],
+    "shuffle": SELECTION_CONFIG_OPTIMISED["shuffle"],
+    "n_shuffles": SELECTION_CONFIG["n_shuffles"],
+    "shuffle_rng_seeds": SELECTION_CONFIG["shuffle_rng_seeds"],
+    "rng_seed": SELECTION_CONFIG["rng_seed"],
+    "db_exclusions": _exclusion_identities(UNAVAILABLE_RECORDS),
+    "objective": "ks_mu_sigma",
+    # equal importance (the user's choice; NOT equal influence -- see the report)
+    "lambda_ks": 1.0,
+    "lambda_mu": 1.0,
+    "lambda_sigma": 1.0,
+    "acceptance": "ks",
+    "weight_rsd595": 0.40,
+}
+
+# Validate both at import, so a typo fails immediately rather than inside a run.
+for _sc in (SELECTION_CONFIG_MU_SIGMA, SELECTION_CONFIG_KS_MU_SIGMA):
+    normalise_selection_scheme(_sc)
+del _sc
+
+
 def gm_db_for_selection(gm_db: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
     """THE place where the selection database is filtered (both selections).
 
@@ -424,7 +534,44 @@ def setup_AvgSA03_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125, s
                              nonSA_imt_strs, sa_periods, t_upper, sites)
 
 
-def setup_AvgSA03_gcim_gm_selection(weight_rsd595=0.25, sites=None):
+def setup_AvgSA03_gcim_gm_selection_for_scheme(selection_config: dict, sites=None):
+    """:func:`setup_AvgSA03_gcim_gm_selection` for a given selection scheme.
+
+    Every notebook of a moment-objective selection (032/033 "__mu_sigma" /
+    "__ks_mu_sigma" copies) builds its selection context through here, so the
+    context ALWAYS carries the scheme's RSD595 weight and its selection scheme:
+
+    - ``weight_rsd595`` from the config (default 0.25 if the config has none), so
+      the IM weights -- and therefore the stripe fingerprints -- of nb 032 and nb 033
+      agree. (Calling the plain setup function in one of them would give 0.25 there
+      and a different fingerprint for every stripe.)
+    - ``basic_selection_ctx["selection_scheme"]``: the validated, canonical scheme
+      (objective, its parameters, acceptance; see
+      gm_selection.normalise_selection_scheme), which the engine reads at every
+      scoring and acceptance step and which enters the fingerprints.
+
+    For ``SELECTION_CONFIG`` / ``SELECTION_CONFIG_OPTIMISED`` it returns exactly what
+    the plain setup function returns (weight 0.25, no scheme entry).
+    Same return value and ``sites`` semantics as the plain function.
+    """
+    site_iml_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db = \
+        setup_AvgSA03_gcim_gm_selection(
+            weight_rsd595=selection_config.get("weight_rsd595", DEFAULT_WEIGHT_RSD595),
+            sites=sites)
+    scheme = normalise_selection_scheme(selection_config)
+    if scheme["objective"] != "ks" or scheme["acceptance"] != "ks":
+        # Only a non-default scheme is stored, so the default context stays exactly
+        # the one the plain setup function returns.
+        basic_selection_ctx["selection_scheme"] = scheme
+    return site_iml_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db
+
+
+# Ds5-95 weight of the original and KS-optimised selections (the remaining weight is
+# shared equally by the 21 spectral IMs).
+DEFAULT_WEIGHT_RSD595 = 0.25
+
+
+def setup_AvgSA03_gcim_gm_selection(weight_rsd595=DEFAULT_WEIGHT_RSD595, sites=None):
     """Build everything the AvgSA([0,3]) record selection needs.
 
     ``sites`` selects which per-site disagg shards to load: ``None`` loads every

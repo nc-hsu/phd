@@ -439,8 +439,8 @@ def optimise_ground_motion_ensembles_for_sites(
         penalty_constant: float = 10
         ):
 
-    obj_func = weighted_ks_statistic_and_L2norm_penalty
-
+    # The objective is chosen per (site, iml) below from the context's selection
+    # scheme (objective_and_kwargs): KS by default, or a moment objective.
     optimised_ensembles = {}
     scores = {}
 
@@ -467,8 +467,10 @@ def optimise_ground_motion_ensembles_for_sites(
         site_selection_ctx = basic_selection_ctx.copy()
         site_selection_ctx["site_params"] = site_params
 
-        obj_func_kwargs = _optimise_obj_kwargs(
-            site, iml, gcim_dists, basic_selection_ctx, penalty_constant)
+        obj_func, obj_func_kwargs = objective_and_kwargs(
+            site, iml, gcim_dists, basic_selection_ctx,
+            im_columns=_record_im_columns(pr_ensemble, basic_selection_ctx),
+            penalty_constant=penalty_constant)
 
         # do the optimisation (the key IS the conditioning iml)
         cond_iml = iml
@@ -1068,7 +1070,14 @@ def stripe_fingerprints_by_exclusion_version(selection_config: dict,
 
     Every notebook that runs the stale check for a selection must use this, with
     the same arguments, so they all make the same stale/valid decision.
+
+    It first checks that ``basic_selection_ctx`` was built for ``selection_config``
+    (same selection scheme, same RSD595 weight if the config states one; see
+    :func:`check_ctx_matches_config`). A mismatch would make every stripe of the
+    selection read as stale and be reselected with the wrong objective, so it raises.
+    For the original and KS-optimised configs this check always passes.
     """
+    check_ctx_matches_config(basic_selection_ctx, selection_config)
     current = check_exclusion_versions(exclusion_records)
 
     # Version 0 = "the manifest has no db_exclusions entry". cache_utils.
@@ -1962,16 +1971,48 @@ def weighted_ks_statistic_and_L2norm_penalty(
     n_recs: int,
     penalty_constant: float
     """
+    # The two terms are computed by _weighted_ks_terms, which the combined
+    # KS + moments objective (weighted_ks_and_moment_objective) reuses: that
+    # objective scales sum(w*D) by its lambda_KS but must leave c*V unscaled, so it
+    # needs the two parts separately. The expression below is the exact expression
+    # this function always returned, in the same operation order, so its value is
+    # bit-identical to the pre-refactor version (tests/test_gm_selection_moment_
+    # objectives.py checks this against a frozen copy). That matters: the original
+    # and KS-optimised selections were scored with it.
+    total_weighted_ks, total_violation = _weighted_ks_terms(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list,
+        im_weights, n_recs)
+
+    objective_value = (total_violation * penalty_constant) + total_weighted_ks
+
+    return objective_value
+
+
+def _weighted_ks_terms(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list,
+        im_weights, n_recs) -> tuple[float, float]:
+    """The two building blocks of the KS objective, ``(sum_m w_m D_m, V)``.
+
+    - ``sum_m w_m D_m``: the IM-weighted sum of the KS distances D_m between each
+      IM's empirical CDF (over the set) and the GCIM target CDF.
+    - ``V``: the sum of squared amounts by which the empirical CDF leaves the KS
+      acceptance band (zero for an IM that stays inside it). It is NOT weighted by
+      w_m: it acts as the constraint "stay inside the band", not as a fit measure.
+
+    Same arguments as :func:`weighted_ks_statistic_and_L2norm_penalty` minus
+    ``penalty_constant``. IMs with zero weight are skipped entirely (they add to
+    neither term), as they always were.
+    """
     # sort all IMTs at once along the record axis (axis 0)
     sorted_ims = np.sort(rec_ims, axis=0)
-    
+
     # pre-calculate the ECDF steps (i/n and (i-1)/n). constant for a fixed ensemble size
     steps_up = np.linspace(1.0/n_recs, 1.0, n_recs).reshape(-1, 1)
     steps_down = np.linspace(0.0, (n_recs-1.0)/n_recs, n_recs).reshape(-1, 1)
-    
+
     total_weighted_ks = 0.0
     total_violation = 0.0
-    
+
     for i in range(len(target_cdfs_list)):
 
         if im_weights[i] == 0:
@@ -2000,9 +2041,178 @@ def weighted_ks_statistic_and_L2norm_penalty(
         total_violation += (upper_violation + lower_violation)
         total_weighted_ks += im_weights[i] * ks_stat
 
-    objective_value = (total_violation * penalty_constant) + total_weighted_ks
-        
-    return objective_value
+    return total_weighted_ks, total_violation
+
+
+# =============================================================================
+# Moment-based objectives (the "__mu_sigma" and "__ks_mu_sigma" selections)
+# =============================================================================
+# The KS objective above measures the largest vertical gap between the set's
+# empirical CDF and the GCIM target CDF. With 30 records one record moves the ECDF
+# by only 1/30, so KS barely notices a few extreme records -- yet those records
+# dominate the set's sample SD. Since the study uses the set MOMENTS (mean and SD
+# of ln IM) as regression covariates, these objectives target the moments directly.
+#
+# For selection IM m (conditioning IM dropped) and a set of n records:
+#
+#     z_mu,m    = (mean_m(ln IM) - mu_GCIM,m) / sigma_GCIM,m     mean error, in target SDs
+#     r_sigma,m = s_m(ln IM) / sigma_GCIM,m                       SD ratio (s with ddof=1)
+#
+# Both are scale-free, so the spectral IMs -- whose sigma_GCIM is small after
+# conditioning on AvgSA -- count as much as Ds5-95. The SD error is taken as
+# ln r_sigma (see _sd_error): symmetric in FACTORS (1.1x too wide costs the same as
+# 1/1.1 too narrow), and ln s is roughly symmetric around ln sigma for a sample SD.
+#
+# All functions take ln IM values (the greedy optimiser passes np.log(ims_scaled)),
+# and target vectors ALREADY ALIGNED with the columns of rec_ims -- see
+# objective_and_kwargs, which looks them up by IM name.
+
+# How the SD error is measured: "log" -> ln(s / sigma) (the choice for these
+# selections), "ratio" -> s / sigma - 1. It is part of the selection-scheme
+# fingerprint of the moment objectives (normalise_selection_scheme), so switching it
+# invalidates only the moment-objective stripes, never the KS ones.
+SD_ERROR_KIND = "log"
+
+
+def _sd_error(sample_sd, target_sd, kind: str = SD_ERROR_KIND):
+    """Signed SD error of a set, per IM; the objectives square it.
+
+    ``kind="log"``: ``ln(s / sigma)``. ``kind="ratio"``: ``s / sigma - 1``. The two
+    agree to first order near s = sigma; they differ in how they treat too-wide
+    versus too-narrow sets (the log form is symmetric in factors, the ratio form in
+    absolute amounts). Kept behind this one helper so the choice can be switched in
+    one place.
+    """
+    ratio = np.asarray(sample_sd) / np.asarray(target_sd)
+    if kind == "log":
+        return np.log(ratio)
+    if kind == "ratio":
+        return ratio - 1.0
+    raise ValueError(f"SD error kind must be 'log' or 'ratio', got {kind!r}")
+
+
+def _moment_errors(rec_ims, mu_target, sigma_target, sd_error_kind: str = SD_ERROR_KIND):
+    """``(z_mu, e_sigma)`` per IM for one set: the standardised mean error and the
+    SD error (see :func:`_sd_error`). ``rec_ims`` is (n_recs, n_ims) of ln IM."""
+    mean = np.mean(rec_ims, axis=0)
+    # ddof=1: the sample SD, exactly as the selector stores sig_lnIM_recs in every
+    # stripe (assemble_ensemble_dict), so the objective optimises the quantity that
+    # is later reported and used as a covariate.
+    sd = np.std(rec_ims, axis=0, ddof=1)
+    z_mu = (mean - mu_target) / sigma_target
+    e_sigma = _sd_error(sd, sigma_target, sd_error_kind)
+    return z_mu, e_sigma
+
+
+def _validate_a_sigma(a_sigma) -> float:
+    """Return ``a_sigma`` as a float, raising unless 0 <= a_sigma <= 1."""
+    a_sigma = float(a_sigma)
+    # written as "not (inside)" so that NaN is rejected too
+    if not (0.0 <= a_sigma <= 1.0):
+        raise ValueError(f"a_sigma must lie in [0, 1], got {a_sigma}")
+    return a_sigma
+
+
+def _normalise_lambdas(lambda_ks, lambda_mu, lambda_sigma) -> tuple[float, float, float]:
+    """Normalise the three importance weights of J' so they sum to one.
+
+    Raises if any is negative (or NaN) or if all are zero (the normalisation would
+    divide by zero, and an objective with no metric in it is meaningless).
+    """
+    lams = tuple(float(x) for x in (lambda_ks, lambda_mu, lambda_sigma))
+    if any(not (x >= 0.0) for x in lams):
+        raise ValueError(f"lambda_ks, lambda_mu, lambda_sigma must all be >= 0, got {lams}")
+    total = sum(lams)
+    if not (total > 0.0):
+        raise ValueError("lambda_ks + lambda_mu + lambda_sigma must be > 0 "
+                         f"(got {lams})")
+    return tuple(x / total for x in lams)
+
+
+def weighted_moment_objective(rec_ims, mu_target, sigma_target, im_weights, a_sigma,
+                              sd_error_kind: str = SD_ERROR_KIND):
+    """J_mu_sigma: the moment-only objective of the ``__mu_sigma`` selection.
+
+        J = sum_m w_m [ a_mu * z_mu,m^2 + a_sigma * e_sigma,m^2 ],   a_mu = 1 - a_sigma
+
+    rec_ims      : (n_recs, n_ims) ln IM of the set (conditioning IM dropped)
+    mu_target    : (n_ims,) GCIM mean of ln IM, aligned with the columns of rec_ims
+    sigma_target : (n_ims,) GCIM SD of ln IM, aligned likewise
+    im_weights   : (n_ims,) IM weights w_m (sum to one)
+    a_sigma      : weight of the SD error, in [0, 1]; the mean error gets 1 - a_sigma
+
+    There is no KS term and no KS-band penalty: this selection is not required to
+    pass the KS test. J = 0 exactly when every IM's set mean and SD equal the target.
+    """
+    a_sigma = _validate_a_sigma(a_sigma)
+    a_mu = 1.0 - a_sigma
+    z_mu, e_sigma = _moment_errors(rec_ims, mu_target, sigma_target, sd_error_kind)
+    return float(np.sum(np.asarray(im_weights) * (a_mu * z_mu**2 + a_sigma * e_sigma**2)))
+
+
+def weighted_ks_and_moment_objective(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list,
+        im_weights, n_recs, penalty_constant, mu_target, sigma_target,
+        lambda_ks, lambda_mu, lambda_sigma, sd_error_kind: str = SD_ERROR_KIND):
+    """J': KS and moments together, the objective of the ``__ks_mu_sigma`` selection.
+
+        J' = c*V + ( l_KS * sum w D  +  l_mu * sum w z_mu^2  +  l_sigma * sum w e_sigma^2 )
+
+    with l_k = lambda_k / (lambda_ks + lambda_mu + lambda_sigma), so the lambdas act
+    as importance weights of the three metrics and only their ratios matter.
+
+    ``c*V`` (``penalty_constant`` times the KS-band violation) sits OUTSIDE the
+    normalisation: it is the constraint that keeps the set inside the KS band, not
+    one of the weighted metrics, so it is never scaled down by l_KS.
+
+    The KS arguments are those of :func:`weighted_ks_statistic_and_L2norm_penalty`
+    and both terms come from the same code (:func:`_weighted_ks_terms`). The sum is
+    written so that with lambdas (1, 0, 0) it reproduces that function bit for bit:
+    ``c*V + (1.0*ksum + 0.0 + 0.0)`` is the same float as ``c*V + ksum``.
+
+    Note the three metrics live on different natural scales (sum w D is typically
+    ~0.09, while z^2 at the sampling-noise floor is ~1/30), so equal lambdas are not
+    equal influence. The lambdas are the user's choice; moment_objective_terms
+    reports the size of each term.
+    """
+    l_ks, l_mu, l_sigma = _normalise_lambdas(lambda_ks, lambda_mu, lambda_sigma)
+    ks_sum, violation = _weighted_ks_terms(
+        rec_ims, target_cdfs_list, upper_ks_bounds_list, lower_ks_bounds_list,
+        im_weights, n_recs)
+    z_mu, e_sigma = _moment_errors(rec_ims, mu_target, sigma_target, sd_error_kind)
+    w = np.asarray(im_weights)
+    mu_sum = float(np.sum(w * z_mu**2))
+    sigma_sum = float(np.sum(w * e_sigma**2))
+    return (violation * penalty_constant) + (l_ks * ks_sum + l_mu * mu_sum + l_sigma * sigma_sum)
+
+
+def moment_objective_terms(rec_ims, ks_kwargs: dict, mu_target, sigma_target,
+                           im_weights, sd_error_kind: str = SD_ERROR_KIND) -> dict:
+    """Every term of every objective, for reporting (the optimiser never calls this).
+
+    Returns ``{"sum_wD", "V", "cV", "sum_wz2", "sum_we2", "J_ks", "z_mu", "e_sigma"}``
+    for one set: the weighted KS sum, the raw and penalised band violation, the
+    weighted squared mean and SD errors, today's KS objective, and the per-IM
+    ``z_mu`` / ``e_sigma`` vectors. ``ks_kwargs`` is the dict from
+    :func:`_optimise_obj_kwargs`. The objective-specific totals (J_mu_sigma, J')
+    follow from these with the scheme's weights.
+    """
+    ks_sum, violation = _weighted_ks_terms(
+        rec_ims, ks_kwargs["target_cdfs_list"], ks_kwargs["upper_ks_bounds_list"],
+        ks_kwargs["lower_ks_bounds_list"], ks_kwargs["im_weights"], ks_kwargs["n_recs"])
+    z_mu, e_sigma = _moment_errors(rec_ims, mu_target, sigma_target, sd_error_kind)
+    w = np.asarray(im_weights)
+    cV = violation * ks_kwargs["penalty_constant"]
+    return {
+        "sum_wD": ks_sum,
+        "V": violation,
+        "cV": cV,
+        "sum_wz2": float(np.sum(w * z_mu**2)),
+        "sum_we2": float(np.sum(w * e_sigma**2)),
+        "J_ks": cV + ks_sum,
+        "z_mu": z_mu,
+        "e_sigma": e_sigma,
+    }
 
 
 def get_best_ensemble_in_list(
@@ -2100,9 +2310,8 @@ def preliminary_record_selection(
             gm_db, basic_selection_ctx, site_model, rng_seed, only_select,
             desc=desc if desc is not None else "Selecting GM Ensembles")
 
-        # get the best of the candidate ensembles for each site and iml
-        obj_func = weighted_ks_statistic_and_L2norm_penalty
-
+        # get the best of the candidate ensembles for each site and iml, scored with
+        # the selection scheme's objective (KS by default; see objective_and_kwargs)
         preliminary_ensembles = {}
 
         for (site, iml), ensembles in candidate_ensembles.items():
@@ -2112,8 +2321,10 @@ def preliminary_record_selection(
                 preliminary_ensembles[(site, iml)] = None
                 continue
 
-            obj_func_kwargs = _optimise_obj_kwargs(
-                        site, iml, gcim_dists, basic_selection_ctx, penalty_constant)
+            obj_func, obj_func_kwargs = objective_and_kwargs(
+                        site, iml, gcim_dists, basic_selection_ctx,
+                        im_columns=_record_im_columns(ensembles[0], basic_selection_ctx),
+                        penalty_constant=penalty_constant)
 
             e = get_best_ensemble_in_list(
                 ensembles, basic_selection_ctx["conditioning_imt"].string,
@@ -2147,7 +2358,10 @@ def preliminary_record_selection(
                 with open(preliminary_selection_fp, "wb") as file:
                     pickle.dump(preliminary_ensembles, file)
 
-    # Check if all the sites and poes found a set of suitable ground motions
+    # Check if all the sites and poes found a set of suitable ground motions.
+    # "Passing" means accepted under the scheme's acceptance criterion: KS by
+    # default (unchanged), or "a complete set exists" for the __mu_sigma selection.
+    acceptance = selection_scheme_of(basic_selection_ctx)["acceptance"]
     prelim_ensembles_not_passing = []
     no_preliminary_ensembles = []
     for (site, iml), ensemble in preliminary_ensembles.items():
@@ -2156,7 +2370,7 @@ def preliminary_record_selection(
             prelim_ensembles_not_passing.append((site, iml))
             no_preliminary_ensembles.append((site, iml))
 
-        elif not ensemble["ks_passed"]:
+        elif not ensemble_accepted(ensemble, acceptance, basic_selection_ctx["n_samples"]):
             prelim_ensembles_not_passing.append((site, iml))
 
     if not quiet:
@@ -2235,13 +2449,15 @@ def optimise_record_selection(
                 pickle.dump(optimised_ensembles, file)
 
     # Check if all the sites and poes found a set of suitable ground motions
+    # (accepted under the scheme's acceptance criterion; KS by default).
+    acceptance = selection_scheme_of(basic_selection_ctx)["acceptance"]
     optim_ensembles_not_passing = []
     for (site, iml), ensemble in optimised_ensembles.items():
 
         if ensemble is None:
             optim_ensembles_not_passing.append((site, iml))
 
-        elif not ensemble["ks_passed"]:
+        elif not ensemble_accepted(ensemble, acceptance, basic_selection_ctx["n_samples"]):
             optim_ensembles_not_passing.append((site, iml))
 
     if not quiet:
@@ -2269,9 +2485,169 @@ def _ctx_with_unbounded(base_ctx: dict, unbounded: list[str]) -> dict:
     return ctx
 
 
-def _ensemble_passes(ensemble) -> bool:
-    """True if an ensemble exists and passed the KS test."""
-    return ensemble is not None and ensemble["ks_passed"]
+def _ensemble_passes(ensemble, acceptance: str = "ks", n_samples: int | None = None) -> bool:
+    """True if an ensemble is ACCEPTABLE under the selection's acceptance criterion.
+
+    The name is historical: with the default ``acceptance="ks"`` it is exactly the
+    old test "the ensemble exists and passed the KS test". See
+    :func:`ensemble_accepted` for the criteria; this wrapper keeps the old call
+    sites (and their default behaviour) unchanged.
+    """
+    return ensemble_accepted(ensemble, acceptance, n_samples)
+
+
+# =============================================================================
+# Selection scheme: objective + acceptance criterion
+# =============================================================================
+# A selection scheme says WHAT the selection optimises (the objective) and WHEN a
+# stripe's record set counts as acceptable (the acceptance criterion). The scheme
+# values are typed in ONE place, the scheme's selection config in
+# setup_AvgSA03_gm_selection.py (e.g. SELECTION_CONFIG_MU_SIGMA), and reach the
+# engine as one entry of the selection context, ctx["selection_scheme"]. The
+# context already flows to every place that scores a set (selection best-of-20,
+# optimiser, round-3 keep-better) and to every fingerprint, so carrying the scheme
+# there means all of them switch together -- no call site can be forgotten.
+#
+# A context WITHOUT the entry is the default scheme ("ks" objective, "ks"
+# acceptance): that is how the original and KS-optimised selections run, so their
+# notebooks did not need to change.
+
+SELECTION_OBJECTIVES = ("ks", "mu_sigma", "ks_mu_sigma")
+ACCEPTANCE_CRITERIA = ("ks", "complete_set")
+
+# The canonical form of the default scheme. _selection_ctx_fingerprint_inputs adds
+# nothing to a fingerprint for a scheme equal to this, which keeps every existing
+# stripe / stage / final fingerprint byte-identical.
+DEFAULT_SELECTION_SCHEME = {"objective": "ks", "acceptance": "ks"}
+
+# Defaults for the moment parameters when a config names the objective but not its
+# parameters (the user's choice for these selections: equal weights).
+DEFAULT_A_SIGMA = 0.5
+DEFAULT_LAMBDAS = (1.0, 1.0, 1.0)
+
+
+def normalise_selection_scheme(spec: dict | None) -> dict:
+    """Validate a selection scheme and return its canonical dict.
+
+    ``spec`` may be ``None`` (the default scheme), a selection config (only the
+    scheme keys are read: ``objective``, ``acceptance``, ``a_sigma``,
+    ``lambda_ks``, ``lambda_mu``, ``lambda_sigma``), or an already-normalised
+    scheme (normalising twice gives the same dict).
+
+    The canonical dict holds only what changes the result:
+
+    - ``"ks"``          -> ``{"objective", "acceptance"}``
+    - ``"mu_sigma"``    -> + ``a_sigma`` and ``sd_error``
+    - ``"ks_mu_sigma"`` -> + ``lambda_ks``, ``lambda_mu``, ``lambda_sigma`` (already
+      normalised to sum to one, so (1,1,1) and (5,5,5) give the same scheme and the
+      same fingerprint) and ``sd_error``
+
+    It is what the fingerprints hash, so it must be deterministic. Validation
+    happens here so that a bad config fails when a notebook starts, not an hour into
+    the run.
+    """
+    spec = dict(spec or {})
+    objective = spec.get("objective", "ks")
+    acceptance = spec.get("acceptance", "ks")
+    if objective not in SELECTION_OBJECTIVES:
+        raise ValueError(f"objective must be one of {SELECTION_OBJECTIVES}, got {objective!r}")
+    if acceptance not in ACCEPTANCE_CRITERIA:
+        raise ValueError(f"acceptance must be one of {ACCEPTANCE_CRITERIA}, got {acceptance!r}")
+
+    moment_keys = {"a_sigma", "lambda_ks", "lambda_mu", "lambda_sigma"}
+    out = {"objective": objective, "acceptance": acceptance}
+    if objective == "ks":
+        # Parameters of another objective next to "ks" are almost certainly a
+        # config mistake (the objective line was forgotten); refuse rather than
+        # silently ignore them.
+        stray = moment_keys & set(spec)
+        if stray:
+            raise ValueError(f"objective 'ks' takes no moment parameters, got {sorted(stray)}")
+    elif objective == "mu_sigma":
+        stray = {"lambda_ks", "lambda_mu", "lambda_sigma"} & set(spec)
+        if stray:
+            raise ValueError(f"objective 'mu_sigma' takes a_sigma, not {sorted(stray)}")
+        out["a_sigma"] = _validate_a_sigma(spec.get("a_sigma", DEFAULT_A_SIGMA))
+        out["sd_error"] = spec.get("sd_error", SD_ERROR_KIND)
+    else:  # "ks_mu_sigma"
+        if "a_sigma" in spec:
+            raise ValueError("objective 'ks_mu_sigma' takes lambda_ks/mu/sigma, not a_sigma")
+        lams = (spec.get("lambda_ks", DEFAULT_LAMBDAS[0]),
+                spec.get("lambda_mu", DEFAULT_LAMBDAS[1]),
+                spec.get("lambda_sigma", DEFAULT_LAMBDAS[2]))
+        out["lambda_ks"], out["lambda_mu"], out["lambda_sigma"] = _normalise_lambdas(*lams)
+        out["sd_error"] = spec.get("sd_error", SD_ERROR_KIND)
+    if "sd_error" in out and out["sd_error"] not in ("log", "ratio"):
+        raise ValueError(f"sd_error must be 'log' or 'ratio', got {out['sd_error']!r}")
+    return out
+
+
+def selection_scheme_of(ctx: dict) -> dict:
+    """The canonical selection scheme a selection context carries (default if none)."""
+    return normalise_selection_scheme(ctx.get("selection_scheme"))
+
+
+def ensemble_accepted(ensemble, acceptance: str = "ks", n_samples: int | None = None) -> bool:
+    """True if a stripe's record set is acceptable under ``acceptance``.
+
+    - ``"ks"`` (default): the set exists and passed the KS test -- the criterion of
+      the original and KS-optimised selections, identical to the old
+      ``_ensemble_passes``.
+    - ``"complete_set"``: the set exists and is complete, i.e. has ``n_samples``
+      records (when given) and no empty row. Whether it passes KS does not matter;
+      ``ks_passed`` is still stored in the stripe, as a diagnostic. This is the
+      criterion of the ``__mu_sigma`` selection, whose objective does not target KS.
+
+    Every place that decides "is this stripe done?" goes through here (the round
+    work-sets in build_final_ensembles, the pass/fail summaries, nb 033's write
+    gate), so the criterion cannot differ between them.
+    """
+    if ensemble is None:
+        return False
+    if acceptance == "ks":
+        return bool(ensemble["ks_passed"])
+    if acceptance == "complete_set":
+        recs = ensemble["recs"]
+        if n_samples is not None and len(recs) != n_samples:
+            return False
+        # select_ensembles already discards candidates with empty rows; this makes
+        # the criterion explicit rather than relying on that.
+        return not recs.isnull().all(axis=1).any()
+    raise ValueError(f"acceptance must be one of {ACCEPTANCE_CRITERIA}, got {acceptance!r}")
+
+
+def check_ctx_matches_config(ctx: dict, selection_config: dict) -> None:
+    """Raise if a selection context was not built for ``selection_config``.
+
+    The stripe fingerprint hashes BOTH the selection config and the context, so a
+    context built with the plain setup function (RSD595 weight 0.25, KS objective)
+    but fingerprinted against e.g. SELECTION_CONFIG_MU_SIGMA would make every
+    stripe of that selection look stale -- and the reselection would then run with
+    the wrong objective and weight. Checked:
+
+    - the selection scheme (objective, its parameters, acceptance), and
+    - the RSD595 weight, if the config states one (``weight_rsd595``).
+
+    For the original and KS-optimised configs (no scheme keys, no weight) this
+    compares the default with the default and passes.
+    """
+    want = normalise_selection_scheme(selection_config)
+    have = selection_scheme_of(ctx)
+    if want != have:
+        raise ValueError(
+            f"selection context carries scheme {have} but the selection config asks for "
+            f"{want}. Build the context with setup_AvgSA03_gcim_gm_selection_for_scheme("
+            f"<the same config>).")
+    if "weight_rsd595" in selection_config:
+        names = [im.string for im in ctx["selection_imts"]]
+        if "RSD595" not in names:
+            raise ValueError("config states weight_rsd595 but the context selects no RSD595")
+        w = float(np.asarray(ctx["imt_weights"])[names.index("RSD595")])
+        if not np.isclose(w, selection_config["weight_rsd595"]):
+            raise ValueError(
+                f"selection context has RSD595 weight {w} but the selection config asks "
+                f"for {selection_config['weight_rsd595']}. Build the context with "
+                f"setup_AvgSA03_gcim_gm_selection_for_scheme(<the same config>).")
 
 
 def _round_select_optimise_unbounded(spec) -> tuple[list[str], list[str]]:
@@ -2293,8 +2669,16 @@ def _selection_ctx_fingerprint_inputs(ctx: dict) -> dict:
 
     Returned as a flat dict of plain/hashable values for :func:`fingerprint`.
     Object-valued entries (IMTs) are reduced to their stable ``.string`` form.
+
+    This one function feeds all three kinds of fingerprint (stripe manifests,
+    round-stage caches, the final-ensembles manifest), so the selection scheme is
+    added HERE -- and only when it is not the default. A context without a scheme
+    (or with the default one) therefore gives exactly the dict it always gave, and
+    the ~1,064 existing stripes of the original and KS-optimised selections keep
+    matching their manifests. A non-default scheme adds a ``selection_scheme``
+    entry, so changing e.g. a lambda later invalidates that selection's stripes.
     """
-    return {
+    out = {
         "n_ensembles": ctx["n_ensembles"],
         "n_samples": ctx["n_samples"],
         "p_value": ctx["p_value"],
@@ -2308,6 +2692,14 @@ def _selection_ctx_fingerprint_inputs(ctx: dict) -> dict:
         "selection_imts": tuple(im.string for im in ctx["selection_imts"]),
         "imt_weights": np.asarray(ctx["imt_weights"]),
     }
+    scheme = selection_scheme_of(ctx)
+    if scheme != DEFAULT_SELECTION_SCHEME:
+        # repr of the sorted items: deterministic, and readable in the manifest's
+        # summary. (cache_utils compares fingerprints with SUBSET semantics, so an
+        # old manifest WITHOUT this key would still match a default fingerprint --
+        # which is exactly why the key must never be added for the default.)
+        out["selection_scheme"] = repr(tuple(sorted(scheme.items())))
+    return out
 
 
 def _optimise_obj_kwargs(site, iml, gcim_dists, basic_selection_ctx,
@@ -2338,6 +2730,93 @@ def _optimise_obj_kwargs(site, iml, gcim_dists, basic_selection_ctx,
     }
 
 
+def _record_im_columns(ensemble, ctx) -> list[str]:
+    """The IM column names of a set's ln IM matrix, in matrix order (conditioning
+    IM dropped) -- the order the objective sees the columns in."""
+    cond = ctx["conditioning_imt"].string
+    return list(ensemble["recs"]["ims_scaled"].drop(columns=cond).columns)
+
+
+def gcim_moment_targets(stats: pd.DataFrame, im_columns: list[str]) -> tuple[np.ndarray, np.ndarray]:
+    """``(mu_target, sigma_target)``: the GCIM mean and SD of ln IM per IM, looked up
+    BY NAME in the order of ``im_columns``.
+
+    ``stats`` is ``gcim_dists[(site, iml)]["stats"]`` (rows indexed by IM string,
+    columns ``"mean"`` and ``"sigma"``: the exact mixture moments over the
+    disaggregation scenarios). The objective receives a bare matrix with no column
+    names, so its targets must be aligned here, by label -- never by position, so a
+    reordering of ``stats`` can never silently pair an IM with another IM's target.
+    """
+    missing = [c for c in im_columns if c not in stats.index]
+    if missing:
+        raise KeyError(f"GCIM stats have no row for {missing}")
+    mu = stats.loc[im_columns, "mean"].to_numpy(dtype=float)
+    sigma = stats.loc[im_columns, "sigma"].to_numpy(dtype=float)
+    if not np.all(sigma > 0):
+        raise ValueError("GCIM sigma must be > 0 for every selection IM "
+                         f"(got {dict(zip(im_columns, sigma))})")
+    return mu, sigma
+
+
+def objective_and_kwargs(site, iml, gcim_dists, ctx, im_columns: list[str] | None = None,
+                         penalty_constant: float = 10) -> tuple[Callable, dict]:
+    """``(objective_function, kwargs)`` for one ``(site, iml)`` under the context's
+    selection scheme. THE single dispatch used by every place that scores a set:
+
+    1. the best-of-20 candidate choice (:func:`preliminary_record_selection`),
+    2. the greedy optimiser (:func:`optimise_ground_motion_ensembles_for_sites`,
+       also reached by the shuffled round 3),
+    3. the round-3 keep-better comparison (:func:`_score_ensemble`).
+
+    Because all of them call this with the same context, they always score with the
+    same objective -- otherwise round 3 would compare scores of different objectives.
+
+    - ``"ks"`` (also: no scheme in the context): today's
+      :func:`weighted_ks_statistic_and_L2norm_penalty` with exactly today's
+      :func:`_optimise_obj_kwargs` dict -- the default path is unchanged.
+    - ``"mu_sigma"``: :func:`weighted_moment_objective`.
+    - ``"ks_mu_sigma"``: :func:`weighted_ks_and_moment_objective`.
+
+    ``im_columns`` (the record IM columns, conditioning IM dropped, in matrix
+    order) is needed for the moment objectives: their GCIM targets are looked up by
+    those names. It is also checked against ``selection_imts``, because the IM
+    weights (and the KS target list) are in that order and are applied by position;
+    a mismatch would misweight every IM, so it raises.
+    """
+    scheme = selection_scheme_of(ctx)
+    objective = scheme["objective"]
+    if objective == "ks":
+        return (weighted_ks_statistic_and_L2norm_penalty,
+                _optimise_obj_kwargs(site, iml, gcim_dists, ctx, penalty_constant))
+
+    if im_columns is None:
+        raise ValueError(f"objective {objective!r} needs the record IM column names")
+    expected = [im.string for im in ctx["selection_imts"]]
+    if list(im_columns) != expected:
+        raise ValueError(
+            "record IM columns are not in selection_imts order, so the IM weights "
+            f"would be misapplied:\n  record: {list(im_columns)}\n  selection_imts: {expected}")
+    mu, sigma = gcim_moment_targets(gcim_dists[(site, iml)]["stats"], list(im_columns))
+
+    if objective == "mu_sigma":
+        return weighted_moment_objective, {
+            "mu_target": mu, "sigma_target": sigma,
+            "im_weights": ctx["imt_weights"],
+            "a_sigma": scheme["a_sigma"],
+            "sd_error_kind": scheme["sd_error"],
+        }
+    # "ks_mu_sigma": the KS kwargs (incl. penalty_constant c) + the moment targets
+    kwargs = _optimise_obj_kwargs(site, iml, gcim_dists, ctx, penalty_constant)
+    kwargs.update({
+        "mu_target": mu, "sigma_target": sigma,
+        "lambda_ks": scheme["lambda_ks"],
+        "lambda_mu": scheme["lambda_mu"],
+        "lambda_sigma": scheme["lambda_sigma"],
+        "sd_error_kind": scheme["sd_error"],
+    })
+    return weighted_ks_and_moment_objective, kwargs
+
+
 def _score_ensemble(ensemble, site, iml, gcim_dists, basic_selection_ctx) -> float:
     """Objective score for an ensemble (lower is better); ``np.inf`` if missing.
 
@@ -2345,14 +2824,17 @@ def _score_ensemble(ensemble, site, iml, gcim_dists, basic_selection_ctx) -> flo
     comparable across rounds for a given ``(site, iml)`` (the target CDFs, and
     hence the objective, depend only on ``(site, iml)`` — not on the round's
     causal-parameter bounds). Used to keep the better of the incumbent and the
-    shuffled round-4 result.
+    shuffled round-4 result. The objective comes from the context's selection
+    scheme via :func:`objective_and_kwargs` (KS by default).
     """
     if ensemble is None:
         return np.inf
-    kwargs = _optimise_obj_kwargs(site, iml, gcim_dists, basic_selection_ctx)
+    obj_func, kwargs = objective_and_kwargs(
+        site, iml, gcim_dists, basic_selection_ctx,
+        im_columns=_record_im_columns(ensemble, basic_selection_ctx))
     cond = basic_selection_ctx["conditioning_imt"].string
     ims = np.log(ensemble["recs"]["ims_scaled"].drop(columns=cond).to_numpy())
-    return weighted_ks_statistic_and_L2norm_penalty(ims, **kwargs)
+    return obj_func(ims, **kwargs)
 
 
 def build_final_ensembles(
@@ -2431,9 +2913,33 @@ def build_final_ensembles(
         fingerprint and the final manifest so the filter is part of the provenance;
         ``None`` (the default) adds nothing, leaving existing fingerprints unchanged.
         This argument only RECORDS the exclusion -- it does not filter ``gm_db``.
+
+    Selection scheme
+    ----------------
+    The objective and the acceptance criterion come from
+    ``basic_selection_ctx["selection_scheme"]`` (absent = the default: KS objective,
+    KS acceptance -- the behaviour of the original and KS-optimised selections, and
+    their console output, are unchanged). Every scoring step reads the objective
+    from the context (:func:`objective_and_kwargs`), every "is this stripe done?"
+    test reads the acceptance from it (:func:`ensemble_accepted`), and the scheme
+    enters every stage fingerprint and the final manifest through
+    :func:`_selection_ctx_fingerprint_inputs` when it is not the default.
+
+    Under ``acceptance="complete_set"`` a stripe is done as soon as it has a full
+    record set, so rounds after the first only reselect + optimise stripes that
+    could not form one. ``ks_passed`` is still computed and stored, and its count
+    is printed as a diagnostic.
     """
     output_fp = Path(output_fp)
     n_rounds = len(round_unbounded)
+    # The acceptance criterion of this selection, and the set size it checks against.
+    acceptance = selection_scheme_of(basic_selection_ctx)["acceptance"]
+    n_samples = basic_selection_ctx["n_samples"]
+    ks_gate = acceptance == "ks"
+
+    def accepted(e) -> bool:
+        # the ONE "is this stripe done?" test of the engine (see ensemble_accepted)
+        return _ensemble_passes(e, acceptance, n_samples)
     round_specs = [_round_select_optimise_unbounded(s) for s in round_unbounded]
     if force_optimisation is None:
         force_optimisation = [False] * n_rounds
@@ -2492,17 +2998,29 @@ def build_final_ensembles(
         return f"bounded: {b} | unbounded: {u}"
 
     def _count(keys, dct):
-        """(#passing, #failing-with-a-set, #no-set) over ``keys`` in ``dct``."""
+        """(#passing, #failing-with-a-set, #no-set) over ``keys`` in ``dct``.
+
+        "Passing" = accepted under the selection's acceptance criterion (KS by
+        default, so the counts are what they always were)."""
         passing = failing = no_set = 0
         for k in keys:
             e = dct.get(k)
             if e is None:
                 no_set += 1
-            elif e["ks_passed"]:
+            elif accepted(e):
                 passing += 1
             else:
                 failing += 1
         return passing, failing, no_set
+
+    def _ks_fail_note(keys, dct) -> str:
+        # Under a non-KS acceptance, KS is only a diagnostic: report how many of the
+        # sets fail it, so the console still shows it. Empty under KS acceptance
+        # (the default), which keeps that console output exactly as before.
+        if ks_gate:
+            return ""
+        n = sum(1 for k in keys if dct.get(k) is not None and not dct[k]["ks_passed"])
+        return f"  [diagnostic: {n} of these fail KS]"
 
     # Two layers, matching the legacy notebook: ``base`` holds the *selection*
     # results only (preliminary + reselections) and is what every optimise round
@@ -2564,7 +3082,11 @@ def build_final_ensembles(
                 ensembles[k] = sel[k]
             p, f_, n0 = _count(sel_keys, ensembles)
             note = f"  (of which {n0} could not form a record set at all)" if n0 else ""
-            print(f"    -> {p} pass, {f_ + n0} fail KS{note}")
+            if ks_gate:
+                print(f"    -> {p} pass, {f_ + n0} fail KS{note}")
+            else:
+                print(f"    -> {p} accepted ({acceptance}), {f_ + n0} not accepted{note}"
+                      f"{_ks_fail_note(sel_keys, ensembles)}")
 
         # ---- OPTIMISATION phase ------------------------------------------------
         # Work-set computed AFTER selection so reselected sites are included:
@@ -2574,7 +3096,7 @@ def build_final_ensembles(
             opt_keys = [k for k in work_set if ensembles.get(k) is not None]
             scope = "force: all still-failing sets that have a record set"
         else:
-            opt_keys = [k for k in work_set if not _ensemble_passes(ensembles.get(k))]
+            opt_keys = [k for k in work_set if not accepted(ensembles.get(k))]
             scope = "only sites still failing"
         print(f"Optimisation phase — {len(opt_keys)} (site, iml)  [{scope}]")
 
@@ -2624,7 +3146,7 @@ def build_final_ensembles(
                 # keep-best: only adopt the shuffled result if it passes, there is
                 # no incumbent, or it scores strictly better than the incumbent.
                 incumbent = ensembles.get(k)
-                if _ensemble_passes(cand) or incumbent is None:
+                if accepted(cand) or incumbent is None:
                     ensembles[k] = cand
                     replaced += 1
                 elif (_score_ensemble(cand, *k, gcim_dists, basic_selection_ctx)
@@ -2635,12 +3157,16 @@ def build_final_ensembles(
                     kept += 1
 
             p, f_, n0 = _count(opt_keys, ensembles)
-            print(f"    -> {p} now pass, {f_ + n0} still fail")
+            if ks_gate:
+                print(f"    -> {p} now pass, {f_ + n0} still fail")
+            else:
+                print(f"    -> {p} now accepted ({acceptance}), {f_ + n0} not accepted"
+                      f"{_ks_fail_note(opt_keys, ensembles)}")
             if shuf:
                 print(f"      (keep-best: replaced {replaced}, kept incumbent for {kept})")
 
         # carry the sites that still don't have a passing record set
-        work_set = [k for k in all_keys if not _ensemble_passes(ensembles.get(k))]
+        work_set = [k for k in all_keys if not accepted(ensembles.get(k))]
         if work_set:
             print(f"-> {len(work_set)} (site, iml) carried into the next round")
         else:
@@ -2654,6 +3180,11 @@ def build_final_ensembles(
               f"ensemble after {n_rounds} rounds")
     else:
         print(f"OK! - all (site, iml) have a passing ensemble after {n_rounds} rounds")
+    if not ks_gate:
+        # "passing" above means accepted under `acceptance`; say so, and give the
+        # KS result as the diagnostic it now is.
+        print(f"      (acceptance = {acceptance!r}; KS is a diagnostic only"
+              f"{_ks_fail_note(all_keys, ensembles)})")
 
     # Save the canonical artifact + manifest.
     output_fp.parent.mkdir(parents=True, exist_ok=True)
