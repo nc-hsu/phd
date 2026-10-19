@@ -14,6 +14,13 @@ from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     create_gmm_map,
     create_corr_model_map,
     get_poe_from_disaggstats,
+    # The generic exclusion machinery lives in gm_selection.py (it cannot import
+    # from this module). _exclusion_identities is re-exported here under its old
+    # name, so existing imports from this module keep working.
+    drop_unavailable_records as _drop_unavailable_records,
+    _exclusion_identities,
+    check_exclusion_versions,
+    stripe_fingerprints_by_exclusion_version,
 )
 import phd_project.scripts.WP1_ground_motion_set.manage_flatfiles as mf
 
@@ -25,6 +32,9 @@ cfg = load_config()
 # for these values: stripe_input_fingerprint hashes them, so any divergence
 # between notebooks would desynchronise the incremental stale check. Keep in sync
 # with the values passed to build_final_ensembles in nb 032.
+#
+# The "db_exclusions" key (the current exclusion list) is added below, after
+# UNAVAILABLE_RECORDS is defined -- see there.
 SELECTION_CONFIG = {
     "percentiles": [0.05, 0.16, 0.33, 0.5, 0.67, 0.84, 0.95],
     "round_unbounded": [[], ["d"], ["m", "d", "vs30"], ["m", "d", "vs30"]],
@@ -55,9 +65,43 @@ SELECTION_CONFIG = {
 # "network_code" column (added 2026-09-30), so that network is expressed as its list
 # of RSNs.
 #
-# This is documentation + input to the one-off reselection cell at the end of nb
-# 032. "label" is a human tag for the console output; the row match is only ever on
-# the identity fields.
+# Both selections (original and optimised) drop every record listed here from the
+# database, in memory, before selecting (gm_db_for_selection below), and record the
+# list in every stripe manifest (the "db_exclusions" key of SELECTION_CONFIG /
+# SELECTION_CONFIG_OPTIMISED).
+#
+# The list is VERSIONED (see the "Database exclusions" section of gm_selection.py):
+#
+#   "added_in_version"  the version of this list that first contained the entry.
+#                       The list "at version v" is every entry with
+#                       added_in_version <= v; version 0 is no list at all. A stripe
+#                       selected under an older version stays valid as long as it
+#                       contains none of the records added since, so adding an
+#                       entry reselects ONLY the stripes that contain it. Versions
+#                       must run 1, 2, ..., N without gaps: a new entry gets
+#                       N + 1 (or N, if it is added together with the newest one
+#                       before anything has been selected with N). NEVER renumber
+#                       or remove an existing entry -- every manifest written under
+#                       an older version would then match nothing, and its stripe
+#                       would be reselected.
+#
+#   Versions so far (and the stripes selected under each):
+#     0  no list               528 original stripes
+#     1  ONA                   original one-off reselection of (31, 1.15)
+#     2  + RSN 6003695/6003748/6003796
+#                              original one-offs (41, 0.65), (41, 0.95), (44, 1.15);
+#                              all 532 optimised stripes
+#     3  + RSN 7004773         everything selected from 2026-10-19 on
+#   (The four original one-offs predate the versioning, and their manifests still
+#   claim version 0; migrate_stripe_manifests --to recorded-exclusions re-stamps
+#   them with the version their pickle records.)
+#
+#   "affected_stripes"  documentation only: {selection: [(site, iml), ...]} of the
+#                       stripes that contained the record when it was added.
+#
+# "label" is a human tag for the console output; the row match is only ever on the
+# identity fields. Only "database" + "identity" are hashed, so every other field can
+# be edited without making any stripe stale.
 UNAVAILABLE_RECORDS = [
     {
         "database": "NGASub",
@@ -84,9 +128,11 @@ UNAVAILABLE_RECORDS = [
                   "download crashes. Found via RSN 4040498, then confirmed across "
                   "the whole network.",
         "date": "2026-08-27",
+        "added_in_version": 1,
         # Only one ONA record was ever selected: RSN 4040498 (Fukushimaoki 2011,
-        # Mw 6.34), in this stripe.
-        "affected_stripes": [(31, 1.15)],
+        # Mw 6.34), in this stripe of the original selection. The optimised
+        # selection excluded ONA from the start.
+        "affected_stripes": {"original": [(31, 1.15)]},
     },
     {
         "database": "NGASub",
@@ -107,70 +153,53 @@ UNAVAILABLE_RECORDS = [
                   "selection and alpha were computed from, so the MSA ran them at the "
                   "wrong intensity",
         "date": "2026-09-30",
-        # Selected (H1 in every case) in these stripes, slot in brackets:
+        "added_in_version": 2,
+        # Selected (H1 in every case) in these stripes of the original selection,
+        # slot in brackets (the optimised selection excluded them from the start):
         #   (41, 0.65): 6003695 [29]   -- run in the MSA, site 41, 3s and 5s
         #   (41, 0.95): 6003748 [26], 6003695 [29]   -- not in either structure's MSA
         #   (44, 1.15): 6003796 [29]   -- not in either structure's MSA
-        "affected_stripes": [(41, 0.65), (41, 0.95), (44, 1.15)],
+        "affected_stripes": {"original": [(41, 0.65), (41, 0.95), (44, 1.15)]},
+    },
+    {
+        "database": "NGASub",
+        "label": "NGA-Sub RSN 7004773 (waveform cannot be downloaded)",
+        # Selected (H1, once each) in two stripes of the optimised selection; never
+        # selected in the original selection. Found after the full optimised
+        # selection had been run with version 2 of this list, so version 3 makes
+        # only those two stripes stale. Both component rows go, because the RSN is
+        # the download unit.
+        "identity": {"index": ["7004773"]},
+        "reason": "the waveform cannot be downloaded from the NGA-Sub database",
+        "date": "2026-10-19",
+        "added_in_version": 3,
+        "affected_stripes": {"optimised": [(31, 0.65), (42, 0.5)]},
     },
 ]
+
+# Current version of the list. Validates the versions when this module is imported
+# (integers, running 1..N without gaps), so a malformed entry fails immediately
+# rather than inside a stale check.
+EXCLUSION_LIST_VERSION = check_exclusion_versions(UNAVAILABLE_RECORDS)
+
+# The original selection filters with, and fingerprints against, the current list
+# too. Its stripes selected before the list existed have no "db_exclusions" entry
+# in their manifests (version 0); they stay valid via the versioned stale check
+# (stripe_fingerprints below) as long as they contain none of the listed records.
+SELECTION_CONFIG["db_exclusions"] = _exclusion_identities(UNAVAILABLE_RECORDS)
 
 
 def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = None,
                              verbose: bool = True) -> pd.DataFrame:
-    """Return a COPY of ``gm_db`` with every row of each unavailable record removed.
+    """Return a COPY of ``gm_db`` without every row of each record in ``records``
+    (default: ``UNAVAILABLE_RECORDS``).
 
-    **Deliberately NOT called by :func:`setup_AvgSA03_gcim_gm_selection`.** The
-    ORIGINAL selection path must keep using the full database, because
-    ``gm_selection.stripe_input_fingerprint`` hashes the database *file's bytes*:
-    the ~510 stripes already on disk were selected from the complete DB and their
-    manifests say so. Filtering by default would make every future selection
-    silently inconsistent with that provenance -- and editing the CSV itself is
-    worse still, since the selection results identify records by the DataFrame's
-    positional ``RangeIndex`` (see ``greedy_optimise_ensemble``), which every row
-    below a deleted one would shift.
-
-    It has exactly two callers:
-
-    - the one-off reselection cell in the ORIGINAL nb 032, which reselects a
-      single ``(site, iml)`` around a record that turned out to be undownloadable
-      and records the deviation in the stripe's ``db_exclusions`` key;
-    - :func:`gm_db_for_selection_optimised`, which filters the database for the
-      WHOLE second ("optimised") selection, from the start. That selection writes
-      to its own folders, and the exclusion IS in its provenance fingerprint (via
-      ``SELECTION_CONFIG_OPTIMISED["db_exclusions"]``), so neither problem above
-      applies to it.
-
-    Dropping is done with ``DataFrame.drop(index=...)`` so the surviving rows keep
-    their original index labels -- that equivalence with the on-disk DB is the
-    whole point of filtering in memory rather than on disk.
+    Thin wrapper kept for its old signature; the implementation is
+    ``gm_selection.drop_unavailable_records``. For the selection itself use
+    :func:`gm_db_for_selection`, the one place the database is filtered.
     """
     records = UNAVAILABLE_RECORDS if records is None else records
-    meta = gm_db["metadata"]
-
-    to_drop = pd.Index([])
-    for rec in records:
-        mask = meta["database"] == rec["database"]
-        for field, value in rec["identity"].items():
-            col = meta[field].astype(str)
-            # a list value matches any of its entries (used to name a whole network
-            # by its RSNs); a scalar is a plain equality match on one record.
-            if isinstance(value, (list, tuple, set)):
-                mask &= col.isin({str(v) for v in value})
-            else:
-                mask &= col == str(value)
-        hits = meta.index[mask]
-        if verbose:
-            label = rec.get("label", rec["identity"])
-            print(f"  excluding {rec['database']} {label}: "
-                  f"{len(hits)} row(s) {list(hits)}")
-        to_drop = to_drop.union(hits)
-
-    filtered = gm_db.drop(index=to_drop)
-    if verbose:
-        print(f"gm_db: {len(gm_db)} -> {len(filtered)} rows "
-              f"({len(to_drop)} dropped)")
-    return filtered
+    return _drop_unavailable_records(gm_db, records, verbose=verbose)
 
 
 # =============================================================================
@@ -184,29 +213,11 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
 # ["gm_selection_optimised"], cfg["results"]["AvgSA_03_record_selection_optimised"]).
 #
 # Why a separate constant rather than editing SELECTION_CONFIG: the per-stripe
-# fingerprint hashes the selection config, so editing SELECTION_CONFIG would make
-# all original stripes read as stale, and the next run of the original nb 032/033
-# would reselect and overwrite every one of them.
-
-def _exclusion_identities(records: list[dict]) -> tuple:
-    """The part of each ``UNAVAILABLE_RECORDS`` entry that decides WHICH rows go.
-
-    Only ``database`` + ``identity`` are kept, normalised to sorted tuples of
-    strings. This is what the optimised selection's fingerprint hashes, so the
-    stripes go stale when the set of excluded records changes, but NOT when a
-    free-text field (``label``, ``reason``, the comments) is edited.
-    """
-    out = []
-    for rec in records:
-        ident = []
-        for field, value in sorted(rec["identity"].items()):
-            if isinstance(value, (list, tuple, set)):
-                value = tuple(sorted(str(v) for v in value))
-            else:
-                value = str(value)
-            ident.append((field, value))
-        out.append((rec["database"], tuple(ident)))
-    return tuple(sorted(out))
+# fingerprint hashes the selection config, so editing SELECTION_CONFIG's round
+# settings would make all original stripes read as stale, and the next run of the
+# original nb 032/033 would reselect and overwrite every one of them. (The one key
+# the two configs share in meaning, "db_exclusions", is the exception: it is
+# versioned -- see UNAVAILABLE_RECORDS -- so growing the list does not do that.)
 
 
 # Round scheme of the optimised selection (the engine is build_final_ensembles in
@@ -229,8 +240,10 @@ def _exclusion_identities(records: list[dict]) -> tuple:
 #
 # "db_exclusions" is NOT a round setting: it is here so stripe_input_fingerprint
 # hashes it (see gm_selection.stripe_input_fingerprint), which puts the exclusion
-# into every optimised stripe's manifest. The filtering itself happens in
-# gm_db_for_selection_optimised below -- the ONLY place it happens.
+# into every optimised stripe's manifest. It is the CURRENT version of
+# UNAVAILABLE_RECORDS; older versions are handled by stripe_fingerprints below.
+# The filtering itself happens in gm_db_for_selection below -- the ONLY place it
+# happens.
 SELECTION_CONFIG_OPTIMISED = {
     "percentiles": SELECTION_CONFIG["percentiles"],   # same GCIM targets (nb 031 file shared)
     "round_unbounded": [["d"], ["m", "d", "vs30"], ["m", "d", "vs30"]],
@@ -243,29 +256,52 @@ SELECTION_CONFIG_OPTIMISED = {
 }
 
 
-def gm_db_for_selection_optimised(gm_db: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
-    """THE place where the optimised selection's database filtering happens.
+def gm_db_for_selection(gm_db: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
+    """THE place where the selection database is filtered (both selections).
 
     Returns a copy of ``gm_db`` without every record listed in
-    ``UNAVAILABLE_RECORDS`` (the NGA-Sub ONA network, and NGA-Sub RSN 6003695 /
-    6003748 / 6003796 whose waveforms are ~3-4.5e4 x their flatfile SA). nb
-    032-optimised calls it once, straight after ``setup_AvgSA03_gcim_gm_selection``,
-    and passes ONLY the filtered frame to ``build_final_ensembles``, so these records
-    can never be selected in any round.
+    ``UNAVAILABLE_RECORDS`` -- ALL versions of the list, always, so a stripe
+    (re)selected now can never pick any listed record. nb 032 and nb 032-optimised
+    call it once, straight after ``setup_AvgSA03_gcim_gm_selection``, and pass ONLY
+    the filtered frame to ``build_final_ensembles``.
 
     - The database file on disk is never edited; filtering is in memory with
       ``DataFrame.drop(index=...)``, so the surviving rows keep their original
       index labels and every selected record still points at the right row of the
       canonical CSV (nb 033's network-code lookup relies on that).
     - The file-byte hash of the database cannot see this filter, so the exclusion
-      is stated in the provenance explicitly: ``SELECTION_CONFIG_OPTIMISED
-      ["db_exclusions"]`` in every stripe manifest, and the ``db_exclusions``
-      argument of ``build_final_ensembles`` in the stage caches and the
-      final-ensembles manifest. Both are derived from the same
-      ``UNAVAILABLE_RECORDS`` list used here, so adding a record to that list makes
-      every optimised stripe stale and it is reselected without it.
+      is stated in the provenance explicitly: ``db_exclusions`` in every stripe
+      manifest (from the selection config), and the ``db_exclusions`` argument of
+      ``build_final_ensembles`` in the stage caches and the final-ensembles
+      manifest. Adding a record to ``UNAVAILABLE_RECORDS`` (as a new version)
+      makes stale ONLY the stripes that contain it -- see :func:`stripe_fingerprints`.
     """
-    return drop_unavailable_records(gm_db, UNAVAILABLE_RECORDS, verbose=verbose)
+    return _drop_unavailable_records(gm_db, UNAVAILABLE_RECORDS, verbose=verbose)
+
+
+# Old name, kept so existing imports keep working. Same function: the filter used
+# to apply to the optimised selection only.
+gm_db_for_selection_optimised = gm_db_for_selection
+
+
+def stripe_fingerprints(selection_config: dict, source_fps_stripe: dict,
+                        basic_selection_ctx: dict, disagg_stats):
+    """``(fp_fn, superseded)`` for the stale check of one AvgSA_03 selection.
+
+    ``selection_config`` is ``SELECTION_CONFIG`` (original selection) or
+    ``SELECTION_CONFIG_OPTIMISED``. Pass both results to
+    ``gm_selection.find_stale_stripes(wanted, folder, fp_fn, superseded=superseded)``.
+    ``fp_fn`` is also what a newly written stripe manifest records.
+
+    A stripe is valid if its manifest matches the current exclusion list, or an
+    older version of it and the stripe contains none of the records added since.
+    Every notebook that runs the stale check (031, 032, 033 and the optimised
+    copies) must get its functions from here, so they all decide alike. See
+    ``gm_selection.stripe_fingerprints_by_exclusion_version``.
+    """
+    return stripe_fingerprints_by_exclusion_version(
+        selection_config, UNAVAILABLE_RECORDS, source_fps_stripe,
+        basic_selection_ctx, disagg_stats)
 
 
 def stripe_source_fps() -> dict:

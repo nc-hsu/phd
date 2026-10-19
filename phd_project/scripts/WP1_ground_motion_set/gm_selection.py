@@ -893,35 +893,287 @@ def stripe_input_fingerprint(site, iml, source_fps: dict,
             sc["n_shuffles"], sc["shuffle_rng_seeds"], sc["rng_seed"],
         )),
         **_selection_ctx_fingerprint_inputs(basic_selection_ctx),
-        # Records filtered out of the database in memory (the "optimised"
-        # selection, see setup_AvgSA03_gm_selection.gm_db_for_selection_optimised).
-        # The gm_db_file hash cannot see such a filter, so it is stated here. Only
-        # added when the config carries the key: the original SELECTION_CONFIG does
-        # not, so the original stripes' fingerprints are unchanged.
+        # Records filtered out of the database in memory (see
+        # setup_AvgSA03_gm_selection.gm_db_for_selection). The gm_db_file hash
+        # cannot see such a filter, so it is stated here. Only added when the
+        # config carries the key: a stripe selected before exclusions existed has
+        # no such entry in its manifest ("exclusion-list version 0", matched by
+        # stripe_fingerprints_by_exclusion_version via an entry that must be
+        # ABSENT from the manifest, not by an empty list).
         **({"db_exclusions": repr(sc["db_exclusions"])}
            if "db_exclusions" in sc else {}),
     )
 
 
-def find_stale_stripes(wanted_keys, result_folder, fp_fn):
+# =============================================================================
+# Database exclusions: records that were selected but cannot be used
+# =============================================================================
+# A record can turn out to be unusable after it has been selected (its waveform
+# cannot be downloaded, or the waveform does not match the flatfile the selection
+# was made from). Such records are listed in an exclusion list (for AvgSA_03:
+# setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS) and dropped from the database IN
+# MEMORY before selecting. The list grows over time, so it is VERSIONED: every
+# entry carries "added_in_version", the version of the list that first contained
+# it, and the list "at version v" is every entry with added_in_version <= v.
+# Version 0 is "no list at all".
+#
+# Why versioned: the list is part of each stripe's fingerprint (it decides which
+# records a selection could pick). Without versions, adding one record would
+# change every stripe's fingerprint and the next run would reselect all of them.
+# With versions, a stripe selected under an OLDER list stays valid as long as it
+# contains none of the records added since -- only the stripes that actually
+# contain a newly excluded record are reselected. Such a stripe keeps its old
+# manifest, which therefore still says truthfully which list it was selected
+# with. (It is a valid selection that uses none of the excluded records; it is
+# not necessarily the selection a full rerun with the newer list would return,
+# because removing database rows changes the random draws and shuffle orderings.)
+#
+# The functions here are generic (any list, any selection config); the AvgSA_03
+# list and its wrappers live in setup_AvgSA03_gm_selection.py, which imports from
+# this module (so this module must not import from it).
+
+def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict],
+                             verbose: bool = True) -> pd.DataFrame:
+    """Return a COPY of ``gm_db`` with every row of each listed record removed.
+
+    ``records`` is an exclusion list (e.g. ``UNAVAILABLE_RECORDS``): each entry
+    names a ``database`` and an ``identity`` dict of ``{metadata column: value}``.
+    A scalar value is an equality match; a list value matches any of its entries
+    (how a whole network is excluded, as its list of RSNs). All component rows of a
+    matching record go, because the record is the download unit.
+
+    Works on any frame with the selection database's ``("metadata", ...)`` columns
+    -- the full database, or the ``recs`` of a single stripe (that is how
+    :func:`stripe_fingerprints_by_exclusion_version` checks whether a stripe
+    contains an excluded record, without loading the database).
+
+    Dropping is done with ``DataFrame.drop(index=...)`` so the surviving rows keep
+    their original index labels. That is the whole point of filtering in memory:
+    every selected record still points at the right row of the canonical CSV, and
+    the CSV is never edited (editing it would change its byte hash, which every
+    stripe fingerprints, and would shift every row below a deleted one).
+    """
+    meta = gm_db["metadata"]
+
+    to_drop = pd.Index([])
+    for rec in records:
+        mask = meta["database"] == rec["database"]
+        for field, value in rec["identity"].items():
+            col = meta[field].astype(str)
+            # a list value matches any of its entries (used to name a whole network
+            # by its RSNs); a scalar is a plain equality match on one record.
+            if isinstance(value, (list, tuple, set)):
+                mask &= col.isin({str(v) for v in value})
+            else:
+                mask &= col == str(value)
+        hits = meta.index[mask]
+        if verbose:
+            label = rec.get("label", rec["identity"])
+            print(f"  excluding {rec['database']} {label}: "
+                  f"{len(hits)} row(s) {list(hits)}")
+        to_drop = to_drop.union(hits)
+
+    filtered = gm_db.drop(index=to_drop)
+    if verbose:
+        print(f"gm_db: {len(gm_db)} -> {len(filtered)} rows "
+              f"({len(to_drop)} dropped)")
+    return filtered
+
+
+def _exclusion_identities(records: list[dict]) -> tuple:
+    """The part of each exclusion-list entry that decides WHICH rows go.
+
+    Only ``database`` + ``identity`` are kept, normalised to sorted tuples of
+    strings. This is what stripe fingerprints hash (as ``db_exclusions``), so a
+    stripe goes stale when the set of excluded records changes, but NOT when a
+    free-text field (``label``, ``reason``, ``date``, the comments) is edited --
+    nor when ``added_in_version`` or ``affected_stripes`` are, which is what lets
+    the versions be added to an existing list without changing its hash.
+    """
+    out = []
+    for rec in records:
+        ident = []
+        for field, value in sorted(rec["identity"].items()):
+            if isinstance(value, (list, tuple, set)):
+                value = tuple(sorted(str(v) for v in value))
+            else:
+                value = str(value)
+            ident.append((field, value))
+        out.append((rec["database"], tuple(ident)))
+    return tuple(sorted(out))
+
+
+def check_exclusion_versions(records: list[dict]) -> int:
+    """Validate the ``added_in_version`` fields of an exclusion list; return the
+    current (highest) version.
+
+    Every entry must carry an integer ``added_in_version`` >= 1, and the versions
+    used must run 1, 2, ..., N without gaps (a gap would be a version nobody can
+    say which list it was). An empty list is version 0.
+    """
+    if not records:
+        return 0
+    versions = []
+    for rec in records:
+        v = rec.get("added_in_version")
+        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            raise ValueError(
+                f"exclusion entry {rec.get('label', rec.get('identity'))!r} needs an "
+                f"integer added_in_version >= 1, got {v!r}")
+        versions.append(v)
+    current = max(versions)
+    missing = set(range(1, current + 1)) - set(versions)
+    if missing:
+        raise ValueError(f"exclusion-list versions must run 1..{current} without gaps; "
+                         f"no entry has added_in_version {sorted(missing)}")
+    return current
+
+
+def exclusion_records_in_version(records: list[dict], version: int) -> list[dict]:
+    """The exclusion list as it stood at ``version``: every entry added in it or
+    earlier. Version 0 is the empty list."""
+    return [r for r in records if r["added_in_version"] <= version]
+
+
+def exclusion_records_added_after(records: list[dict], version: int) -> list[dict]:
+    """Entries a stripe selected under ``version`` was NOT protected from. Such a
+    stripe stays valid only if it contains none of them."""
+    return [r for r in records if r["added_in_version"] > version]
+
+
+def stripe_fingerprints_by_exclusion_version(selection_config: dict,
+                                             exclusion_records: list[dict],
+                                             source_fps_stripe: dict,
+                                             basic_selection_ctx: dict,
+                                             disagg_stats):
+    """Stripe fingerprint functions for every version of an exclusion list.
+
+    Returns ``(fp_fn, superseded)`` for :func:`find_stale_stripes`:
+
+    - ``fp_fn(site, iml)`` -- the fingerprint under the CURRENT (newest) version of
+      ``exclusion_records``. A stripe whose manifest matches it is valid, and every
+      newly written manifest records it.
+    - ``superseded`` -- one ``(old_fp_fn, contains_later_exclusion)`` pair per
+      older version, newest first, down to version 0. A stripe whose manifest
+      matches ``old_fp_fn`` was selected under that older list; it is still valid
+      iff ``contains_later_exclusion(recs)`` is False, i.e. it selected none of the
+      records added to the list since.
+
+    ``selection_config`` is the selection's config (``SELECTION_CONFIG`` or
+    ``SELECTION_CONFIG_OPTIMISED``). Its own ``db_exclusions`` value is ignored:
+    each version's fingerprint replaces it with that version's list -- except
+    version 0, which must match manifests that have NO ``db_exclusions`` entry at
+    all (stripes selected before any exclusion existed). See ``_absent`` below for
+    how that is expressed.
+
+    Every notebook that runs the stale check for a selection must use this, with
+    the same arguments, so they all make the same stale/valid decision.
+    """
+    current = check_exclusion_versions(exclusion_records)
+
+    # Version 0 = "the manifest has no db_exclusions entry". cache_utils.
+    # manifest_matches compares only the keys of the fingerprint it is given
+    # (subset semantics), so simply leaving the key out would make the v0
+    # fingerprint match EVERY manifest, whatever list it records. Instead the key
+    # is given a hash of None: manifest_matches compares cached.get(name, {}).
+    # get("hash") with it, which is None exactly when the manifest lacks the entry.
+    # This fingerprint is only ever used for matching, never written as a manifest.
+    _absent = {"hash": None, "summary": "<absent: no exclusion list (version 0)>"}
+
+    def fp_fn_for(version: int):
+        sc = dict(selection_config)
+        if version == 0:
+            sc.pop("db_exclusions", None)
+
+            def fp_v0(s, i):
+                fp = stripe_input_fingerprint(
+                    s, i, source_fps_stripe, basic_selection_ctx, sc, disagg_stats)
+                fp["db_exclusions"] = dict(_absent)
+                return fp
+            return fp_v0
+        sc["db_exclusions"] = _exclusion_identities(
+            exclusion_records_in_version(exclusion_records, version))
+        return lambda s, i: stripe_input_fingerprint(
+            s, i, source_fps_stripe, basic_selection_ctx, sc, disagg_stats)
+
+    def contains_any_of(records: list[dict]):
+        # True if the filter would drop any row of the stripe's own record set,
+        # i.e. the stripe contains one of `records`. No database load needed.
+        return lambda recs: len(drop_unavailable_records(recs, records, verbose=False)) < len(recs)
+
+    fp_fn = fp_fn_for(current)
+    superseded = [(fp_fn_for(v), contains_any_of(exclusion_records_added_after(exclusion_records, v)))
+                  for v in range(current - 1, -1, -1)]
+    return fp_fn, superseded
+
+
+def manifest_exclusion_version(stripe_fp, site, iml, fp_fn, superseded,
+                               current_version: int) -> int | None:
+    """Which exclusion-list version a stripe's manifest was written under, or
+    ``None`` if it matches none (stale for some other reason, or no manifest).
+
+    ``superseded`` must be the list returned by
+    :func:`stripe_fingerprints_by_exclusion_version` (newest first, down to v0), so
+    its ``k``-th entry is version ``current_version - 1 - k``. Used for reporting
+    (``diagnose_stale_stripes``); the stale decision itself is
+    :func:`find_stale_stripes`.
+    """
+    if manifest_matches(stripe_fp, fp_fn(site, iml)):
+        return current_version
+    for k, (old_fp_fn, _) in enumerate(superseded):
+        if manifest_matches(stripe_fp, old_fp_fn(site, iml)):
+            return current_version - 1 - k
+    return None
+
+
+def find_stale_stripes(wanted_keys, result_folder, fp_fn, superseded=()):
     """Split ``wanted_keys`` into ``(to_compute, valid)`` against the result folder.
 
-    A ``(site, iml)`` is *valid* iff its stripe pickle exists and its
-    ``.manifest.json`` sidecar matches ``fp_fn(site, iml)`` (see
-    :func:`stripe_input_fingerprint`); otherwise it is *to_compute* (missing,
-    unmanaged, or stale). This is the "what has been selected and is still valid"
-    tracker: pass ``to_compute`` down the pipeline to (re)select only those
-    stripes, leaving every valid stripe on disk untouched.
+    A ``(site, iml)`` is *valid* iff its stripe pickle exists and either
+
+    - its ``.manifest.json`` sidecar matches ``fp_fn(site, iml)`` (see
+      :func:`stripe_input_fingerprint`), or
+    - it matches one of the ``superseded`` fingerprints (the stripe was selected
+      under an older exclusion list) AND the stripe contains none of the records
+      excluded since -- see :func:`stripe_fingerprints_by_exclusion_version`, which
+      builds both ``fp_fn`` and ``superseded``.
+
+    Otherwise it is *to_compute* (missing, unmanaged, stale, or selected under an
+    older exclusion list but containing a record that list did not yet exclude).
+    This is the "what has been selected and is still valid" tracker: pass
+    ``to_compute`` down the pipeline to (re)select only those stripes, leaving
+    every valid stripe on disk untouched. ``superseded`` defaults to empty, which
+    is the plain "manifest matches" check.
     """
     result_folder = Path(result_folder)
     to_compute, valid = [], []
     for (site, iml) in wanted_keys:
         stripe_fp = stripe_pickle_path(result_folder, site, iml)
-        if stripe_fp.is_file() and manifest_matches(stripe_fp, fp_fn(site, iml)):
+        if not stripe_fp.is_file():
+            to_compute.append((site, iml))
+        elif manifest_matches(stripe_fp, fp_fn(site, iml)):
+            valid.append((site, iml))
+        elif _valid_under_superseded(stripe_fp, site, iml, superseded):
             valid.append((site, iml))
         else:
             to_compute.append((site, iml))
     return to_compute, valid
+
+
+def _valid_under_superseded(stripe_fp, site, iml, superseded) -> bool:
+    """True if the stripe was selected under an older exclusion list and selected
+    none of the records added to the list since.
+
+    A manifest matches at most one version, so the first match decides. The stripe
+    pickle is opened only for a manifest that matches an older version, so a stripe
+    that is current or plainly stale costs nothing extra.
+    """
+    for old_fp_fn, contains_later_exclusion in superseded:
+        if manifest_matches(stripe_fp, old_fp_fn(site, iml)):
+            with open(stripe_fp, "rb") as f:
+                recs = pickle.load(f)["recs"]
+            return not contains_later_exclusion(recs)
+    return False
 
 
 def adjust_ensemble_distributions(

@@ -17,15 +17,24 @@ Two very different things get confused here, so it names them explicitly:
   per-stripe content hashes, so such a mismatch is real -- unlike the whole-file
   hashes they replaced, which went stale for all ~500 stripes whenever a single
   new iml was disaggregated across the 60 sites.
+- **A stripe that contains a newly excluded record.** The stale check is
+  versioned by exclusion list (``UNAVAILABLE_RECORDS``): a stripe whose manifest
+  was written under an older version of the list is still valid, unless it
+  contains a record that was excluded after that version. Such a stripe is
+  reported with the version it was selected under and the record(s) it contains.
+  The summary also counts the valid stripes by the version they were selected
+  under.
 
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --show 20
+    python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --selection optimised
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import pickle
 import sys
 from collections import Counter
 from pathlib import Path
@@ -33,44 +42,98 @@ from pathlib import Path
 from phd_project.config.config import load_config
 from phd_project.scripts import disagg_shards
 from phd_project.scripts.cache_utils import _manifest_path
+
 from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
-    stripe_input_fingerprint,
+    drop_unavailable_records,
+    exclusion_records_added_after,
+    manifest_exclusion_version,
     stripe_pickle_path,
 )
 from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
+    EXCLUSION_LIST_VERSION,
     SELECTION_CONFIG,
+    SELECTION_CONFIG_OPTIMISED,
+    UNAVAILABLE_RECORDS,
     setup_AvgSA03_gcim_gm_selection,
+    stripe_fingerprints,
     stripe_source_fps,
     wanted_stripe_keys,
 )
+
+# Each selection's result folder (cfg["results"] key), selection config, and the
+# notebook that would (re)compute its stale stripes.
+SELECTIONS = {
+    "original": ("AvgSA_03_record_selection", SELECTION_CONFIG, "031 / 032"),
+    "optimised": ("AvgSA_03_record_selection_optimised", SELECTION_CONFIG_OPTIMISED,
+                  "032-optimised"),
+}
 
 NO_PICKLE = "no stripe pickle on disk (never selected, or pruned)"
 NO_MANIFEST = "stripe pickle present but no .manifest.json (unmanaged)"
 
 
-def _reason(stripe_fp: Path, current: dict) -> tuple[str, list[str]]:
-    """(reason, differing input names) for one stripe."""
+def _diff(cached: dict, fp: dict) -> list[str]:
+    """Names of the fingerprint entries whose hash the manifest does not match.
+
+    Same comparison as cache_utils.manifest_matches: only the entries of ``fp``
+    count, and an entry whose hash is None (the version-0 "no exclusion list"
+    marker) matches only a manifest that lacks it."""
+    return [name for name, cur in fp.items()
+            if cached.get(name, {}).get("hash") != cur["hash"]]
+
+
+def _contained(stripe_fp: Path, version: int) -> list[str]:
+    """Labels of the records excluded after ``version`` that this stripe contains."""
+    with open(stripe_fp, "rb") as f:
+        recs = pickle.load(f)["recs"]
+    return [rec.get("label", str(rec["identity"]))
+            for rec in exclusion_records_added_after(UNAVAILABLE_RECORDS, version)
+            if len(drop_unavailable_records(recs, [rec], verbose=False)) < len(recs)]
+
+
+def _reason(stripe_fp: Path, site, iml, fp_fn, superseded) -> tuple[str, list[str], int | None]:
+    """(reason, differing input names, version) for one stripe.
+
+    ``version`` is the exclusion-list version the manifest was written under, for a
+    stripe that is valid ("MATCHES") or stale only because it contains a record
+    excluded since; ``None`` otherwise."""
     if not stripe_fp.is_file():
-        return NO_PICKLE, []
+        return NO_PICKLE, [], None
     mp = _manifest_path(stripe_fp)
     if not mp.is_file():
-        return NO_MANIFEST, []
+        return NO_MANIFEST, [], None
+
+    version = manifest_exclusion_version(stripe_fp, site, iml, fp_fn, superseded,
+                                         EXCLUSION_LIST_VERSION)
+    if version is not None:
+        if version == EXCLUSION_LIST_VERSION:
+            return "MATCHES (not stale)", [], version
+        contained = _contained(stripe_fp, version)
+        if not contained:
+            return "MATCHES (not stale)", [], version
+        return (f"selected under exclusion list v{version}, contains record(s) excluded "
+                f"since: {'; '.join(contained)}"), [], version
+
+    # Matches no version: some other input differs. Report the differences against
+    # the version the manifest is closest to, so the db_exclusions entry is not
+    # listed merely because the stripe was selected under an older list.
     cached = json.loads(mp.read_text()).get("inputs", {})
-    diff = [name for name, cur in current.items()
-            if cached.get(name, {}).get("hash") != cur["hash"]]
-    if not diff:
-        return "MATCHES (not stale)", []
-    return "input mismatch", diff
+    candidates = [(EXCLUSION_LIST_VERSION, fp_fn)] + [
+        (EXCLUSION_LIST_VERSION - 1 - k, f) for k, (f, _) in enumerate(superseded)]
+    v, diff = min(((v, _diff(cached, f(site, iml))) for v, f in candidates),
+                  key=lambda t: len(t[1]))
+    return f"input mismatch (vs exclusion list v{v})", diff, None
 
 
-def diagnose(show: int = 10) -> int:
+def diagnose(show: int = 10, selection: str = "original") -> int:
     cfg = load_config()
-    result_folder = Path(cfg["results"]["AvgSA_03_record_selection"])
+    results_key, selection_config, recompute_nb = SELECTIONS[selection]
+    result_folder = Path(cfg["results"][results_key])
     shard_dir = Path(cfg["proc_data"]["AvgSA_03_disagg_data_shards"])
 
     # --- environment first: a missing shard set makes EVERY stripe stale -----
     print("=" * 72)
-    print("INPUTS")
+    print(f"INPUTS  (selection: {selection}, exclusion list v{EXCLUSION_LIST_VERSION})")
     print("=" * 72)
     shards = disagg_shards.shard_paths(shard_dir) if shard_dir.is_dir() else []
     index_ok = (shard_dir / disagg_shards.INDEX_NAME).is_file()
@@ -101,15 +164,17 @@ def diagnose(show: int = 10) -> int:
     # --- the stale check, exactly as the notebooks run it -------------------
     wanted = wanted_stripe_keys()
     _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
-    fp_fn = lambda s, i: stripe_input_fingerprint(
-        s, i, stripe_source_fps(), ctx, SELECTION_CONFIG, disagg_stats)
+    fp_fn, superseded = stripe_fingerprints(
+        selection_config, stripe_source_fps(), ctx, disagg_stats)
 
     reasons, diff_counter, examples = Counter(), Counter(), {}
+    valid_by_version = Counter()
     stale = []
     for (site, iml) in wanted:
         fp = stripe_pickle_path(result_folder, site, iml)
-        reason, diff = _reason(fp, fp_fn(site, iml))
+        reason, diff, version = _reason(fp, site, iml, fp_fn, superseded)
         if reason == "MATCHES (not stale)":
+            valid_by_version[version] += 1
             continue
         stale.append((site, iml))
         key = reason if not diff else f"input mismatch: {', '.join(sorted(diff))}"
@@ -122,8 +187,12 @@ def diagnose(show: int = 10) -> int:
     print("=" * 72)
     print(f"STALE: {len(stale)} of {len(wanted)} wanted stripes")
     print("=" * 72)
+    print("  valid stripes by the exclusion-list version they were selected under:")
+    for v in sorted(valid_by_version):
+        print(f"    v{v}: {valid_by_version[v]:>4}"
+              + ("  (current)" if v == EXCLUSION_LIST_VERSION else ""))
     if not stale:
-        print("  Nothing stale. 031 would compute nothing.")
+        print(f"\n  Nothing stale. nb {recompute_nb} would compute nothing.")
         return 0
 
     for reason, n in reasons.most_common():
@@ -132,7 +201,11 @@ def diagnose(show: int = 10) -> int:
         print(f"        e.g. site {site}, iml {iml}  ->  {fp.name}")
 
     print("\n" + "-" * 72)
-    if reasons and all(r == NO_PICKLE for r in reasons):
+    if reasons and all(r.startswith("selected under exclusion list") for r in reasons):
+        print("DIAGNOSIS: every stale stripe contains a record excluded after the")
+        print("  exclusion-list version it was selected under. That is the versioned")
+        print("  exclusion working as designed: these, and only these, are reselected.")
+    elif reasons and all(r == NO_PICKLE for r in reasons):
         print("DIAGNOSIS: every stale stripe simply has no stripe pickle yet.")
         print()
         print("  Nb 031 computes the GCIM but NEVER writes a stripe pickle or")
@@ -162,7 +235,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--show", type=int, default=10,
                     help="how many stale stripes to list (default 10)")
-    return diagnose(ap.parse_args(argv).show)
+    ap.add_argument("--selection", choices=sorted(SELECTIONS), default="original",
+                    help="which selection's result folder to check (default: original)")
+    args = ap.parse_args(argv)
+    return diagnose(args.show, args.selection)
 
 
 if __name__ == "__main__":

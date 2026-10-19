@@ -42,6 +42,23 @@ each migration only where it can prove the underlying data is unchanged.
     their order and every other value must be byte-identical to the database the stripe
     was selected from. Any other manifest is genuinely stale and is left alone.
 
+``--to recorded-exclusions`` (one-off, 2026-10-19)
+    Four stripes of the ORIGINAL selection -- (31, 1.15), (41, 0.65), (41, 0.95),
+    (44, 1.15) -- were reselected by the old one-off cell of nb 032 against an
+    in-memory-filtered database, but their manifests were deliberately written as if
+    from the full database (no ``db_exclusions`` entry, i.e. exclusion-list version
+    0). The filter actually used is recorded inside each stripe pickle
+    (``ensemble["db_exclusions"]``, a copy of the ``UNAVAILABLE_RECORDS`` entries in
+    force at the time). Now that the list is versioned, this re-stamps those
+    manifests with the version their pickle records (v1 for (31, 1.15), v2 for the
+    others), so the provenance says what really happened. Honest because a manifest
+    is re-stamped only when (a) the recorded list equals exactly one version of
+    ``UNAVAILABLE_RECORDS`` and (b) the manifest still matches the version-0
+    fingerprint, i.e. every OTHER input is unchanged. The new entry is checked
+    against the fingerprint the stale check will compute before anything is
+    written. Optional: without it these four stripes are still valid (they contain
+    none of the listed records); their manifests just keep claiming version 0.
+
 The stripe pickles and their ``.manifest.json`` sidecars are git-tracked, so
 ``git diff`` shows exactly what changed and ``git checkout`` undoes it.
 
@@ -50,6 +67,8 @@ The stripe pickles and their ``.manifest.json`` sidecars are git-tracked, so
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to shards
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to network-code
     python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to network-code --write
+    python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to recorded-exclusions
+    python -m phd_project.scripts.WP1_ground_motion_set.migrate_stripe_manifests --to recorded-exclusions --write
 """
 
 from __future__ import annotations
@@ -69,13 +88,22 @@ from phd_project.scripts.cache_utils import (
     _manifest_path,
     file_hash,
     fingerprint,
+    manifest_matches,
 )
 from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
+    _exclusion_identities,
+    exclusion_records_in_version,
     stats_row,
     stripe_pickle_path,
 )
 from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
     DISAGG_IMT,
+    EXCLUSION_LIST_VERSION,
+    SELECTION_CONFIG,
+    UNAVAILABLE_RECORDS,
+    setup_AvgSA03_gcim_gm_selection,
+    stripe_fingerprints,
+    stripe_source_fps,
     wanted_stripe_keys,
 )
 from phd_project.scripts.WP1_ground_motion_set.manage_flatfiles import (
@@ -401,11 +429,123 @@ def migrate_to_network_code_db(*, write: bool = False) -> int:
     return 0
 
 
+# --- recorded-exclusions migration (one-off, 2026-10-19) -----------------------
+RX_NOT_RECORDED = "no db_exclusions recorded in the stripe pickle (nothing to do)"
+RX_DONE = "manifest already records the pickle's exclusion-list version"
+RX_NO_VERSION = ("recorded exclusion list equals no version of UNAVAILABLE_RECORDS "
+                 "-- left alone")
+RX_NOT_V0 = ("manifest does not match the version-0 fingerprint (another input "
+             "differs) -- genuinely stale, left alone")
+RX_MIGRATE = "re-stamp: version 0 -> the version recorded in the pickle"
+
+
+def migrate_to_recorded_exclusions(*, write: bool = False) -> int:
+    """Re-stamp ORIGINAL-selection manifests with the exclusion-list version their
+    stripe pickle records (see the module docstring).
+
+    Iterates the wanted ``(site, iml)`` key set, like the content-hash migration,
+    because the native iml is needed for the fingerprint. Only stripe pickles that
+    carry a ``db_exclusions`` key are candidates; the original selection has four.
+    """
+    cfg = load_config()
+    result_folder = Path(cfg["results"]["AvgSA_03_record_selection"])
+    print(f"results    : {result_folder}")
+    print(f"exclusion list: current version v{EXCLUSION_LIST_VERSION}\n")
+
+    # The same fingerprint functions the notebooks' stale check uses. `superseded` runs
+    # newest first down to v0, so version v (< current) is superseded[current - 1 - v].
+    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
+    fp_fn, superseded = stripe_fingerprints(
+        SELECTION_CONFIG, stripe_source_fps(), ctx, disagg_stats)
+    fp_for = {EXCLUSION_LIST_VERSION: fp_fn}
+    for k, (f, _) in enumerate(superseded):
+        fp_for[EXCLUSION_LIST_VERSION - 1 - k] = f
+    identities_of = {v: _exclusion_identities(exclusion_records_in_version(UNAVAILABLE_RECORDS, v))
+                     for v in range(1, EXCLUSION_LIST_VERSION + 1)}
+
+    counts: dict[str, int] = {}
+    changed = []
+    for site, iml in wanted_stripe_keys():
+        stripe_fp = stripe_pickle_path(result_folder, site, iml)
+        mf = _manifest_path(stripe_fp)
+        if not stripe_fp.is_file() or not mf.is_file():
+            continue
+        with open(stripe_fp, "rb") as f:
+            recorded = pickle.load(f).get("db_exclusions")
+
+        if recorded is None:
+            kind, version = RX_NOT_RECORDED, None
+        else:
+            matches = [v for v, ids in identities_of.items()
+                       if ids == _exclusion_identities(recorded)]
+            version = matches[0] if len(matches) == 1 else None
+            if version is None:
+                kind = RX_NO_VERSION
+            elif manifest_matches(stripe_fp, fp_for[version](site, iml)):
+                kind = RX_DONE
+            elif manifest_matches(stripe_fp, fp_for[0](site, iml)):
+                kind = RX_MIGRATE
+            else:
+                kind = RX_NOT_V0
+        counts[kind] = counts.get(kind, 0) + 1
+        if kind in (RX_NO_VERSION, RX_NOT_V0):
+            print(f"  [left alone] {mf.name}: {kind}")
+        if kind != RX_MIGRATE:
+            continue
+
+        # The entry exactly as stripe_input_fingerprint computes it for this version
+        # (same function, same arguments), inserted where it would sit: after every
+        # other input, before pickagm_version.
+        target = fp_for[version](site, iml)
+        manifest = json.loads(mf.read_text())
+        inputs = manifest.get("inputs", {})
+        new_inputs = {k: v for k, v in inputs.items() if k != "pickagm_version"}
+        new_inputs["db_exclusions"] = target["db_exclusions"]
+        if "pickagm_version" in inputs:
+            new_inputs["pickagm_version"] = inputs["pickagm_version"]
+
+        # Self-check before anything is written: the re-stamped manifest must match the
+        # version-`version` fingerprint in every entry (what the stale check compares).
+        bad = [k for k, cur in target.items()
+               if new_inputs.get(k, {}).get("hash") != cur["hash"]]
+        if bad:
+            print(f"ERROR: re-stamped {mf.name} would not match v{version} in {bad}; "
+                  f"nothing written.")
+            return 1
+
+        manifest["inputs"] = new_inputs
+        # Own _meta keys, so the record of the earlier migrations is not overwritten.
+        manifest.setdefault("_meta", {}).update({
+            "exclusions_restamped_at": datetime.now(timezone.utc).isoformat(),
+            "exclusions_restamped_from": (
+                "no db_exclusions entry (exclusion-list version 0, as the old one-off "
+                f"reselection cell of nb 032 wrote it) -> version {version}, the list "
+                "recorded in the stripe pickle's db_exclusions key"),
+        })
+        print(f"  ({site}, {iml}): v0 -> v{version}")
+        changed.append((mf, manifest))
+
+    print("\nclassification:")
+    for k, n in sorted(counts.items()):
+        print(f"  {n:>4}  {k}")
+    print(f"\n{len(changed)} manifest(s) to re-stamp.")
+
+    if not write:
+        print("\n-- dry run; nothing written. Re-run with --write to apply.")
+        return 0
+
+    for mf, manifest in changed:
+        mf.write_text(json.dumps(manifest, indent=2))
+    print(f"re-stamped {len(changed)} manifest(s).")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write", action="store_true", help="actually rewrite the manifests")
-    ap.add_argument("--to", choices=("content-hashes", "shards", "network-code"),
+    ap.add_argument("--to", choices=("content-hashes", "shards", "network-code",
+                                     "recorded-exclusions"),
                     default="content-hashes",
                     help="which re-stamp to run (default: content-hashes)")
     args = ap.parse_args(argv)
@@ -413,6 +553,8 @@ def main(argv=None) -> int:
         return migrate(write=args.write)
     if args.to == "network-code":
         return migrate_to_network_code_db(write=args.write)
+    if args.to == "recorded-exclusions":
+        return migrate_to_recorded_exclusions(write=args.write)
     return migrate_to_content_hashes(write=args.write)
 
 
