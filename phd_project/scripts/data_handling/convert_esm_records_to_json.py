@@ -127,6 +127,8 @@ COMPONENTS = ("U", "V", "W")
 #   IV -> 8P (T12xx, 2016 Central Italy), 8H (RMxx, 2009 L'Aquila), 5G (T08xx, 2012 Emilia),
 #         9N (T0721), EU (GMN, 1976 Friuli)
 #   RO -> EU, CR -> EU, IP -> EU (historical records), SI -> SL (Slovenia, 1998)
+#   ES -> EU (added 2026-10-19): ES-1993-0002__SADR__00.h5 holds only EU.SADR, a 1993 Spanish
+#         record archived under EU like the other historical ones above
 # GE and HL deliberately have NO entries: GE.KTHA and HL.KTHA are different recordings (see "WHICH
 # NETWORK" at the top), so neither may ever stand in for the other.
 # ---------------------------------------------------------------------------------------------
@@ -136,6 +138,7 @@ NETWORK_CODE_ALIASES = {
     "CR": ["EU"],
     "IP": ["EU"],
     "SI": ["SL"],
+    "ES": ["EU"],
 }
 
 # The OLD positional rule (key-sorted 1st/2nd/3rd dataset = U/V/W). Kept ONLY so that the dry run
