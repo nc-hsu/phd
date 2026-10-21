@@ -31,7 +31,12 @@ data_processed/07_gm_records/*.json
 # Local golden-master snapshot for the gm-selection regression test (large pickles).
 # Regenerate by copying current pipeline outputs into tests/golden/; not for git.
 tests/golden/
+# Worked example written by tests/test_gcim_saratio.py when run as a script:
+# the method figure plus the conditional spectra and correlation matrices behind
+# it (a few MB of CSV). Regenerate with `python tests/test_gcim_saratio.py`.
+tests/saratio_worked_example/
 
+dump/
 admin/
 meeting_presentations/
 

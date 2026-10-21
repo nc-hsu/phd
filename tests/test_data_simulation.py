@@ -388,3 +388,277 @@ def test_regression_recovers_every_coefficient(structure, V_bb):
         assert 0.80 < summary.loc[f"beta_{k}", "se_ratio"] < 1.20
         # Same mild undercoverage as the A1a check -- see the comment there.
         assert 0.87 < summary.loc[f"beta_{k}", "cov_95"] <= 1.0
+
+
+# =============================================================================
+# The hybrid bootstrap: pseudo-data and the scheme-comparison study
+# =============================================================================
+#
+# dump/plan_hybrid_bootstrap.md. The record-only outer bootstrap refits each
+# record-resampling replicate as it is; that replicate carries TWO rounds of
+# sampling noise while V_known describes one, so every replicate tau^2 is
+# inflated by about the mean sampling variance. The hybrid bootstrap refits
+# pseudo-data with one round: X beta_hat + new effects drawn from the fitted
+# tau's + the centred replicate cloud. The tests below check the pieces
+# (centring, the effect draw, the covariance of the pseudo-data, seeding) and
+# then the claim itself, on fake data with a known truth.
+
+
+def test_refactored_simulator_draws_are_bit_identical(structure, V_bb):
+    """Acceptance 1: moving the effect draw into ``draw_effects`` changed no number.
+
+    The reference below is the loop ``simulate_y`` contained before the
+    refactor, written out. Exact equality, not approximate: the same generator
+    calls in the same order, and the same order of floating-point additions,
+    must give the same bits -- which is what keeps every seeded recovery test
+    above meaning what it meant.
+    """
+    Z, S, I = structure["Z"], structure["S"], structure["I"]
+    V = np.diag(np.full(N_ROWS, 0.001)) + Z @ V_bb @ Z.T
+    X = np.column_stack([np.ones(N_ROWS), np.linspace(-1, 1, N_ROWS)])
+    beta = np.array([0.1, -0.05])
+    components = {"tau_d": (Z, 0.10), "tau_s": (S, 0.08), "tau_u": (I, 0.05)}
+
+    rng = np.random.default_rng(99)
+    want = X @ beta
+    for M, tau in ((Z, 0.10), (S, 0.08), (I, 0.05)):
+        want = want + M @ (tau * rng.standard_normal(M.shape[1]))
+    want = want + dsim._known_error_sampler(V)(rng)
+
+    got, parts = dsim.simulate_y(np.random.default_rng(99), beta, X, V, components,
+                                 return_parts=True)
+    assert np.array_equal(got, want)
+    # return_parts still decomposes y exactly as before.
+    assert set(parts) == {"tau_d", "tau_s", "tau_u", "eps"}
+
+    # draw_effects must not write into the vector it is handed: the bootstrap
+    # passes the same X beta_hat for every replicate.
+    base = X @ beta
+    kept = base.copy()
+    dsim.draw_effects(np.random.default_rng(0), [Z, S, I], [0.1, 0.08, 0.05], base=base)
+    assert np.array_equal(base, kept)
+
+
+def test_centred_noise_has_zero_row_means_and_ignores_a_row_shift():
+    """Acceptance 3: e = y - ybar averages zero per row, and a per-row constant cancels.
+
+    The second half is the `_bc` case at array level: a bias-corrected contrast
+    is the uncorrected one plus one constant per row, so it must give the same
+    noise. In floating point the two agree to rounding, not bit for bit.
+    """
+    rng = np.random.default_rng(3)
+    Y = 0.3 + 0.1 * rng.standard_normal((N_ROWS, 250))
+    E = dsim.centre_replicates(Y)
+    assert E.shape == Y.shape
+    assert np.abs(E.mean(axis=1)).max() < 1e-14
+
+    shift = rng.uniform(-0.05, 0.05, N_ROWS)
+    np.testing.assert_allclose(dsim.centre_replicates(Y + shift[:, None]), E,
+                               rtol=0, atol=1e-13)
+    with pytest.raises(ValueError, match="rows are studies"):
+        dsim.centre_replicates(Y[:, 0])
+
+
+def _entrywise_z(S_hat: np.ndarray, Sigma: np.ndarray, N: int) -> float:
+    """Largest |sample - expected| covariance entry, in Monte Carlo standard errors.
+
+    For N draws the sampling variance of a covariance entry (i, j) is about
+    ``(Sigma_ii Sigma_jj + Sigma_ij^2) / N`` (the Wishart result). Scaling by it
+    lets one threshold serve the large diagonal entries and the small
+    off-diagonal ones alike.
+    """
+    d = np.diag(Sigma)
+    se = np.sqrt((np.outer(d, d) + Sigma ** 2) / N)
+    return float(np.max(np.abs(S_hat - Sigma) / se))
+
+
+def test_hybrid_pseudo_data_has_the_fitted_covariance(structure, V_bb):
+    """Acceptance 4: Var(y*) = sum_l tau_l^2 G_l + V_known, the fitted model.
+
+    This is the whole reason the scheme works, so it is tested directly, with
+    no fit involved: a 400-column cloud is cycled 50 times, each of the 20 000
+    pseudo-replicates gets a FRESH effect draw, and the sample covariance of
+    the result is compared entry by entry with the model's.
+
+    "V_known" here is the covariance of the cycled cloud itself. That is the
+    point of taking the noise from the cloud: whatever dependence it has (the
+    dense design block below) arrives in y* without being modelled.
+    """
+    Z, S, I = structure["Z"], structure["S"], structure["I"]
+    rng = np.random.default_rng(5)
+    V = np.diag(0.002 + 0.002 * rng.random(N_ROWS)) + Z @ V_bb @ Z.T
+    draw = dsim._known_error_sampler(V)
+    cloud = 0.2 + np.column_stack([draw(rng) for _ in range(400)])
+    cycled = np.tile(cloud, 50)
+    N = cycled.shape[1]
+
+    fitted = np.linspace(-0.1, 0.1, N_ROWS)
+    taus = {"tau_d2": 0.07, "tau_s2": 0.09, "tau_u2": 0.04}
+    comps = {"tau_d2": (Z, taus["tau_d2"]), "tau_s2": (S, taus["tau_s2"]),
+             "tau_u2": (I, taus["tau_u2"])}
+    Y_star = dsim.hybrid_pseudo_data(cycled, fitted, comps, seed=11)
+    assert Y_star.shape == (N_ROWS, N)
+
+    Gs, _ = dsim.build_component_gs(comps)
+    Sigma = np.cov(cycled) + sum(t ** 2 * G for t, G in zip(taus.values(), Gs))
+    z = _entrywise_z(np.cov(Y_star), Sigma, N)
+    assert z < 5, z
+
+    # ... and it is centred on the fitted values: the noise averages exactly
+    # zero and the effects average zero to Monte Carlo error.
+    se_mean = np.sqrt(np.diag(Sigma) / N)
+    assert np.max(np.abs(Y_star.mean(axis=1) - fitted) / se_mean) < 5
+
+    # A component at ZERO draws nothing: the covariance loses exactly that term.
+    comps0 = comps | {"tau_d2": (Z, 0.0)}
+    Sigma0 = Sigma - taus["tau_d2"] ** 2 * Gs[0]
+    assert _entrywise_z(np.cov(dsim.hybrid_pseudo_data(cycled, fitted, comps0, seed=11)),
+                        Sigma0, N) < 5
+
+
+def test_hybrid_pseudo_data_is_seeded_and_does_not_depend_on_n_boot(structure):
+    """Acceptance 7 at array level: same seed, same matrix; and replicate r is replicate r.
+
+    The second property is why the noise is centred on the WHOLE cloud and the
+    generator is used replicate by replicate: a 250-replicate pilot is then a
+    prefix of the 5000-replicate run, not a different experiment.
+    """
+    Z, I = structure["Z"], structure["I"]
+    rng = np.random.default_rng(8)
+    cloud = rng.normal(0, 0.05, (N_ROWS, 60))
+    fitted = np.full(N_ROWS, 0.1)
+    comps = {"tau_d2": (Z, 0.05), "tau_u2": (I, 0.03)}
+
+    a = dsim.hybrid_pseudo_data(cloud, fitted, comps, seed=1)
+    assert np.array_equal(a, dsim.hybrid_pseudo_data(cloud, fitted, comps, seed=1))
+    assert not np.array_equal(a, dsim.hybrid_pseudo_data(cloud, fitted, comps, seed=2))
+    assert np.array_equal(a[:, :20],
+                          dsim.hybrid_pseudo_data(cloud, fitted, comps, seed=1, n_boot=20))
+
+    with pytest.raises(ValueError, match="n_boot must be between"):
+        dsim.hybrid_pseudo_data(cloud, fitted, comps, seed=1, n_boot=61)
+    with pytest.raises(ValueError, match="fitted has"):
+        dsim.hybrid_pseudo_data(cloud, fitted[:-1], comps, seed=1)
+
+
+def _single_level_study(n_sites: int):
+    """X, V_known and components for an A0b-type model on ``2 * n_sites`` rows.
+
+    One row-level component with tau^2 = 0.02, against sampling variances of
+    about 0.01. The two are chosen close on purpose: the record-only inflation
+    (one extra sampling variance) is then half the size of tau^2 itself and
+    cannot be missed, while tau^2 stays far enough above zero (about three of
+    its own standard errors) that the boundary plays no part in the test.
+    """
+    n = 2 * n_sites
+    rng = np.random.default_rng(21)
+    v = 0.008 + 0.004 * rng.random(n)
+    return np.ones((n, 1)), np.diag(v), {"tau_u2": (np.eye(n), np.sqrt(0.02))}
+
+
+def _close_to_estimate(row, truth: float) -> bool:
+    """Is the replicate mean on the full-sample estimate?
+
+    Within 3 Monte Carlo SEs, or within 10% of the true value, whichever is
+    looser. The second clause is there for the same reason ``unbiased`` above
+    does not use z alone: an MCSE shrinks with the size of the run, so a pure
+    z-threshold eventually fails on a bias too small to matter. (A small
+    positive bias is real here: a replicate variance cannot go below zero.)
+    """
+    return abs(row["z"]) < 3 or abs(row["excess"]) < 0.10 * truth
+
+
+def test_record_only_bootstrap_inflates_tau2_and_the_hybrid_does_not():
+    """Acceptance 5, univariate: the problem and the fix, on data with a known truth.
+
+    For each simulated study the replicate-mean tau^2 is compared with that
+    study's own full-sample estimate.
+
+    * record-only: too large by about the mean sampling variance (within 25%),
+      and by far more than Monte Carlo error;
+    * hybrid: on the estimate.
+
+    Fast version (30 studies x 50 replicates x 2 schemes); the coverage study
+    is the slow test below.
+    """
+    X, V, comps = _single_level_study(n_sites=20)
+    res = dsim.simulate_bootstrap_schemes(0.1, X, V, comps, n_sims=30, n_boot=50,
+                                          seed=SEED, progress=False)
+    s = dsim.summarise_bootstrap_schemes(res)
+    print("\n" + s.to_string(float_format="%.5f"))
+
+    rec, hyb = s.loc[("tau_u2", "record")], s.loc[("tau_u2", "hybrid")]
+    assert rec["z"] > 5, rec.to_dict()
+    assert rec["excess"] == pytest.approx(res.mean_v, rel=0.25), (rec.to_dict(), res.mean_v)
+    assert _close_to_estimate(hyb, res.truth["tau_u2"]), hyb.to_dict()
+    # The hybrid interval is the wider one: it also carries the effect redraw.
+    assert hyb["mean_width"] > rec["mean_width"]
+
+    # Seeded: the whole study is reproduced by (seed, n_sims, n_boot).
+    again = dsim.simulate_bootstrap_schemes(0.1, X, V, comps, n_sims=3, n_boot=10,
+                                            seed=SEED, progress=False)
+    once = dsim.simulate_bootstrap_schemes(0.1, X, V, comps, n_sims=3, n_boot=10,
+                                           seed=SEED, progress=False)
+    pd.testing.assert_frame_equal(again.draws, once.draws)
+
+    with pytest.raises(ValueError, match="unknown bootstrap scheme"):
+        dsim.simulate_bootstrap_schemes(0.1, X, V, comps, n_sims=1, n_boot=5,
+                                        schemes=("record", "parametric"))
+
+
+@pytest.mark.slow
+def test_hybrid_interval_covers_tau2_and_the_record_only_one_does_not():
+    """Acceptance 6, univariate: coverage of the 95% percentile interval for tau^2.
+
+    250 studies of 60 rows, 150 replicates per scheme (75 000 fits, about a
+    quarter of an hour).
+
+    WHAT "CONSISTENT WITH 0.95" MEANS HERE. A percentile interval for a
+    variance is only first-order accurate, because the estimate is skewed. For
+    a plain variance on nu degrees of freedom the parametric percentile
+    interval covers at about 0.934 for nu = 39 and 0.946 for nu = 119 (from the
+    chi-square distribution; nearly all the misses are on one side). So about
+    0.94 is expected at 60 rows, before Monte Carlo error, whose binomial SE at
+    250 studies is 0.014. The tolerance is therefore [0.90, 0.99].
+
+    The record-only interval is centred one sampling variance too high, so it
+    must cover far less often: at least 0.2 less.
+    """
+    X, V, comps = _single_level_study(n_sites=30)
+    res = dsim.simulate_bootstrap_schemes(0.1, X, V, comps, n_sims=250, n_boot=150,
+                                          seed=SEED)
+    s = dsim.summarise_bootstrap_schemes(res)
+    print("\n" + s.to_string(float_format="%.5f"))
+
+    rec, hyb = s.loc[("tau_u2", "record")], s.loc[("tau_u2", "hybrid")]
+    assert 0.90 <= hyb["coverage"] <= 0.99, hyb.to_dict()
+    assert rec["coverage"] <= hyb["coverage"] - 0.2, (rec.to_dict(), hyb.to_dict())
+    assert _close_to_estimate(hyb, res.truth["tau_u2"]), hyb.to_dict()
+
+
+@pytest.mark.slow
+def test_hybrid_bootstrap_on_a_crossed_model(structure, V_bb):
+    """The same study on the model the hybrid scheme is actually used for.
+
+    Design, site and row components with a DENSE design block in V_known, as
+    in A0c / A1c. Smaller than the single-level study (100 studies x 100
+    replicates), because each fit has three variance parameters.
+
+    Asserted on the TOTAL between-row variance, which is the well-identified
+    quantity; the per-component rows are printed. With 40 rows the design and
+    row components are often on their zero boundary, where a bootstrap interval
+    is one-sided -- that is reported (``frac_zero``), not asserted.
+    """
+    Z, S, I = structure["Z"], structure["S"], structure["I"]
+    rng = np.random.default_rng(31)
+    V = np.diag(0.002 + 0.002 * rng.random(N_ROWS)) + Z @ V_bb @ Z.T
+    comps = {"tau_d2": (Z, 0.06), "tau_s2": (S, 0.10), "tau_u2": (I, 0.05)}
+    res = dsim.simulate_bootstrap_schemes(0.1, np.ones((N_ROWS, 1)), V, comps,
+                                          n_sims=100, n_boot=100, seed=SEED)
+    s = dsim.summarise_bootstrap_schemes(res)
+    print("\n" + s.to_string(float_format="%.5f"))
+
+    rec, hyb = s.loc[("T_sq", "record")], s.loc[("T_sq", "hybrid")]
+    assert rec["z"] > 5, rec.to_dict()
+    assert _close_to_estimate(hyb, res.truth["T_sq"]), hyb.to_dict()
+    assert 0.88 <= hyb["coverage"] <= 0.99, hyb.to_dict()

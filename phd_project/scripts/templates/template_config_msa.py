@@ -30,7 +30,10 @@ injection_function_params (default {}) holds any extra keyword parameters passed
 
 - resume (default True) skips any (stripe, record) pair whose result log already
   exists, so re-running the batch -- e.g. after dropping in an extra stripe pickle --
-  only analyses the missing pairs. Set to False to force a full re-run.
+  only analyses the missing pairs. A log only counts if its record name matches the
+  stripe pickle's record for that slot and its scale factor agrees to 3 dp; a log
+  left by a record since swapped out of the selection is re-run automatically.
+  Set to False to force a full re-run.
 
 """
 

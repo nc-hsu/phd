@@ -92,6 +92,12 @@ coupling will read as zero however the covariance is computed.
 - Variance components: `tau_d^2` design, `tau_s^2` site, `tau_u^2` row-level
   (the design x site interaction). `tau_u` is named after the symbol `u_i`, not
   after a word — the user has decided to keep that inconsistency.
+- **SaRatio is always written and coded as a ratio**:
+  `SaRatio(T1) = SA(T1) / (prod_j SA(T_j))^(1/n)`, with `T_j = 0.2 T1 : 0.01 : 3 T1`
+  (geometric mean in the denominator, i.e. AvgSA over the band). Do not present
+  it as `ln SaRatio = a' ln PSA` or any other linear-operator form. In code,
+  take the geometric mean as `scipy.stats.gmean` / exp(mean ln SA), never a raw
+  product, which underflows over a few hundred ordinates below 1 g.
 - `v_a[i]` = SS-arm sampling variance for row i (diagonal only).
   `v1[i]` = combined `Var_r(a_i - b_{g[i]})` = `v_a[i] + V_bb[g[i],g[i]]`
   (exact — the arms use disjoint record sets, so the cross term is zero).
@@ -108,6 +114,9 @@ coupling will read as zero however the covariance is computed.
 - **All code gets extensive documentation comments** explaining what each part
   does and why, not just what. This is a standing instruction.
 - Do not write code unless asked.
+- **Every saved plot uses `facecolor="w"`** (e.g. `fig.savefig(fp, ..., facecolor="w")`),
+  so PNGs have an opaque white background in any viewer. Applies to all
+  notebooks and scripts, new and edited.
 - **NEVER touch git unless explicitly told to.** No `git add`, no `git commit`,
   no `git push`, no branch or tag operations — on your own initiative, ever, not
   even for files you just changed at the user's request. The user decides what

@@ -4,8 +4,8 @@ from pathlib import Path
 
 from standes.parallel import run_records_in_subprocesses
 from standes.analysis.msa import (
-    find_stripe_pickles, stripe_id, stripe_record_tags, record_is_complete,
-    collate_stripe, collate_msa_results)
+    find_stripe_pickles, stripe_id, stripe_record_tags, read_stripe_selection,
+    read_record_log, record_log_mismatch, collate_stripe, collate_msa_results)
 from standes.utils import import_from_path
 
 
@@ -16,7 +16,12 @@ from standes.utils import import_from_path
 ##
 ## Resumable: a pair whose record log already exists is skipped, so re-running the
 ## batch (e.g. after dropping in an extra stripe pickle) only analyses the missing
-## pairs. Set `resume = False` in the config to force a full re-run. Stripe result
+## pairs. "Exists" also means "is current": the log's record name must equal the one
+## the stripe pickle names for that slot, and its scale factor must agree to 3 dp.
+## A log left by a different record (a record was swapped in the stripe selection)
+## is reported as stale and that pair re-run -- so replacing one record in a stripe
+## re-analyses only that record, with no files deleted by hand. Set `resume = False`
+## in the config to force a full re-run. Stripe result
 ## folders are named `stripe_{stripe_id}` (the stripe's intensity tag), so adding a
 ## lower- or higher-intensity stripe never renumbers the existing ones.
 ##
@@ -50,17 +55,33 @@ def run(config_data: str | Path,
     resume = config.get("resume", True)
 
     # build the full flattened list of "{stripe_id}:{record}" tags, skipping any
-    # (stripe, record) pair whose result already exists when resuming
+    # (stripe, record) pair whose result already exists AND belongs to the record the
+    # selection currently names for that slot. Pairs are addressed by slot index, so
+    # a log on disk could have been written for a record that has since been swapped
+    # out of the stripe; the identity check catches that and re-dispatches the pair.
     tags: list[str] = []
     n_total = 0
+    n_complete = 0
+    stale: list[tuple[str, str]] = []       # (tag, reason) of logs that no longer match
     for stripe_pickle in stripe_pickles:
         sid = stripe_id(stripe_pickle)
         stripe_folder = output_folder / f"stripe_{sid}"
+        # one pickle read per stripe: the expected record name / scale factor per slot
+        records = read_stripe_selection(stripe_pickle).records
         for record_tag in stripe_record_tags(stripe_pickle, config["max_n_records"]):
             n_total += 1
-            if resume and record_is_complete(stripe_folder, record_tag):
-                continue
-            tags.append(f"{sid}:{record_tag}")
+            tag = f"{sid}:{record_tag}"
+            if resume:
+                existing = read_record_log(stripe_folder, record_tag)
+                if existing is not None:
+                    expected = records[record_tag]
+                    reason = record_log_mismatch(
+                        existing, expected.record_name, expected.scale_factor)
+                    if reason is None:
+                        n_complete += 1
+                        continue            # finished, and for the right record
+                    stale.append((tag, reason))
+            tags.append(tag)
 
     semaphore_module = _load_semaphore() if use_semaphore else None
     # n_cores is None when this coordinator was spawned by a *_buildings launcher --
@@ -71,9 +92,14 @@ def run(config_data: str | Path,
 
     print(f"Launch Time: {datetime.now()}"
           + (f" | {semaphore_module.describe_max_concurrent()}" if semaphore_module else ""))
-    if resume and n_total - len(tags):
-        print(f"resuming: {n_total - len(tags)}/{n_total} pair(s) already complete, "
+    if resume and (n_complete or stale):
+        print(f"resuming: {n_complete}/{n_total} pair(s) already complete, "
+              f"{len(stale)} stale (record changed) -> re-running, "
               f"dispatching {len(tags)}")
+        # list every stale pair: re-running something that looked finished should
+        # never happen silently
+        for tag, reason in stale:
+            print(f"  stale {tag}: {reason}")
     print(f"Dispatching {len(tags)} (stripe, record) job(s) across "
           f"{len(stripe_pickles)} stripe(s)")
     start_time = datetime.now()
