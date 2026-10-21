@@ -1,0 +1,16 @@
+check,original,shifted,changed
+sign of m,-1.0,1.0,True
+CI of m includes 0,True,True,False
+tau_d > tau_s,False,False,False
+CI of tau_d - tau_s includes 0,True,False,True
+tau_d at zero,False,True,True
+tau_s at zero,False,False,False
+tau_u at zero,False,False,False
+sign of d_ln_saratio_mean_unif_corrected,-1.0,1.0,True
+CI of d_ln_saratio_mean_unif_corrected includes 0,True,True,False
+sign of d_ln_ds595_mean_unif_corrected,-1.0,-1.0,False
+CI of d_ln_ds595_mean_unif_corrected includes 0,False,False,False
+sign of d_ln_saratio_sigma_unif_corrected,1.0,1.0,False
+CI of d_ln_saratio_sigma_unif_corrected includes 0,False,False,False
+sign of d_ln_ds595_sigma_unif_corrected,-1.0,-1.0,False
+CI of d_ln_ds595_sigma_unif_corrected includes 0,False,True,True
