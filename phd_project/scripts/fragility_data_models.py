@@ -75,6 +75,36 @@ When you add them, pass the FULL ``Contrast.V`` (the default), never
 as a design random effect, so a diagonal V lets tau_d^2 absorb it and read too
 high. That is the identifiability trap of ``analysis_models.md`` section A1c.
 
+The joint theta/beta model (A8)
+-------------------------------
+The A8 rungs fit theta and beta TOGETHER, to separate the sampling correlation
+of (theta_hat, beta_hat) from the correlation of the true corrections. They do
+not change the one-quantity-per-container rule: a ``JointContrast`` pairs a
+theta Contrast with a beta Contrast, and the A8 rungs live in their own table
+(``JOINT_MODEL_SPECS``), fit object (``JointModelFit``) and registry
+(``JointModelRegistry``). The bivariate REML is ``mra.fit_reml_mv``. See the
+section "The joint theta / beta model (A8)" below, and
+``dump/plan_joint_theta_beta_model.md`` for the design decisions.
+
+Two bootstrap schemes
+---------------------
+Every spec carries ``bootstrap_scheme``, and the two schemes answer different
+questions (``dump/plan_hybrid_bootstrap.md``):
+
+``"record"`` (the default; every id without an ``_hb`` suffix)
+    Refit each record-resampling replicate as it is. Right for the mean m and
+    its interval, conditional on these sites and designs (a finite-population
+    statement). WRONG for every variance component: a replicate carries two
+    rounds of sampling noise and the fit is told about one, so each replicate
+    tau^2 is inflated by about the mean sampling variance.
+``"hybrid"`` (ids ending ``_hb``)
+    Refit pseudo-data ``X beta_hat + (new effects drawn from the fitted
+    variance components) + (the record-resample deviations)``, which carries
+    one round of noise. Its replicate variance components centre on the fitted
+    ones, so intervals on a tau or a rho come from here. Its m interval is a
+    superpopulation one: it includes the effect of drawing other sites and
+    designs. The pseudo-data are built by ``dsim.hybrid_pseudo_data``.
+
 On xarray
 ---------
 ``(row, replicate, arm, quantity)`` is genuinely a 4-D labelled array and xarray
@@ -107,7 +137,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from functools import cached_property
 from pathlib import Path
 
@@ -121,6 +151,7 @@ import pandas as pd
 from scipy import stats
 
 import phd_project.scripts.data_simulation as dsim
+import phd_project.scripts.fit_cache as fcache
 import phd_project.scripts.metaregression_analysis as mra
 
 # =============================================================================
@@ -284,6 +315,13 @@ class FragilityData:
         Symbol -> log point estimates, same index as the matching ``reps``.
     estimates_bc : dict of str -> Series or None
         The bias-corrected point estimates. See :meth:`hat`.
+    bias : dict of str -> Series or None
+        The bootstrap bias of the log estimate exactly as nb 070 MEASURED it
+        (``{arm}_log_{q}_bias`` in the nb-072 dataset), at the arm's natural
+        scope. This is not necessarily the correction that was APPLIED: theta is
+        measured but corrected by zero. It is kept only so
+        :meth:`plugin_offset` can recover the reference the bias was measured
+        against. See :meth:`replicate_shift`.
     """
 
     quantity: str
@@ -293,6 +331,7 @@ class FragilityData:
     reps: dict[str, pd.DataFrame | None]
     estimates: dict[str, pd.Series | None]
     estimates_bc: dict[str, pd.Series | None] = field(default_factory=dict)
+    bias: dict[str, pd.Series | None] = field(default_factory=dict)
 
     # -- the bare mathematical symbols -------------------------------------
     # Exposed so a cell can read as the roadmap writes it. They are views onto
@@ -356,7 +395,10 @@ class FragilityData:
         """Log point estimates for one symbol.
 
         ``corrected=True`` returns the bias-corrected estimate that nb 070
-        section 2.4 writes and nb 072 carries as ``{arm}_log_{q}_bc``.
+        section 2.4 writes and nb 072 carries as ``{arm}_log_{q}_bc``. A model
+        uses it only when its :class:`ModelSpec` says ``corrected=True``. Those
+        are the ``*_bc`` ids, so a model id always names exactly one set of
+        estimates.
 
         The default is deliberately the UNCORRECTED estimate. Efron &
         Tibshirani (Ch. 10, ~p. 128) warn that bias correction inflates
@@ -380,14 +422,123 @@ class FragilityData:
         _require_symbol(symbol)
         return "row" if SCOPE_OF_ARM[ARM_OF_SYMBOL[symbol]] == "by_site" else "group"
 
+    def plugin_offset(self, symbol: str) -> float:
+        """``s``: where this arm's replicate cloud sits relative to ``hat + bias``.
+
+        nb 070 measures each arm's bias as ``b = E*[x*] - x_ref``, where
+        ``x_ref`` is the PLUG-IN value, i.e. the estimator's formula applied to
+        the resampled data treated as the whole population (Efron & Tibshirani
+        Ch. 4, ~pp. 35-37, approximate). For the binomial-MLE arms (both MSA
+        arms) and for every theta, the plug-in IS the published estimate, so
+        ``s = 0``. For the IDA moment-fit arms it is not: ``lognorm_moment_fit``
+        divides by n - 1 (Bessel), the bootstrap world's truth divides by n,
+        and so ``x_ref = ln(beta_hat * sqrt((n-1)/n))`` and
+        ``s = ln sqrt(21/22) = -0.0233`` at 22 records (nb 070 section 2.1,
+        "Plug-in reference for the moment-fit arms").
+
+        In other words the cloud sits at ``E*[x*] = hat + s + b``. The offset is
+        READ FROM THE DATA as ``mean(cloud) - hat - bias`` rather than written
+        down from a record count, so this method makes no assumption about
+        which arms are moment fits or how many records they used. A plug-in
+        reference is a fixed rescaling of the published estimate, so ``s`` must
+        be the SAME number for every unit of the arm. That is asserted: a spread
+        means the bias column and the cloud do not belong together, for example
+        a dataset written by nb 072 before nb 070 was re-run.
+
+        Returns
+        -------
+        float
+            The offset. Snapped to exactly 0.0 when it is zero to floating-point
+            noise, so an arm that needs no plug-in correction (theta, MSA) gets
+            no shift at all rather than one of ~1e-16.
+        """
+        measured = self.bias.get(symbol)
+        if measured is None:
+            raise KeyError(
+                f"no measured bootstrap bias for symbol {symbol!r} "
+                f"(arm {ARM_OF_SYMBOL.get(symbol, symbol)!r}); it comes from the "
+                f"'{{arm}}_log_{self.quantity}_bias' column nb 072 writes. It is "
+                "needed to centre the replicates of a bias-corrected fit - see "
+                "FragilityData.replicate_shift.")
+        resid = self.rep(symbol).mean(axis=1) - self.hat(symbol) - measured
+        spread = float(resid.max() - resid.min())
+        if spread > 1e-8:
+            raise ValueError(
+                f"the plug-in offset of {symbol!r} is not constant across units "
+                f"(spread {spread:.2e}). mean(cloud) - hat - bias should be one "
+                "number per arm (0 for an MLE arm, ln sqrt((n-1)/n) for a moment "
+                "fit). The bias column and the replicate cloud disagree - re-run "
+                "nb 070 then nb 072.")
+        s = float(resid.mean())
+        return 0.0 if abs(s) < 1e-10 else s
+
+    def replicate_shift(self, symbol: str) -> pd.Series:
+        """Per-unit constant that centres the replicates of a bias-corrected fit.
+
+        Only ``y_hat`` changes when estimates are bias-corrected. Left alone,
+        the replicate cloud stays where the UNCORRECTED estimator's cloud sits,
+        and a percentile interval built from it is not an interval for the
+        number being reported. On A2 (beta) its midpoint lands 0.008 off the
+        corrected estimate, about half a bootstrap SE.
+
+        The shift that fixes it, per unit (task D3, option (ii), chosen
+        2026-10-07)::
+
+            x*_shifted = x* - (2 b + s)
+
+        where ``b = hat - hat_bc`` is the correction APPLIED and ``s`` is
+        :meth:`plugin_offset`. The reasoning, in three steps:
+
+        1. The cloud sits at ``E*[x*] = hat + s + b``.
+        2. The bias-corrected estimator is ``x_bc = hat - b``. Its bootstrap
+           analogue is ``x* - b`` (Efron & Tibshirani Ch. 10, eq. 10.6,
+           ~p. 138, approximate), which is centred on the bootstrap world's
+           truth ``hat + s``.
+        3. The percentile method reads the bootstrap distribution as if the
+           bootstrap world's truth were the real-world estimate (Ch. 13,
+           ~pp. 168-171, approximate). That is automatic when the estimator is
+           the plug-in, but here it has to be arranged: translate by
+           ``x_bc - (hat + s)``. Adding the two steps gives ``-b - b - s``.
+
+        The result is the percentile interval OF THE BIAS-CORRECTED ESTIMATOR.
+        It keeps what made percentiles the choice in :meth:`ModelFit.ci` in the
+        first place: they respect the log transform, and they keep the
+        skewness of M*. Being one constant per unit, it changes no spread, so
+        ``V``, ``v`` and every bootstrap SE are untouched.
+
+        Dropping ``s`` (shifting by ``-2b``) would be wrong by a whole bootstrap
+        SE on the IDA contrasts. Measured on A2, it pushes the interval's
+        midpoint 0.026 above the estimate.
+
+        For theta, ``b = 0`` (nb 070 corrects theta by zero) and ``s = 0``, so
+        the shift is exactly zero and a "corrected" theta fit is the
+        uncorrected one.
+        """
+        b_applied = self.hat(symbol) - self.hat(symbol, corrected=True)
+        return -(2.0 * b_applied + self.plugin_offset(symbol))
+
     def term(self, symbol: str, corrected: bool = False):
         """``(replicates, point_estimates, scope)`` for one symbol.
 
         The one accessor the contrast builder needs, which is what lets that
         builder be written once and serve every contrast rather than once per
         pair of arms.
+
+        With ``corrected=True`` BOTH halves change together: the point estimate
+        becomes the bias-corrected one, and every replicate is translated by
+        :meth:`replicate_shift`, so the cloud is centred where the corrected
+        estimator's own bootstrap distribution belongs. This is done here, once,
+        and nowhere else. ``to_rows``, ``make_contrast``, ``bootstrap_fits``,
+        the per-study forest whiskers and DL all read the replicates through
+        this method, so none of them can end up mixing a corrected estimate
+        with an uncorrected cloud.
         """
-        return self.rep(symbol), self.hat(symbol, corrected), self.scope_of(symbol)
+        reps = self.rep(symbol)
+        if corrected:
+            # Broadcast one constant per unit (row of `reps`) across all k
+            # replicates. axis=0 aligns on the unit labels, not on position.
+            reps = reps.add(self.replicate_shift(symbol), axis=0)
+        return reps, self.hat(symbol, corrected), self.scope_of(symbol)
 
     def contrast(self, name: str, other: str | None = None,
                  *, corrected: bool = False) -> "Contrast":
@@ -783,6 +934,11 @@ def load_fragility_data(
     reps: dict[str, pd.DataFrame | None] = {}
     estimates: dict[str, pd.Series | None] = {}
     estimates_bc: dict[str, pd.Series | None] = {}
+    # The bias as nb 070 MEASURED it. It is read only to centre the replicates of
+    # a bias-corrected fit (FragilityData.plugin_offset). Unlike the estimate
+    # columns it is optional: an older dataset without it still loads, and only
+    # a `*_bc` model then refuses to fit, with a message that says why.
+    bias: dict[str, pd.Series | None] = {}
 
     for arm, symbol in ((a, SYMBOLS[a]) for a in ARMS):
         cloud = _load_cloud(root, arm, quantity, im_tag, k_samples)
@@ -794,6 +950,7 @@ def load_fragility_data(
             if verbose:
                 print(f"  {arm:8s} ({symbol:5s}): no saved bootstrap - skipped")
             reps[symbol] = estimates[symbol] = estimates_bc[symbol] = None
+            bias[symbol] = None
             continue
 
         est_col = f"{arm}_log_{quantity}"
@@ -804,14 +961,23 @@ def load_fragility_data(
                     f"{path.name} has no column {col!r} - re-run nb 072, which "
                     "writes the log and bias-corrected columns for every arm")
 
+        bias_col = f"{arm}_log_{quantity}_bias"
+        has_bias = bias_col in rows.columns
+
         if SCOPE_OF_ARM[arm] == "by_site":
             target = rows.index
             estimates[symbol] = rows[est_col]
             estimates_bc[symbol] = rows[bc_col]
+            bias[symbol] = rows[bias_col] if has_bias else None
         else:
             target = groups
             estimates[symbol] = _collapse_to_groups(rows, est_col, groups)
             estimates_bc[symbol] = _collapse_to_groups(rows, bc_col, groups)
+            # Collapsed with the same within-group constancy check as the
+            # estimates: a design-level bias that varies inside its design would
+            # be the same row -> design mapping error.
+            bias[symbol] = (_collapse_to_groups(rows, bias_col, groups)
+                            if has_bias else None)
 
         absent = sorted(set(target) - set(cloud.index))
         if absent:
@@ -825,7 +991,8 @@ def load_fragility_data(
                   f"{reps[symbol].shape[1]} replicates")
 
     data = FragilityData(quantity=quantity, im_tag=im_tag, rows=rows, groups=groups,
-                         reps=reps, estimates=estimates, estimates_bc=estimates_bc)
+                         reps=reps, estimates=estimates, estimates_bc=estimates_bc,
+                         bias=bias)
 
     if check:
         report = check_fragility_data(
@@ -1050,6 +1217,11 @@ class Contrast:
         The factor table for THESE rows, at this scope.
     V : ndarray
         (n, n) the full sampling covariance.
+    corrected : bool
+        Whether ``y_hat`` holds the bias-corrected estimates, with ``y`` centred
+        to match (:meth:`FragilityData.replicate_shift`). Carried on the
+        contrast itself so every printout and plot built from it can say which
+        estimates it shows, without needing the spec.
     """
 
     name: str
@@ -1061,6 +1233,9 @@ class Contrast:
     y: pd.DataFrame
     rows: pd.DataFrame
     V: np.ndarray
+    # Last and defaulted, so every existing keyword construction of a Contrast
+    # still means what it did.
+    corrected: bool = False
 
     @property
     def n(self) -> int:
@@ -1149,7 +1324,8 @@ class Contrast:
         """One-line description, for printing."""
         return (f"{self.name} = {self.terms[0]} - {self.terms[1]}  ({self.label}), "
                 f"{self.scope} scope, n={self.n}, k={self.k}, "
-                f"mean ratio {np.exp(self.y_hat.mean()):.4f}")
+                f"mean ratio {np.exp(self.y_hat.mean()):.4f}"
+                f"{'  ' + BC_TAG if self.corrected else ''}")
 
 
 def make_contrast(data: FragilityData, name: str,
@@ -1166,7 +1342,11 @@ def make_contrast(data: FragilityData, name: str,
         A key of ``_CONTRAST_SPECS``.
     corrected : bool
         Use the bias-corrected point estimates. See :meth:`FragilityData.hat`
-        for why this is not the default.
+        for why this is not the default. This changes ``y_hat`` AND translates
+        each row of the replicates ``y`` by a constant, so the cloud is centred
+        where the corrected estimator's bootstrap distribution belongs
+        (:meth:`FragilityData.replicate_shift`). ``V`` is unchanged, because a
+        constant shift per row does not change any covariance.
     """
     if name not in _CONTRAST_SPECS:
         raise KeyError(f"unknown contrast {name!r} - known: {sorted(_CONTRAST_SPECS)}")
@@ -1216,7 +1396,8 @@ def make_contrast(data: FragilityData, name: str,
     V = mra.bootstrap_cov(y.to_numpy(dtype=float), rowvar=True)
 
     return Contrast(name=name, label=label, quantity=data.quantity, scope=scope,
-                    terms=(left, right), y_hat=y_hat, y=y, rows=rows, V=V)
+                    terms=(left, right), y_hat=y_hat, y=y, rows=rows, V=V,
+                    corrected=corrected)
 
 
 # =============================================================================
@@ -1228,6 +1409,32 @@ def make_contrast(data: FragilityData, name: str,
 # (effect sizes -> forest plot -> heterogeneity -> replicate refits -> intervals
 # -> SE comparison) becomes one row of this table plus one call to
 # ModelRegistry.fit.
+
+# The outer-bootstrap schemes a spec can ask for; see "Two bootstrap schemes" in
+# the module docstring. Taken from dsim so the validation study and the specs
+# cannot disagree on the spelling.
+BOOTSTRAP_SCHEMES: tuple[str, ...] = dsim.BOOTSTRAP_SCHEMES
+
+# The tag every printout and plot of a hybrid-bootstrap fit carries, so its
+# intervals are never read as record-only ones (or the reverse).
+HB_TAG = "[hybrid bootstrap]"
+
+# Default seed of the hybrid bootstrap's random-effect draws. One constant, so
+# two notebooks that fit the same `_hb` id get the same replicates without
+# having to agree on a number. Override per call with fit(..., boot_seed=).
+BOOT_SEED = 20261013
+
+
+def _check_bootstrap_scheme(model_id: str, scheme: str) -> None:
+    """Raise if ``scheme`` is not one of :data:`BOOTSTRAP_SCHEMES`.
+
+    Shared by ModelSpec and JointModelSpec, so both refuse a misspelt scheme
+    when the spec is CONSTRUCTED rather than letting it fall through to the
+    record-only path and report the wrong intervals under a hybrid label.
+    """
+    if scheme not in BOOTSTRAP_SCHEMES:
+        raise ValueError(f"{model_id}: unknown bootstrap_scheme {scheme!r}; "
+                         f"expected one of {BOOTSTRAP_SCHEMES}")
 
 
 @dataclass(frozen=True)
@@ -1260,6 +1467,33 @@ class ModelSpec:
     note : str
         Why this rung exists and what it does and does not license. Printed by
         :meth:`ModelFit.summary`, so the reasoning travels with the number.
+    corrected : bool
+        Fit on the bias-corrected point estimates (nb 070 section 2.4), with the
+        replicates centred to match (:meth:`FragilityData.replicate_shift`).
+        False by default, which reproduces every earlier result exactly.
+
+        ONE ID, ONE CONTRAST. Whether a fit is corrected is a property of the
+        SPEC, never of an argument passed at fit time or a setting on the
+        registry. So any id a notebook or the thesis cites, such as "A2",
+        always points at the same numbers. The corrected version of a model is
+        its own hand-written entry with a ``_bc`` suffix (``"A2_bc"``), placed
+        directly below its partner so every analysed model is visible in the
+        source. :func:`_check_model_specs` enforces, at import, that the suffix
+        and the flag agree, and that a ``_bc`` spec differs from its partner
+        only in ``model_id``, ``corrected`` and ``note``.
+    bootstrap_scheme : {"record", "hybrid"}
+        Which outer bootstrap :meth:`ModelRegistry.fit` runs; see "Two
+        bootstrap schemes" in the module docstring and :func:`bootstrap_fits`.
+        ``"record"`` by default, which reproduces every earlier result exactly.
+        Keyword-only.
+
+        Like ``corrected``, this is a property of the SPEC, for the same
+        reason: an id must always mean one set of numbers. The hybrid version
+        of a model is its own hand-written entry with an ``_hb`` suffix
+        (``"A0c_hb"``; ``"A0c_bc_hb"`` if it is also bias-corrected, in that
+        order), and :func:`_check_model_specs` enforces that the suffix and the
+        flag agree and that an ``_hb`` spec differs from its partner only in
+        ``model_id``, ``bootstrap_scheme`` and ``note``.
     """
 
     model_id: str
@@ -1269,6 +1503,15 @@ class ModelSpec:
     covariates: tuple[str, ...] = ()
     diagonal_V: bool = False
     note: str = ""
+    # LAST, after `note`, so that no existing spec that passes arguments by
+    # position changes meaning. Always pass it by keyword.
+    corrected: bool = False
+    # After `corrected`, and keyword-ONLY (enforced, unlike `corrected`), so it
+    # can never be set by a stray positional argument.
+    bootstrap_scheme: str = field(default="record", kw_only=True)
+
+    def __post_init__(self):
+        _check_bootstrap_scheme(self.model_id, self.bootstrap_scheme)
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
@@ -1285,22 +1528,29 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         the MEAN correction lies, the PI says where the NEXT building lands,
         and it is the second one an engineer needs."""),
 
-    "A0b": ModelSpec("A0b", "y0_avg", ("REML",), note="""
-            A0a against the GEOMETRIC MEAN of the IDA collapse bracket. See A0a."""),
+    "A0b": ModelSpec(
+        "A0b", "y0_avg", ("REML",), note="""
+        A0a against the GEOMETRIC MEAN of the IDA collapse bracket. See A0a."""),
 
-    "A0c": ModelSpec("A0c", "y0_avg", ("REML",), components=("design", "site"), note="""
-            A0a against the GEOMETRIC MEAN of the IDA collapse bracket. 
-            In this model the bewteen-study variance is decomposed into random-effects,
-            building group, and site effects, based on the results of A1b and A1c.
-            The random-effects includes the site * structure interaction + any 
-            betwen row randomness. 
-            
-            Using the full variance matrix (V_aa + ZVbbZ') rather 
-            than the diagonal will capture crossing between the rows.
-            """),
+    "A0b_bc": ModelSpec(
+        "A0b_bc", "y0_avg", ("REML",),
+        corrected=True, note="""
+        A0b on bias-corrected estimates. See A0c_bc."""),
+    
+    "A0b_hb": ModelSpec(
+        "A0b_hb", "y0_avg", ("REML",),
+        bootstrap_scheme="hybrid", note="""
+        A0b with the hybrid outer bootstrap. See A0c_hb"""),
 
-    "A0d": ModelSpec("A0d", "y0", ("REML",), components=("design", "site"), note="""
-        A0a with the bewteen-study variance decomposed into random-effects,
+    "A0b_bc_hb": ModelSpec(
+        "A0b_bc_hb", "y0_avg", ("REML",),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A0b_bc with the HYBRID outer bootstrap: see A0b_bc and A0b_hb."""),
+
+    "A0c": ModelSpec(
+        "A0c", "y0_avg", ("REML",), components=("design", "site"), note="""
+        A0a against the GEOMETRIC MEAN of the IDA collapse bracket. 
+        In this model the bewteen-study variance is decomposed into random-effects,
         building group, and site effects, based on the results of A1b and A1c.
         The random-effects includes the site * structure interaction + any 
         betwen row randomness. 
@@ -1308,6 +1558,43 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         Using the full variance matrix (V_aa + ZVbbZ') rather 
         than the diagonal will capture crossing between the rows.
         """),
+
+    "A0c_bc": ModelSpec(
+        "A0c_bc", "y0_avg", ("REML",), components=("design", "site"),
+        corrected=True, note="""
+        A0c on bias-corrected estimates. See A0c.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+    
+    "A0c_hb": ModelSpec(
+        "A0c_hb", "y0_avg", ("REML",), components=("design", "site"),
+        bootstrap_scheme="hybrid", note="""
+        A0c with the HYBRID outer bootstrap: each replicate is X beta_hat plus
+        new design, site and row effects drawn from the fitted tau's, plus the
+        record-resample deviations y^(r) - ybar. Use this fit, not A0c, for any
+        interval on tau_d, tau_s or tau_u (ModelFit.tau_ci), and read the
+        boundary fractions beside them: a component fitted at zero is drawn at
+        zero. Its CI on the summary effect is a SUPERPOPULATION interval (other
+        sites and designs could have been drawn); the interval for these 120
+        rows is A0c's."""),
+
+    "A0c_bc_hb": ModelSpec(
+        "A0c_bc_hb", "y0_avg", ("REML",), components=("design", "site"),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A0c_bc with the HYBRID outer bootstrap: see A0c_bc and A0c_hb."""),
+
+    "A0d": ModelSpec(
+        "A0d", "y0", ("REML",), components=("design", "site"), note="""
+        A0a with the bewteen-study variance decomposed into random-effects,
+        building group, and site effects, based on the results of A1b and A1c.
+        The random-effects includes the site * structure interaction + any 
+        betwen row randomness."""),
 
     "A1a": ModelSpec(
         "A1a", "y1", ("DL", "REML"), diagonal_V=True, note="""
@@ -1328,32 +1615,32 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         rather than a reportable number."""),
 
     "A1b": ModelSpec(
-            "A1b", "y1", estimators=("REML",), components=("design",), note="""
-            Site-specific MSA against fixed-set MSA: the pure record-set effect,
-            with the analysis procedure held constant.
-    
-            In this model the bewteen-study variance is split into random-effects,
-            and building group effects. The random-effects cannot be considered
-            as the "variance due to the site" because it includes the 
-            (site + site * structure interaction + random) components. 
-            
-            Using the full variance matrix (V_aa + ZVbbZ') rather than the diagonal 
-            will capture crossing between the rows."""),
+        "A1b", "y1", estimators=("REML",), components=("design",), note="""
+        Site-specific MSA against fixed-set MSA: the pure record-set effect,
+        with the analysis procedure held constant.
+
+        In this model the bewteen-study variance is split into random-effects,
+        and building group effects. The random-effects cannot be considered
+        as the "variance due to the site" because it includes the 
+        (site + site * structure interaction + random) components. 
+        
+        Using the full variance matrix (V_aa + ZVbbZ') rather than the diagonal 
+        will capture crossing between the rows."""),
 
     "A1c": ModelSpec(
-                "A1c", "y1", estimators=("REML",), components=("design", "site"), note="""
-                Site-specific MSA against fixed-set MSA: the pure record-set effect,
-                with the analysis procedure held constant.
+        "A1c", "y1", estimators=("REML",), components=("design", "site"), note="""
+        Site-specific MSA against fixed-set MSA: the pure record-set effect,
+        with the analysis procedure held constant.
+
+        In this model the bewteen-study variance is split into random-effects,
+        building group, and site effects. The random-effects includes the 
+        site * structure interaction + any betwen row randomness. 
         
-                In this model the bewteen-study variance is split into random-effects,
-                building group, and site effects. The random-effects includes the 
-                site * structure interaction + any betwen row randomness. 
-                
-                Using the full variance matrix (V_aa + ZVbbZ') rather 
-                than the diagonal will capture crossing between the rows."""),
+        Using the full variance matrix (V_aa + ZVbbZ') rather 
+        than the diagonal will capture crossing between the rows."""),
 
     "A2": ModelSpec(
-        "A2", "y2", ("DL", "REML"), note="""
+        "A2", "y2", ("REML",), note="""
         Fixed-set MSA against fixed-set IDA, at 51 rows because one row IS one
         design -- the fixed-set stripe IMLs come from the fragility curve, not
         from site hazard, so these arms depend on the design only. Replicating
@@ -1367,17 +1654,522 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         effect. No group structure is needed, but the full V still is -- V_bb,
         V_cc and the V_bc cross term are all dense."""),
 
+    "A2_bc": ModelSpec(
+        "A2_bc", "y2", ("REML",), corrected=True, note="""
+        A2 on bias-corrected estimates. See A2. This is the rung the correction
+        matters most for: before correction |bias|/se on y2 is about 0.64-0.87
+        (nb 070), well above the 0.25 threshold.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A2_hb": ModelSpec(
+        "A2_hb", "y2", ("REML",), bootstrap_scheme="hybrid", 
+        note="""
+        A2 with the hybrid bootstrap scheme. 
+        See A2 and A0a_hb."""),    
+    
+    "A2_bc_hb": ModelSpec(
+        "A2_bc_hb", "y2", ("REML",), corrected=True, bootstrap_scheme="hybrid", 
+        note="""
+        A2 on bias-corrected estimates with the hybrid bootstrap scheme. 
+        See A2_bc and A2_hb."""),
+
     # ---- the collapse-bracket variants -------------------------------------
     # nb 073 section 2.4 described these and never implemented them. They are
     # table entries, not code. Read them as a SENSITIVITY BAND on A0a/A2: the
     # three IDA arms are one analysis read three ways off the collapse bracket,
     # so the spread across them is the cost of that modelling choice, not three
     # independent findings.
-    "A2_ub": ModelSpec("A2_ub", "y2_ub", ("DL", "REML"), note="""
+    "A2_ub": ModelSpec(
+        "A2_ub", "y2_ub", ("REML",), note="""
         A2 against the upper bound of the IDA collapse bracket. See A2."""),
-    "A2_avg": ModelSpec("A2_avg", "y2_avg", ("DL", "REML"), note="""
+    
+    "A2_ub_bc": ModelSpec(
+        "A2_ub_bc", "y2_ub", ("REML",), corrected=True, note="""
+        A2_ub on bias-corrected estimates. See A2_ub and A2_bc.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A2_ub_hb": ModelSpec(
+        "A2_ub_hb", "y2_ub", ("REML",), bootstrap_scheme="hybrid", note="""
+        A2 with the hybrid bootstrap scheme. See A2 and A2_hb."""),
+
+    "A2_ub_bc_hb": ModelSpec(
+        "A2_ub_bc_hb", "y2_ub", ("REML",), corrected=True, bootstrap_scheme="hybrid",
+        note="""
+        A2_ub on bias-corrected estimates with the hybrid bootstrap scheme. 
+        See A2_ub and A2_bc_hb."""),
+    
+    "A2_avg": ModelSpec("A2_avg", "y2_avg", ("REML",), note="""
         A2 against the geometric mean of the IDA collapse bracket. See A2."""),
+    
+    "A2_avg_bc": ModelSpec("A2_avg_bc", "y2_avg", ("REML",), corrected=True, note="""
+        A2_avg on bias-corrected estimates. See A2_avg and A2_bc.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A2_avg_hb": ModelSpec(
+        "A2_avg_hb", "y2_avg", ("REML",), bootstrap_scheme="hybrid", note="""
+        A2 with the hybrid bootstrap scheme. See A2 and A2_hb."""),
+
+    "A2_avg_bc_hb": ModelSpec(
+        "A2_avg_bc_hb", "y2_avg", ("REML",), corrected=True, bootstrap_scheme="hybrid",
+        note="""
+        A2_avg on bias-corrected estimates with the hybrid bootstrap scheme. 
+        See A2_avg and A2_bc_hb."""),
+
+    # ---- Regressions -------------------------------------------------------
+    "A3a": ModelSpec(
+        "A3a", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_rtp5000", 
+            "d_ln_ds595_mean_rtp5000", 
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000"), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3a_bc": ModelSpec(
+        "A3a_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_rtp5000",
+            "d_ln_ds595_mean_rtp5000",
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000"),
+        corrected=True, note="""
+        A3a on bias-corrected estimates. See A3a. The slopes move too, because
+        the bias differs from row to row; their bootstrap CIs are centred by the
+        same per-row shift.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A3a_hb": ModelSpec(
+        "A3a_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_rtp5000",
+            "d_ln_ds595_mean_rtp5000",
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000"),
+        bootstrap_scheme="hybrid", note="""
+        A3a with hybrid bootstrap scheme."""),
+
+    "A3a_bc_hb": ModelSpec(
+        "A3a_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_rtp5000",
+            "d_ln_ds595_mean_rtp5000",
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000"),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A3a with bias correction and the hybrid bootstrap scheme."""),
+
+    "A3aa": ModelSpec(
+        "A3aa", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_rtp5000", 
+            "d_ln_ds595_mean_rtp5000", 
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000",
+            "ks_unif"), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+    
+    "A3ab": ModelSpec(
+        "A3ab", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+        ), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+    
+    "A3ac": ModelSpec(
+        "A3ac", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "drec_ln_saratio_mean_unif",
+            "drec_ln_ds595_mean_unif",
+            "drec_ln_saratio_sigma_unif",
+            "drec_ln_ds595_sigma_unif",
+        ), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3ac_bc": ModelSpec(
+        "A3ac_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif",
+            "d_ln_ds595_mean_unif",
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "drec_ln_saratio_mean_unif",
+            "drec_ln_ds595_mean_unif",
+            "drec_ln_saratio_sigma_unif",
+            "drec_ln_ds595_sigma_unif",
+        ),
+        corrected=True, note="""
+        A3ac on bias-corrected estimates. See A3ac and A3a_bc.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A3ac_hb": ModelSpec(
+        "A3ac_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif",
+            "d_ln_ds595_mean_unif",
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "drec_ln_saratio_mean_unif",
+            "drec_ln_ds595_mean_unif",
+            "drec_ln_saratio_sigma_unif",
+            "drec_ln_ds595_sigma_unif",
+        ),
+        bootstrap_scheme="hybrid", note="""
+        A3ac with the hybrid bootstrap scheme"""),
+
+    "A3ac_bc_hb": ModelSpec(
+        "A3ac_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif",
+            "d_ln_ds595_mean_unif",
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "drec_ln_saratio_mean_unif",
+            "drec_ln_ds595_mean_unif",
+            "drec_ln_saratio_sigma_unif",
+            "drec_ln_ds595_sigma_unif",
+        ),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A3ac with the hybrid bootstrap scheme"""),
+
+    "A3ad": ModelSpec(
+            "A3ad", "y0_avg", estimators=("REML",), components=("design", "site"), 
+            covariates=(
+                "d_ln_saratio_mean_fisher", 
+                "d_ln_ds595_mean_fisher", 
+                "d_ln_saratio_sigma_fisher",
+                "d_ln_ds595_sigma_fisher",
+                "drec_ln_saratio_mean_fisher",
+                "drec_ln_ds595_mean_fisher",
+                "drec_ln_saratio_sigma_fisher",
+                "drec_ln_ds595_sigma_fisher",
+            ), note="""
+        Regression analysis of the difference between site-specific MSA and IDA FX
+        using the average collapse IML. In this regression only site-specific
+        covariates are considered: SARatio + its standard deviation and DS_595 + its
+        standard deviation.
+    
+        The variance is divided out into the "design" and "site" components
+        """
+        ),
+
+    "A3ad_bc": ModelSpec(
+        "A3ad_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_fisher",
+            "d_ln_ds595_mean_fisher",
+            "d_ln_saratio_sigma_fisher",
+            "d_ln_ds595_sigma_fisher",
+            "drec_ln_saratio_mean_fisher",
+            "drec_ln_ds595_mean_fisher",
+            "drec_ln_saratio_sigma_fisher",
+            "drec_ln_ds595_sigma_fisher",
+        ),
+        corrected=True, note="""
+        A3ad on bias-corrected estimates. See A3ad and A3a_bc.
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A3ad_hb": ModelSpec(
+        "A3ad_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_fisher",
+            "d_ln_ds595_mean_fisher",
+            "d_ln_saratio_sigma_fisher",
+            "d_ln_ds595_sigma_fisher",
+            "drec_ln_saratio_mean_fisher",
+            "drec_ln_ds595_mean_fisher",
+            "drec_ln_saratio_sigma_fisher",
+            "drec_ln_ds595_sigma_fisher",
+        ),
+        bootstrap_scheme="hybrid", note="""
+        A3ad with the hybrid bootstrap scheme."""),
+
+    "A3ad_bc_hb": ModelSpec(
+        "A3ad_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_fisher",
+            "d_ln_ds595_mean_fisher",
+            "d_ln_saratio_sigma_fisher",
+            "d_ln_ds595_sigma_fisher",
+            "drec_ln_saratio_mean_fisher",
+            "drec_ln_ds595_mean_fisher",
+            "drec_ln_saratio_sigma_fisher",
+            "drec_ln_ds595_sigma_fisher",
+        ),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A3ad on bias-corrected estimates with the hybrid bootstrap scheme."""),
+
+    "A3ae": ModelSpec(
+        "A3ae", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif_corrected", 
+            "d_ln_ds595_mean_unif_corrected", 
+            "d_ln_saratio_sigma_unif_corrected",
+            "d_ln_ds595_sigma_unif_corrected",
+        ), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3ae_bc": ModelSpec(
+        "A3ae_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_corrected",
+            "d_ln_ds595_mean_unif_corrected",
+            "d_ln_saratio_sigma_unif_corrected",
+            "d_ln_ds595_sigma_unif_corrected",
+        ),
+        corrected=True, note="""
+        A3ae on bias-corrected estimates. See A3ae and A3a_bc. (The
+        "_corrected" in the covariate names is unrelated: it refers to the
+        covariates, not to the bias correction of the estimates.)
+        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
+        arm's ln(beta) has its own bootstrap bias removed, and the replicates
+        are shifted by -(2b + s) so the CI is the percentile interval of the
+        corrected estimator. Corrected because the MSA binomial MLE and the IDA
+        moment fit are biased differently, so the bias does not cancel in the
+        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
+        Meant for beta. theta is never corrected, so on a theta container this
+        is the uncorrected fit, and fitting it warns."""),
+
+    "A3ae_hb": ModelSpec(
+        "A3ae_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_corrected",
+            "d_ln_ds595_mean_unif_corrected",
+            "d_ln_saratio_sigma_unif_corrected",
+            "d_ln_ds595_sigma_unif_corrected",
+        ),
+        bootstrap_scheme="hybrid", note="""
+        A3ae with the hybrid bootstrap scheme"""),
+
+    "A3ae_bc_hb": ModelSpec(
+        "A3ae_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_corrected",
+            "d_ln_ds595_mean_unif_corrected",
+            "d_ln_saratio_sigma_unif_corrected",
+            "d_ln_ds595_sigma_unif_corrected",
+        ),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A3ae on bias-corrected estimates with the hybrid bootstrap scheme."""),
+
+    "A3b": ModelSpec(
+        # Was "A3a" (a copy-paste slip): the summary printed A3b's numbers under
+        # A3a's name. Fixed 2026-10-08; only the label changes, not the fit.
+        "A3b", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "ln_T1",), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only structure-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3c": ModelSpec(
+        # Was "A3a"; see A3b.
+        "A3c", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_rtp5000", 
+            "d_ln_ds595_mean_rtp5000", 
+            "d_ln_saratio_sigma_rtp5000",
+            "d_ln_ds595_sigma_rtp5000",
+            "ln_T1"), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression all of the A3a and A3b 
+    covariates are considered
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
 }
+
+
+# The tag every printout and plot of a corrected fit carries. One string, so
+# the summary header, the forest title and the contrast summary cannot drift.
+BC_TAG = "[bias-corrected estimates]"
+
+# The only fields in which a `_bc` spec may differ from its uncorrected partner.
+_BC_FREE_FIELDS = frozenset({"model_id", "corrected", "note"})
+
+# Likewise for an `_hb` spec and its record-only partner.
+_HB_FREE_FIELDS = frozenset({"model_id", "bootstrap_scheme", "note"})
+
+
+def _check_model_specs(specs: dict[str, ModelSpec]) -> None:
+    """Enforce "one id, one contrast" on a spec table. Raises ValueError.
+
+    The `_bc` specs are written out by hand rather than generated, which is
+    better for seeing what has been analysed, but it means nothing stops
+    ``"A2_bc"`` drifting from ``"A2"`` (a covariate added to one and not the
+    other, say). Then "A2 vs A2_bc" would no longer isolate the bias correction.
+    This check is what prevents that. It runs at import (below), so a broken
+    table fails the moment the module loads, not three cells into a notebook.
+
+    Rules:
+
+    1. The dict key equals ``spec.model_id``. The key is what ``fit`` and the
+       registry use; the id is what every printout uses. If they differ, the
+       numbers get printed under another model's name, which is what A3b and
+       A3c did until 2026-10-08.
+    2. ``spec.corrected`` is True exactly when the id ends in ``_bc``, so the id
+       alone always says which estimates were used.
+    3. Every ``_bc`` spec has an uncorrected partner (the id without the suffix)
+       and equals it in every field except ``model_id``, ``corrected`` and
+       ``note``. That includes ``bootstrap_scheme``: the partner of
+       ``"A0c_bc_hb"`` is ``"A0c_hb"``, so the pair always agree on the scheme.
+    4. ``spec.bootstrap_scheme`` is ``"hybrid"`` exactly when the id ends in
+       ``_hb``. An id is ``base[_bc][_hb]``, in that order, so ``_hb`` is always
+       the LAST suffix.
+    5. Every ``_hb`` spec has a record-only partner (the id without ``_hb``)
+       and equals it in every field except ``model_id``, ``bootstrap_scheme``
+       and ``note``.
+    """
+    problems: list[str] = []
+
+    def drift_from(spec, partner, free: frozenset) -> list[str]:
+        # fields(type(spec)), not fields(ModelSpec), so the same rules serve the
+        # joint table (JointModelSpec, A8). For a ModelSpec the two are identical.
+        return [f.name for f in fields(type(spec))
+                if f.name not in free
+                and getattr(spec, f.name) != getattr(partner, f.name)]
+
+    for key, spec in specs.items():
+        if key != spec.model_id:
+            problems.append(f"key {key!r} holds a spec whose model_id is {spec.model_id!r}")
+
+        # Read the suffixes off the id: `_hb` is stripped first because it comes
+        # last, then `_bc`. So "A0c_bc_hb" is both, and a wrong-order id such as
+        # "A0c_hb_bc" reads as "_bc only" and fails rule 4 below.
+        is_hb = key.endswith("_hb")
+        rest = key.removesuffix("_hb")
+        is_bc = rest.endswith("_bc")
+        base = rest.removesuffix("_bc")
+        hybrid = spec.bootstrap_scheme == "hybrid"
+
+        if spec.corrected != is_bc:
+            problems.append(
+                f"{key!r}: corrected={spec.corrected}, but only ids ending in '_bc' "
+                "may be (and must be) corrected")
+        if hybrid != is_hb:
+            problems.append(
+                f"{key!r}: bootstrap_scheme={spec.bootstrap_scheme!r}, but only ids "
+                "ending in '_hb' may be (and must be) 'hybrid'; the suffix order is "
+                "base[_bc][_hb]")
+
+        if is_bc and spec.corrected:
+            # The uncorrected partner keeps the `_hb` suffix, if any.
+            partner_id = base + ("_hb" if is_hb else "")
+            partner = specs.get(partner_id)
+            if partner is None:
+                problems.append(f"{key!r} has no uncorrected partner {partner_id!r}")
+            else:
+                drift = drift_from(spec, partner, _BC_FREE_FIELDS)
+                if drift:
+                    problems.append(
+                        f"{key!r} differs from {partner_id!r} in {drift}; a _bc spec "
+                        f"may differ only in {sorted(_BC_FREE_FIELDS)}")
+
+        if is_hb and hybrid:
+            partner_id = rest
+            partner = specs.get(partner_id)
+            if partner is None:
+                problems.append(f"{key!r} has no record-only partner {partner_id!r}")
+            else:
+                drift = drift_from(spec, partner, _HB_FREE_FIELDS)
+                if drift:
+                    problems.append(
+                        f"{key!r} differs from {partner_id!r} in {drift}; an _hb spec "
+                        f"may differ only in {sorted(_HB_FREE_FIELDS)}")
+    if problems:
+        raise ValueError("MODEL_SPECS is inconsistent:\n  " + "\n  ".join(problems))
+
+
+_check_model_specs(MODEL_SPECS)
 
 
 def build_components(spec: ModelSpec, con: Contrast) -> dict[str, tuple]:
@@ -1478,7 +2270,12 @@ def prediction_interval(M: float, T_sq: float, V_M: float, n: int,
         The variance of the summary effect. Prefer the OUTER-BOOTSTRAP variance
         ``Var_r(M*)`` over the model-based ``V_re``: the latter assumes a
         diagonal sampling covariance, which is false for every contrast here
-        that touches a fixed-record-set arm.
+        that touches a fixed-record-set arm. (That is so for DL and for a
+        diagonal-V fit. A REML fit given the full V has a sound model-based
+        variance.) Which bootstrap matters too: the formula wants the
+        SUPERPOPULATION variance, which the hybrid replicates give and the
+        record-only ones slightly understate -- see
+        :meth:`ModelFit.prediction_interval`.
     n : int
         Number of studies.
     alpha : float
@@ -1528,12 +2325,21 @@ class ModelFit:
         intercept-only REML fits; Q, df and p are identical between the two,
         only T_sq and I_sq differ. None for fits with covariates.
     replicates : DataFrame or None
-        One row per outer-bootstrap replicate; columns ``M_star``, ``T_sq``.
+        One row per outer-bootstrap replicate; columns ``M_star``, one
+        ``beta_<name>`` per coefficient (:func:`beta_column`), ``T_sq`` and,
+        for REML, one per variance component.
     x_names : list of str
     scaling : dict
         Covariate centring and scaling, for back-transforming coefficients.
     raw : dict
         The untouched return value of the underlying estimator.
+    boot : dict
+        How the outer bootstrap was run: ``{"scheme", "seed", "zero_levels"}``.
+        Written by the registry from what was ACTUALLY run. Empty for a fit
+        built by hand, which :attr:`boot_scheme` reads as record-only (the only
+        scheme that existed before this field did). ``zero_levels`` names the
+        components that were at zero in the full-sample fit, where the hybrid
+        scheme therefore drew no effects.
     """
 
     spec: ModelSpec
@@ -1547,6 +2353,7 @@ class ModelFit:
     x_names: list[str] = field(default_factory=lambda: ["intercept"])
     scaling: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
+    boot: dict = field(default_factory=dict)
 
     @property
     def model_id(self) -> str:
@@ -1555,6 +2362,35 @@ class ModelFit:
     @property
     def quantity(self) -> str:
         return self.contrast.quantity
+
+    @property
+    def boot_scheme(self) -> str | None:
+        """``"record"`` or ``"hybrid"``; None if no outer bootstrap was run.
+
+        Read from :attr:`boot`, i.e. from what was run, not from the spec --
+        the same principle as :attr:`corrected`. Every reader of the replicates
+        that means something different under the two schemes (the CI, the SEs,
+        the tau intervals) branches on this.
+        """
+        if self.replicates is None:
+            return None
+        return self.boot.get("scheme", "record")
+
+    @property
+    def hybrid(self) -> bool:
+        """True when the replicates come from the hybrid bootstrap."""
+        return self.boot_scheme == "hybrid"
+
+    @property
+    def corrected(self) -> bool:
+        """Whether this fit used the bias-corrected estimates.
+
+        Read from the CONTRAST, i.e. from what was actually fitted, rather than
+        from the spec. The registry guarantees the two agree. Reading the
+        contrast means a fit built by hand outside the registry still reports
+        honestly.
+        """
+        return self.contrast.corrected
 
     @property
     def n(self) -> int:
@@ -1608,9 +2444,144 @@ class ModelFit:
 
         That is a different question from the one :attr:`se_beta` answers; see
         :attr:`se_sampling` for the comparison that is actually like-for-like.
+
+        ALL OF THE ABOVE IS THE RECORD-ONLY SCHEME. On a hybrid fit
+        (:attr:`hybrid`) each replicate also redraws the site, design and row
+        effects, so this number is a SUPERPOPULATION standard error and its
+        like-for-like partner is :attr:`se_beta`, not :attr:`se_sampling`.
+        Expect it slightly above ``se_beta``: the replicates re-estimate the
+        tau's, and so the weights, which the closed form treats as known.
         """
         V = self.V_boot
         return None if V is None else float(np.sqrt(V))
+
+    @cached_property
+    def weight_matrix(self) -> np.ndarray | None:
+        """(q, n) the weights for EVERY coefficient: ``beta_hat = W y``.
+
+        Row k is the weight vector that turns the data into coefficient k, so
+        ``W[0]`` is :attr:`weights` (the intercept) and ``W[1:]`` are the
+        slopes. For GLS this is ``(X' Sigma^-1 X)^-1 X' Sigma^-1`` (BDA3
+        section 14.7, ~pp. 369-371, approximate; Chatterjee & Hadi Ch. 7,
+        ~pp. 179-186, approximate).
+
+        A slope's weights sum to ZERO, not one: a slope is a contrast between
+        rows with high and low covariate values, so it adds some rows and
+        subtracts others. The intercept's weights sum to one because it is an
+        (adjusted) average.
+
+        For DL there is only the intercept, so this is a 1 x n matrix built from
+        the diagonal DL weights. None if a REML fit did not keep its Sigma.
+        """
+        con = self.contrast
+        X, _, _ = build_X(self.spec, con)
+        if self.estimator == "DL":
+            w = 1.0 / (con.v.to_numpy() + self.T_sq)
+            return (w / w.sum())[None, :]
+        Sigma = self.raw.get("Sigma")
+        if Sigma is None:
+            return None
+        # Solve rather than invert Sigma explicitly: numerically kinder, same
+        # answer. Si_X = Sigma^-1 X, and (X' Sigma^-1 X)^-1 X' Sigma^-1 is then
+        # (X' Si_X)^-1 Si_X' because Sigma is symmetric.
+        Si_X = np.linalg.solve(Sigma, X)
+        return np.linalg.solve(X.T @ Si_X, Si_X.T)
+
+    @cached_property
+    def se_sampling_beta(self) -> np.ndarray | None:
+        """(q,) sampling-error-only SE of every coefficient, ``sqrt(diag(W V W'))``.
+
+        The per-coefficient version of :attr:`se_sampling`: the contrast's full
+        sampling covariance V pushed through each coefficient's own weight row.
+        Each entry is the like-for-like partner of the matching entry of
+        :attr:`se_boot_beta` -- they should agree to Monte-Carlo error.
+        """
+        W = self.weight_matrix
+        if W is None:
+            return None
+        # Only the diagonal of W V W' is needed, so compute it row by row
+        # rather than forming the full q x q product: diag(A B) = sum(A * B', 1).
+        return np.sqrt(np.einsum("kn,nm,km->k", W, self.contrast.V, W))
+
+    @cached_property
+    def se_boot_beta(self) -> np.ndarray | None:
+        """(q,) bootstrap SE of every coefficient: SD of its refits across replicates.
+
+        Same finite-population meaning as :attr:`se_boot` (records resampled,
+        sites and designs held fixed), now for the slopes too -- and, like it,
+        superpopulation on a hybrid fit. Entries are NaN
+        for a coefficient the replicate frame does not hold -- for example
+        replicates produced before :func:`bootstrap_fits` kept the slopes.
+        """
+        if self.replicates is None:
+            return None
+        out = np.full(len(self.x_names), np.nan)
+        for k, name in enumerate(self.x_names):
+            col = beta_column(name)
+            if col in self.replicates:
+                out[k] = self.replicates[col].std(ddof=1)
+            elif k == 0:
+                # Older frames only carry the intercept, as M_star.
+                out[k] = self.replicates["M_star"].std(ddof=1)
+        return out
+
+    def coef_table(self, alpha: float = 0.05, natural_units: bool = False) -> pd.DataFrame:
+        """One row per coefficient: estimate, its three SEs, z and a bootstrap CI.
+
+        Columns
+        -------
+        beta        the estimate
+        se_model    sqrt(diag((X' Sigma^-1 X)^-1)) -- includes tau, so a
+                    SUPERPOPULATION SE (see :attr:`se_sampling`)
+        se_sampling sqrt(diag(W V W')) -- sampling error only, these structures
+        se_boot     SD across the outer-bootstrap refits
+        z           beta / se_model, the Wald statistic (normal reference;
+                    it treats the tau^2 as known -- see Knapp-Hartung /
+                    parametric bootstrap if n is small)
+        p           two-sided p-value for z
+        ci_lo/ci_hi percentile bootstrap interval (NaN without replicates).
+                    Like se_boot this is finite-population: it does NOT include
+                    between-study heterogeneity. (Record-only scheme. On a
+                    hybrid fit se_boot and the CI DO include it, and compare
+                    with se_model rather than se_sampling.)
+
+        Parameters
+        ----------
+        natural_units : bool
+            Covariates are centred and scaled in :func:`build_X`, so a slope is
+            "per SD of the covariate". With True, slopes and their SEs/CIs are
+            divided by that SD to read "per unit of the covariate". The
+            intercept is unchanged either way: centring makes it the value at
+            the covariate MEAN, not at zero. z and p are scale-free.
+        """
+        q = len(self.beta)
+        nan = np.full(q, np.nan)
+        se_s = self.se_sampling_beta if self.se_sampling_beta is not None else nan
+        se_b = self.se_boot_beta if self.se_boot_beta is not None else nan
+        tbl = pd.DataFrame({"beta": self.beta, "se_model": self.se_beta,
+                            "se_sampling": se_s, "se_boot": se_b},
+                           index=pd.Index(self.x_names, name="coefficient"))
+
+        tbl["z"] = tbl["beta"] / tbl["se_model"]
+        tbl["p"] = 2 * stats.norm.sf(np.abs(tbl["z"]))
+
+        tbl["ci_lo"], tbl["ci_hi"] = np.nan, np.nan
+        if self.replicates is not None:
+            for name in self.x_names:
+                col = beta_column(name)
+                if col not in self.replicates and name == "intercept":
+                    col = "M_star"
+                if col in self.replicates:
+                    lo, hi = self.replicates[col].quantile([alpha / 2, 1 - alpha / 2])
+                    tbl.loc[name, ["ci_lo", "ci_hi"]] = [lo, hi]
+
+        if natural_units:
+            # Dividing by the SD rescales every column measured in the units of
+            # beta; z and p are ratios and are left alone.
+            for name, sc in self.scaling.items():
+                cols = ["beta", "se_model", "se_sampling", "se_boot", "ci_lo", "ci_hi"]
+                tbl.loc[name, cols] = tbl.loc[name, cols] / sc["sd"]
+        return tbl
 
     @cached_property
     def weights(self) -> np.ndarray | None:
@@ -1625,17 +2596,12 @@ class ModelFit:
         The difference between those two weight vectors is the whole reason the
         two estimators have different bootstrap standard errors on identical
         replicates.
+
+        This is row 0 of :attr:`weight_matrix`; it is taken from there so the
+        intercept and slope weights are guaranteed to come from one calculation.
         """
-        con = self.contrast
-        X, _, _ = build_X(self.spec, con)
-        if self.estimator == "DL":
-            w = 1.0 / (con.v.to_numpy() + self.T_sq)
-            return w / w.sum()
-        Sigma = self.raw.get("Sigma")
-        if Sigma is None:
-            return None
-        Si = np.linalg.inv(Sigma)
-        return (np.linalg.inv(X.T @ Si @ X) @ X.T @ Si)[0]
+        W = self.weight_matrix
+        return None if W is None else W[0]
 
     @cached_property
     def se_sampling(self) -> float | None:
@@ -1666,6 +2632,13 @@ class ModelFit:
         Percentiles rather than ``m +/- z SE`` because they are
         transformation-respecting: exponentiating the endpoints gives the
         interval on the ratio scale directly.
+
+        WHICH QUESTION IT ANSWERS depends on :attr:`boot_scheme`. Record-only:
+        where the mean lies for THESE sites and designs (records resampled,
+        everything else held fixed). Hybrid: where the mean lies for the
+        POPULATION they were drawn from -- the replicates also redraw the
+        effects, so the interval is wider. The record-only interval of an
+        ``_hb`` fit is its partner's (``"A0c"`` for ``"A0c_hb"``).
         """
         if self.replicates is None:
             raise ValueError(
@@ -1674,8 +2647,94 @@ class ModelFit:
         lo, hi = self.replicates["M_star"].quantile([alpha / 2, 1 - alpha / 2])
         return float(lo), float(hi)
 
+    def boundary_fractions(self) -> pd.Series:
+        """Per variance component, the fraction of replicates in which it is exactly 0.
+
+        The number to read BEFORE reading an interval on a tau. A component at
+        zero in most replicates is not being estimated, it is being detected as
+        absent, and a percentile interval there is one-sided: [0, upper].
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id}: no outer bootstrap - pass n_boot")
+        return pd.Series({name: float((self.replicates[name] == 0.0).mean())
+                          for name in self.tau2 if name in self.replicates},
+                         name="frac_at_zero", dtype=float).rename_axis("component")
+
+    def tau_ci(self, name: str = "total", alpha: float = 0.05) -> dict:
+        """Percentile bootstrap interval for one variance component, as a tau^2.
+
+        Parameters
+        ----------
+        name : str
+            A key of :attr:`tau2` (``"tau_d2"``, ``"tau_s2"``, ``"tau_u2"``),
+            or ``"total"`` for their sum (the ``T_sq`` column).
+
+        Returns
+        -------
+        dict
+            ``{"estimate", "lo", "hi", "replicate_mean", "frac_at_zero",
+            "scheme"}``, all on the VARIANCE scale. Take square roots for a
+            tau: percentiles respect monotone transforms, so
+            ``sqrt(lo), sqrt(hi)`` is the percentile interval for tau itself
+            (Efron & Tibshirani Ch. 13, ~pp. 170-174, approximate).
+
+        ONLY MEANINGFUL ON A HYBRID FIT. Record-only replicates carry two
+        rounds of sampling noise, so their variance components are inflated by
+        about the mean sampling variance and this "interval" does not even
+        contain the estimate in the worst cases; calling it there warns.
+
+        Reading it on a hybrid fit:
+
+        * ``replicate_mean`` should sit on ``estimate``. If it does not, either
+          a component is on its boundary (below) or the fit uses a diagonal V
+          (see :func:`bootstrap_fits`, point 2).
+        * A component fitted at zero is drawn at zero, so its interval is
+          ``[0, upper]``: "consistent with zero, and values above ``upper`` are
+          unlikely if it is zero". It is not a 95% interval in the usual sense
+          -- a bootstrap does not behave regularly for a parameter on its
+          boundary -- so quote ``frac_at_zero`` with it.
+        * A percentile interval for a variance is only first-order accurate;
+          with about 120 rows it covers at roughly 0.945 rather than 0.95.
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id}: no outer bootstrap - pass n_boot")
+        col = "T_sq" if name == "total" else name
+        if name != "total" and name not in self.tau2:
+            raise KeyError(f"no variance component {name!r} in {self.model_id}; it has "
+                           f"{sorted(self.tau2)} (or 'total')")
+        if col not in self.replicates:
+            raise KeyError(f"the replicates of {self.model_id} [{self.estimator}] hold "
+                           f"no {col!r} column")
+        if not self.hybrid:
+            warnings.warn(
+                f"{self.model_id}: these are RECORD-ONLY replicates, whose variance "
+                "components are inflated by about the mean sampling variance. This is "
+                "not an interval for tau - fit the '_hb' version of the model.",
+                RuntimeWarning, stacklevel=2)
+        vals = self.replicates[col].to_numpy(dtype=float)
+        lo, hi = np.quantile(vals, [alpha / 2, 1 - alpha / 2])
+        est = self.T_sq if name == "total" else self.tau2[name]
+        return {"estimate": float(est), "lo": float(lo), "hi": float(hi),
+                "replicate_mean": float(vals.mean()),
+                "frac_at_zero": float(np.mean(vals == 0.0)),
+                "scheme": self.boot_scheme}
+
     def prediction_interval(self, alpha: float = 0.05) -> tuple[float, float]:
-        """Where the NEXT building is expected to land. See :func:`prediction_interval`."""
+        """Where the NEXT building is expected to land. See :func:`prediction_interval`.
+
+        ``m +/- t * sqrt(T^2 + Var(m))``. The new building has its own site,
+        design and row effect, so the Var(m) that belongs here is the
+        SUPERPOPULATION one, which counts the fact that these rows are
+        themselves a sample (Borenstein Ch. 17, ~pp. 127-133, approximate).
+
+        * Hybrid fit: :attr:`V_boot` is exactly that, with the full sampling
+          covariance and the tau-estimation noise included.
+        * Record-only fit: :attr:`V_boot` is ``w' V w``, which leaves out the
+          ``w' (sum tau^2 G) w`` part, so the interval is slightly too NARROW.
+          The effect is small because T^2 dominates (0.8% of the half-width
+          for A0b theta). Left as it is by decision (2026-10-13), so that no
+          record-only number moves; the ``_hb`` fit has the right one.
+        """
         V_M = self.V_boot
         if V_M is None:
             V_M = float(self.se_beta[0] ** 2)
@@ -1686,6 +2745,26 @@ class ModelFit:
                 RuntimeWarning, stacklevel=2)
         return prediction_interval(self.m, self.T_sq, V_M, self.n, alpha)
 
+    def covariance(self) -> CovarianceDecomposition:
+        """The fitted marginal covariance Sigma, split into its sources.
+
+        ``Sigma = V_known + sum_c tau_c^2 Z_c Z_c'``. A thin wrapper so the call
+        reads ``fits["A0c"].covariance()``; see :func:`marginal_covariance`
+        for the mathematics and :class:`CovarianceDecomposition` for what comes
+        back.
+        """
+        return marginal_covariance(self)
+
+    def random_effects(self, alpha: float = 0.05) -> RandomEffects:
+        """The estimated effect of every site, design and row (BLUPs).
+
+        ``b_hat_c = tau_c^2 Z_c' Sigma^-1 (y - X beta_hat)``. A thin wrapper so
+        the call reads ``fits["A0c"].random_effects().site``; see
+        :func:`random_effects` for the mathematics and, before plotting them,
+        its caveats on shrinkage.
+        """
+        return random_effects(self, alpha=alpha)
+
     def to_row(self) -> dict:
         """One row of a comparison table."""
         row = {
@@ -1693,6 +2772,15 @@ class ModelFit:
             "estimator": self.estimator,
             "quantity": self.quantity,
             "contrast": self.contrast.name,
+            # Which estimates: the id already says so (the _bc suffix), but a
+            # column makes it filterable, so a table cannot mix corrected and
+            # uncorrected rows without that showing.
+            "corrected": self.corrected,
+            # Which outer bootstrap the se_boot / ci / pi columns come from
+            # (None if none was run). The id says so too (the _hb suffix); the
+            # column makes it filterable, because under "record" the CI is for
+            # these rows and under "hybrid" it is for the population.
+            "bootstrap": self.boot_scheme,
             "n": self.n,
             "ratio": self.ratio(),
             "m": self.m,
@@ -1714,11 +2802,25 @@ class ModelFit:
                     "I_sq": self.het["I_sq"]}
         row |= {f"tau_{k.removeprefix('tau_').removesuffix('2')}": float(np.sqrt(v))
                 for k, v in self.tau2.items()}
+
+        # Slopes, one group of columns per covariate (intercept-only fits add
+        # nothing). Per-SD units, matching beta as fitted; coef_table(
+        # natural_units=True) gives them per unit of the covariate.
+        if len(self.x_names) > 1:
+            ct = self.coef_table()
+            for name in self.x_names[1:]:
+                row |= {f"b[{name}]": ct.at[name, "beta"],
+                        f"se_model[{name}]": ct.at[name, "se_model"],
+                        f"se_sampling[{name}]": ct.at[name, "se_sampling"],
+                        f"se_boot[{name}]": ct.at[name, "se_boot"]}
         return row
 
     def summary(self) -> str:
         """Multi-line report, in ratio units, with the reasoning attached."""
-        out = [f"{self.model_id} [{self.estimator}]  {self.contrast.label}"
+        tag = f"  {BC_TAG}" if self.corrected else ""
+        if self.hybrid:
+            tag += f"  {HB_TAG}"
+        out = [f"{self.model_id} [{self.estimator}]{tag}  {self.contrast.label}"
                f"  ({self.contrast.name} = {self.contrast.terms[0]} - "
                f"{self.contrast.terms[1]}, {self.quantity}, n={self.n})",
                f"  summary effect   : {self.ratio():.4f}   "
@@ -1726,8 +2828,19 @@ class ModelFit:
 
         if self.replicates is not None:
             lo, hi = self.ci()
+            # The two schemes answer different questions; say which, on the
+            # line itself, so the interval cannot be quoted without it.
+            what = ("where the MEAN effect lies, for the POPULATION of sites and "
+                    "designs (effects redrawn)" if self.hybrid
+                    else "where the MEAN effect lies")
             out.append(f"  95% CI           : {np.exp(lo):.4f} - {np.exp(hi):.4f}"
-                       "     <- where the MEAN effect lies")
+                       f"     <- {what}")
+            if self.corrected:
+                # Say how the interval was built. A reader comparing A2 with
+                # A2_bc should know the replicates were moved, and by what.
+                out.append("    -> percentile interval of the bias-corrected "
+                           "estimator: replicates shifted by -(2b + s), see "
+                           "FragilityData.replicate_shift")
             pl, ph = self.prediction_interval()
             out.append(f"  95% PI           : {np.exp(pl):.4f} - {np.exp(ph):.4f}"
                        "     <- where the NEXT case lands")
@@ -1745,9 +2858,31 @@ class ModelFit:
                        "<- sqrt(w' V w), these structures")
         if self.se_boot is not None:
             out.append(f"  SE (bootstrap)   : {self.se_boot:.5f}   "
-                       f"<- {len(self.replicates)} refits")
+                       f"<- {len(self.replicates)} refits"
+                       + (", hybrid: compare with SE (superpop.)" if self.hybrid else ""))
 
-        if self.se_boot is not None and self.se_sampling:
+        if self.hybrid:
+            # Under the hybrid scheme the replicates redraw the effects, so the
+            # like-for-like partner of se_boot is the SUPERPOPULATION SE, not
+            # sqrt(w' V w). It should be equal or a little larger (the refits
+            # also re-estimate the tau's). A large gap means the pseudo-data do
+            # not have the covariance of the fitted model. Only checked for a
+            # full-V REML fit: with a diagonal V the model-based SE is itself
+            # wrong, so there is nothing sound to compare with.
+            if self.estimator == "REML" and not self.spec.diagonal_V:
+                ratio = self.se_boot / float(self.se_beta[0])
+                if not 0.8 < ratio < 1.35:
+                    out.append(
+                        f"    -> hybrid bootstrap SE is {ratio:.2f}x the superpopulation "
+                        "SE; these should agree to Monte-Carlo error (a little above "
+                        "1 is expected). Check the fitted tau's and the replicate "
+                        "alignment, or raise n_boot if it is close.")
+            else:
+                out.append("    -> fitted with a DIAGONAL sampling covariance, but the "
+                           "hybrid noise keeps its full dependence (as the real data "
+                           "do): replicate tau's sit ABOVE the fitted ones by the "
+                           "shared covariance the diagonal fit absorbs.")
+        elif self.se_boot is not None and self.se_sampling:
             ratio = self.se_boot / self.se_sampling
             if not 0.8 < ratio < 1.25:
                 out.append(
@@ -1770,8 +2905,22 @@ class ModelFit:
         # I_sq (Borenstein Ch. 16).
         for name, value in self.tau2.items():
             sd_name = name.removesuffix("2")
-            out.append(f"  {sd_name:<16s} : {np.sqrt(value):.4f}   "
-                       f"(a factor of {np.exp(np.sqrt(value)):.3f})")
+            line = (f"  {sd_name:<16s} : {np.sqrt(value):.4f}   "
+                    f"(a factor of {np.exp(np.sqrt(value)):.3f})")
+            # An interval on a tau only from HYBRID replicates: record-only
+            # ones are inflated (see tau_ci), so printing theirs would put a
+            # wrong interval beside a right estimate.
+            if self.hybrid and name in self.replicates:
+                ci = self.tau_ci(name)
+                line += (f"   95% CI {np.sqrt(ci['lo']):.4f} - {np.sqrt(ci['hi']):.4f}"
+                         f", {ci['frac_at_zero']:.0%} of replicates at 0")
+            out.append(line)
+        if self.hybrid:
+            zero = self.boot.get("zero_levels", ())
+            if zero:
+                out.append(f"    -> {', '.join(zero)} fitted at 0, so drawn at 0: "
+                           "replicates there can only move UP. Read those intervals "
+                           "as [0, upper], and the replicate total as biased up.")
 
         if self.het is not None:
             # NOTE the naming trap: mra returns `Q_df` = Q - df, the EXCESS of Q
@@ -1794,8 +2943,35 @@ class ModelFit:
                        "of variance that is real, and with small sampling "
                        "variances it tends to 1 almost regardless)")
 
-        for q, name in zip(self.beta[1:], self.x_names[1:]):
-            out.append(f"  beta[{name}] : {q:+.4f} per SD")
+        # Covariates: every slope with its standard errors. The headline pair is
+        # coefficient +/- se_model, the superpopulation SE that matches the
+        # intercept's "SE (superpop.)" line above, with its Wald z and p. The
+        # sampling and bootstrap SEs follow, for the same like-for-like check as
+        # the intercept (they should agree with each other, and both be smaller
+        # than se_model, which also carries tau). Slopes are per SD of the
+        # centred/scaled covariate as fitted; the natural-units line divides by
+        # that SD so the number can be read in the covariate's own units.
+        if len(self.x_names) > 1:
+            ct = self.coef_table()
+            nat = self.coef_table(natural_units=True)
+            out.append("  covariates (log scale; slope per SD of covariate):")
+            for name in self.x_names[1:]:
+                r = ct.loc[name]
+                out.append(f"    {name}")
+                out.append(f"      coefficient  : {r['beta']:+.5f}  "
+                           f"SE {r['se_model']:.5f}   "
+                           f"(z = {r['z']:+.2f}, p = {r['p']:.3g})   "
+                           "<- SE includes tau")
+                if np.isfinite(r["se_sampling"]):
+                    out.append(f"      SE (sampling): {r['se_sampling']:.5f}")
+                if np.isfinite(r["se_boot"]):
+                    out.append(f"      SE (bootstr.): {r['se_boot']:.5f}   "
+                               f"95% CI {r['ci_lo']:+.5f} to {r['ci_hi']:+.5f}")
+                if name in self.scaling:
+                    n_r = nat.loc[name]
+                    out.append(f"      per unit     : {n_r['beta']:+.5f}  "
+                               f"SE {n_r['se_model']:.5f}   "
+                               f"(covariate SD = {self.scaling[name]['sd']:.4g})")
 
         if self.spec.note:
             out.append("  " + " ".join(self.spec.note.split()))
@@ -1856,15 +3032,84 @@ def fit_reml(con: Contrast, spec: ModelSpec, **kw) -> tuple:
     return raw["beta"], raw["se_beta"], tau2, het, x_names, scaling, raw
 
 
+def _hybrid_components(spec: ModelSpec, con: Contrast, estimator: str,
+                       tau2: dict[str, float]) -> dict[str, tuple]:
+    """``{name: (factor, tau_hat)}`` for the hybrid bootstrap's effect draws.
+
+    The factor matrices come from :func:`build_components`, the very call that
+    builds the Gs of the fit, with its placeholder taus replaced by the FITTED
+    standard deviations -- the use its docstring describes. So new effects are
+    drawn on exactly the grouping the model was fitted with.
+
+    DL has one bucket of between-row variance and no group structure, so its
+    single component is the row level whatever the spec lists (a spec asking DL
+    for more has already been refused by :func:`fit_dl`).
+    """
+    if estimator == "DL":
+        return {"tau_u2": (np.eye(con.n), float(np.sqrt(tau2["tau_u2"])))}
+    comps = build_components(spec, con)
+    missing = sorted(set(comps) - set(tau2))
+    if missing:
+        raise ValueError(
+            f"{spec.model_id}: the full-sample fit has no variance component(s) "
+            f"{missing}, so the hybrid bootstrap cannot draw effects for them; it "
+            f"holds {sorted(tau2)}")
+    return {name: (factor, float(np.sqrt(tau2[name])))
+            for name, (factor, _) in comps.items()}
+
+
 def bootstrap_fits(con: Contrast, spec: ModelSpec, *, estimator: str,
                    n_boot: int | None = None, method: str = "cholesky",
-                   n_starts: int = 1, **kw) -> pd.DataFrame:
+                   n_starts: int = 1, full_fit: dict | None = None,
+                   boot_seed: int = BOOT_SEED, **kw) -> pd.DataFrame:
     """Refit the model inside every bootstrap replicate: one row per replicate.
 
     This is the INFERENTIAL result (Efron & Tibshirani Ch. 6-7, and
     analysis_models.md section 0). It carries every sampling covariance,
     including ones never written down, which the model-based standard error
     cannot.
+
+    Schemes -- ``spec.bootstrap_scheme`` chooses what is refitted
+    ------------------------------------------------------------
+    ``"record"`` (the default)
+        Column r of ``con.y`` itself: the record resample. In Borenstein's
+        notation (Fig. 12.3) a replicate is::
+
+            y_i^(r) = (mu + zeta_i) + eps_i + delta_i^(r)
+                       true, fixed    real     record
+                                      analysis resample
+
+        The spread of ``M_star`` is then ``w' V w``: how well the mean is known
+        FOR THESE ROWS, a finite-population statement (Gelman & Hill Ch. 21.2,
+        ~pp. 458-460, approximate). That part is right. The variance-component
+        columns are NOT draws of the variance components: the replicate
+        carries two rounds of sampling noise (eps and delta) while V_known
+        describes one, so each replicate tau^2 is too large by about the mean
+        sampling variance. Do not build an interval on a tau from them.
+    ``"hybrid"``
+        Pseudo-data with one round of noise (``dsim.hybrid_pseudo_data``)::
+
+            y*^(r) = X beta_hat + zeta*^(r) + (y^(r) - ybar)
+
+        with ``zeta*`` NEW effects drawn from the fitted variance components.
+        ``Var(y*)`` is then the fitted model, so the replicate tau^2 centre on
+        the fitted ones and :meth:`ModelFit.tau_ci` is meaningful. Because the
+        effects are redrawn, the spread of ``M_star`` is about
+        ``(X' Sigma^-1 X)^-1``: a SUPERPOPULATION statement, how well the mean
+        is known for the population these sites and designs came from. It is a
+        little wider still, because each replicate re-estimates the tau's and
+        hence the weights. Semi-parametric: parametric in the effects,
+        non-parametric in the noise (Efron & Tibshirani Ch. 6, ~pp. 53-56,
+        approximate).
+
+        Three things to know. (1) A component fitted at ZERO is drawn at zero;
+        replicates can still estimate it above zero, never below, so its
+        replicate mean is biased up and its interval is one-sided -- read
+        :meth:`ModelFit.boundary_fractions` with it. (2) The noise keeps its
+        full dependence even when the spec fits with a diagonal V (or DL):
+        that is the position the real data put the estimator in, so there the
+        replicate tau^2 sit ABOVE the fitted one by whatever shared covariance
+        the diagonal fit absorbs. (3) ``full_fit`` is required.
 
     One replicate index drives all the arms for free, because column r of
     ``con.y`` was built by differencing column r of each arm -- so the arms in
@@ -1889,32 +3134,639 @@ def bootstrap_fits(con: Contrast, spec: ModelSpec, *, estimator: str,
     Raise it if a fit is suspected of being multi-modal in a way the full-sample
     fit did not reveal; ``start_spread`` on the full-sample fit is the thing to
     check first.
+
+    Columns of the returned frame
+    -----------------------------
+    ``M_star``
+        The intercept, ``beta[0]``. Kept under this name because
+        :meth:`ModelFit.ci`, :attr:`ModelFit.V_boot` and the forest plot read it.
+    ``beta_<name>``
+        EVERY fixed-effect coefficient, one column per entry of ``x_names``
+        (so ``beta_intercept`` duplicates ``M_star``). Previously only the
+        intercept was kept and the slopes were discarded, even though every
+        refit computes them -- so a covariate had no bootstrap SE or CI at all.
+        Labels come from :func:`beta_column`.
+    ``T_sq``, plus one column per variance component (REML only).
+
+    The frame's ``attrs`` record ``bootstrap_scheme`` and ``seed``, so a frame
+    that has been separated from its fit still says how it was made.
+
+    Parameters added for the hybrid scheme
+    --------------------------------------
+    full_fit : dict, optional
+        ``{"beta": (q,), "tau2": {name: value}}`` from the full-sample fit of
+        the SAME estimator. Required when the scheme is ``"hybrid"`` (the draws
+        need beta_hat and the fitted tau's); ignored otherwise.
+    boot_seed : int
+        Seeds the effect draws. Named apart from ``mra.fit_reml``'s own
+        ``seed`` (the restart jitter), which ``**kw`` can still reach. Same
+        spec, data and seed give identical replicates, and replicate r does not
+        depend on ``n_boot``. Ignored by the record-only scheme, which has
+        nothing random in it.
     """
     columns = list(con.y.columns)
     if n_boot is not None:
         columns = columns[:n_boot]
 
+    # The replicate matrix the loop below reads, one column per replicate.
+    # Record-only: the cloud itself, untouched, so that path is exactly what it
+    # was before the scheme existed. Hybrid: the pseudo-data, built in one call.
+    hybrid = spec.bootstrap_scheme == "hybrid"
+    if hybrid:
+        if full_fit is None:
+            raise ValueError(
+                f"{spec.model_id}: the hybrid bootstrap needs the full-sample fit "
+                "(full_fit={'beta': ..., 'tau2': {...}}), because its pseudo-data "
+                "are X beta_hat plus effects drawn from the fitted tau's. "
+                "ModelRegistry.fit passes it.")
+        # DL is intercept-only whatever X holds, so its fitted values are M.
+        X_fitted = np.ones((con.n, 1)) if estimator == "DL" else build_X(spec, con)[0]
+        fitted = X_fitted @ np.atleast_1d(np.asarray(full_fit["beta"], dtype=float))
+        # The WHOLE cloud goes in, and n_boot is applied inside: the noise is
+        # centred on the mean of all k replicates, which is what V_known is the
+        # covariance about (dsim.centre_replicates).
+        Y_star = dsim.hybrid_pseudo_data(
+            con.y.to_numpy(dtype=float), fitted,
+            _hybrid_components(spec, con, estimator, full_fit["tau2"]),
+            seed=boot_seed, n_boot=len(columns))
+
+    # The coefficient names label the beta_ columns. build_X is cheap and
+    # deterministic, and it is the SAME function the full-sample fit used, so
+    # the labels are guaranteed to be in the same order as the fitted beta
+    # vector. (DL ignores X -- it is intercept-only -- so for DL only the
+    # intercept name is used below.)
+    X, x_names, _ = build_X(spec, con)
+
     if estimator == "REML":
         V_known = con.diag_V() if spec.diagonal_V else con.V
         Gs, names = dsim.build_component_gs(build_components(spec, con))
-        X, _, _ = build_X(spec, con)
 
     out = []
-    for col in columns:
-        y_r = con.y[col].to_numpy(dtype=float)
+    for j, col in enumerate(columns):
+        y_r = Y_star[:, j] if hybrid else con.y[col].to_numpy(dtype=float)
         if estimator == "DL":
             M, _, _, T_sq, _ = mra.compute_re_summary_effect(
                 con.v, pd.Series(y_r, index=con.y_hat.index))
-            out.append({"M_star": float(M), "T_sq": float(T_sq)})
+            out.append({"M_star": float(M), beta_column("intercept"): float(M),
+                        "T_sq": float(T_sq)})
         else:
             raw = mra.fit_reml(y_r, X, V_known, Gs, names=names,
                                method=method, n_starts=n_starts, **kw)
-            row = {"M_star": float(raw["beta"][0]),
-                   "T_sq": float(np.sum(raw["tau2"]))}
+            beta_r = np.atleast_1d(raw["beta"])
+            row = {"M_star": float(beta_r[0])}
+            # One column per coefficient, labelled by NAME, so nothing
+            # downstream has to know the column order of X.
+            row |= {beta_column(nm): float(b) for nm, b in zip(x_names, beta_r)}
+            row["T_sq"] = float(np.sum(raw["tau2"]))
             row |= {n: float(t) for n, t in zip(raw["names"], raw["tau2"])}
             out.append(row)
 
-    return pd.DataFrame(out, index=pd.Index(columns, name="k"))
+    frame = pd.DataFrame(out, index=pd.Index(columns, name="k"))
+    # attrs are metadata only: they change no value and are not compared by
+    # assert_frame_equal, so a record-only frame is still identical to one made
+    # before the scheme existed.
+    frame.attrs["bootstrap_scheme"] = spec.bootstrap_scheme
+    frame.attrs["seed"] = boot_seed if hybrid else None
+    return frame
+
+
+def beta_column(name: str) -> str:
+    """Column label in :attr:`ModelFit.replicates` for the coefficient ``name``.
+
+    A single function so the writer (:func:`bootstrap_fits`) and the readers
+    (:attr:`ModelFit.se_boot_beta`, :meth:`ModelFit.coef_table`) cannot drift
+    apart on the spelling.
+    """
+    return f"beta_{name}"
+
+
+# =============================================================================
+# Covariance structure and the estimated random effects
+# =============================================================================
+#
+# THE MODEL EVERY REML RUNG FITS
+# ------------------------------
+# Written once for all of them, in matrix form (Gelman & Hill Ch. 12.5 and
+# Ch. 13, ~pp. 262-270 and 279-282, approximate; BDA3 Ch. 5.4-5.6,
+# ~pp. 113-128, approximate):
+#
+#     y = X beta + sum_c Z_c b_c + eps
+#
+#     b_c ~ N(0, tau_c^2 I_{L_c})     one vector per variance component c,
+#                                     independent of each other
+#     eps ~ N(0, V_known)             the sampling error, from the bootstrap
+#
+# where, for the crossed rungs (A0c, A0d, A1c, A3a):
+#
+#   component  | Z_c                           | b_c                 | L_c
+#   -----------+-------------------------------+---------------------+-----
+#   design     | Z_d, 120 x 51, Z_d[i,j] = 1   | d_j, one per design | 51
+#              |   when g[i] = j               |                     |
+#   site       | Z_s, 120 x 60, Z_s[i,k] = 1   | s_k, one per site   | 60
+#              |   when sigma[i] = k           |                     |
+#   row        | I_120                         | u_i, one per row    | 120
+#
+# so that, row by row,
+#
+#     y_i = x_i' beta + d_{g[i]} + s_{sigma[i]} + u_i + eps_i .
+#
+# Two things follow, and each gets a function below:
+#
+#   1. The MARGINAL covariance of y (what REML actually fits), obtained by
+#      integrating the b_c out:
+#
+#          Sigma = Cov(y) = V_known + sum_c tau_c^2 Z_c Z_c'
+#
+#      -> marginal_covariance()
+#
+#   2. The best estimate of each b_c GIVEN the data, i.e. how far THIS site,
+#      THIS design, THIS row sits from the average once sampling noise has
+#      been allowed for (the BLUPs, or "partial pooling" estimates)
+#
+#          b_c_hat = tau_c^2 Z_c' Sigma^-1 (y - X beta_hat)
+#
+#      -> random_effects()
+#
+# Both CONDITION on the fitted variance components tau_c^2, i.e. treat them as
+# known. The consequences of that are spelled out in random_effects().
+
+
+# Plain-English names for the component keys build_components() produces,
+# used as the keys of the returned objects. "row" is tau_u: the design x site
+# interaction plus anything else specific to one (site, structure) pair.
+_COMPONENT_NAMES = {"tau_d2": "design", "tau_s2": "site", "tau_u2": "row"}
+
+
+def _component_levels(name: str, con: Contrast) -> pd.Index:
+    """The labels of the columns of Z_c, in the SAME order the codes use.
+
+    Getting this order wrong would attach site 7's effect to site 8's label and
+    nothing would complain, so the labels are built exactly the way
+    :attr:`Contrast.g` and :attr:`Contrast.site_codes` build their codes: from
+    the SORTED unique labels, mapped with ``mra.build_codes``.
+    """
+    if name == "tau_d2":
+        return pd.Index(sorted(con.rows["design_group_id"].unique()),
+                        name="design_group_id")
+    if name == "tau_s2":
+        return pd.Index(sorted(con.rows.index.get_level_values("site").unique()),
+                        name="site")
+    if name == "tau_u2":
+        # One level per row: the identity matrix's columns are the rows.
+        return con.y_hat.index
+    raise ValueError(f"unknown component {name!r}")
+
+
+def _fit_V_known(fit: ModelFit) -> np.ndarray:
+    """The sampling covariance the fit was ACTUALLY handed.
+
+    Must match :func:`fit_reml` / :func:`fit_dl` exactly, otherwise the Sigma
+    rebuilt here is not the Sigma that was fitted:
+
+    * REML on a ``diagonal_V`` spec (A1a) -> ``diag(v)``;
+    * DerSimonian-Laird -> ``diag(v)`` always, because DL only ever sees the
+      variance vector (Borenstein Ch. 12, ~pp. 72-75, approximate);
+    * every other REML fit -> the full ``V``.
+    """
+    con = fit.contrast
+    if fit.spec.diagonal_V or fit.estimator == "DL":
+        return con.diag_V()
+    return con.V
+
+
+@dataclass(frozen=True)
+class CovarianceDecomposition:
+    """The marginal covariance of the effect sizes, and every piece of it.
+
+    WHAT IT IS
+    ----------
+    ::
+
+        Sigma = V_known + tau_d^2 Z_d Z_d' + tau_s^2 Z_s Z_s' + tau_u^2 I
+
+    Element by element, for two rows i and k::
+
+        Sigma[i, k] = V_known[i, k]                    sampling error they share
+                    + tau_d^2 * [g[i] == g[k]]         same design?
+                    + tau_s^2 * [sigma[i] == sigma[k]] same site?
+                    + tau_u^2 * [i == k]               same row?
+
+    where ``[.]`` is 1 when the condition holds and 0 otherwise. So:
+
+    * the DIAGONAL is the total variance of one effect size -- sampling
+      variance plus every tau^2 that applies to it;
+    * the 3-storey and 5-storey rows at one site are coupled by ``tau_s^2``
+      (plus whatever record sharing puts into ``V_known``);
+    * rows sharing a design are coupled by ``tau_d^2`` and, through the shared
+      fixed-set arm, by the dense ``Z V_bb Z'`` part of ``V_known``;
+    * rows sharing neither are coupled only through ``V_known``.
+
+    An analogy: think of each effect size as a measurement made with several
+    instruments at once. The sampling error is the noise of the instrument;
+    each tau^2 is a "shared cause" that nudges every measurement made at the
+    same site (or with the same design) up or down together. Sigma records,
+    for every pair of measurements, how many shared causes they have.
+
+    Attributes
+    ----------
+    Sigma : ndarray (n, n)
+        The fitted marginal covariance. For REML fits this is checked against
+        ``raw["Sigma"]`` from ``mra.fit_reml`` when it is built.
+    V_known : ndarray (n, n)
+        The sampling part, exactly as the fit used it (full or diagonal).
+    parts : dict of str -> ndarray (n, n)
+        ``tau_c^2 Z_c Z_c'`` per component, keyed ``"design"``, ``"site"``,
+        ``"row"``. ``V_known + sum(parts.values()) == Sigma``.
+    tau2 : dict of str -> float
+        The fitted variance components, keyed as ``parts``.
+    Z : dict of str -> ndarray (n, L_c)
+        The factor (indicator) matrices, keyed as ``parts``.
+    levels : dict of str -> Index
+        The label of each column of ``Z[c]``: design ids, site ids, row labels.
+    row_index : Index
+        The label of each row of ``Sigma``.
+    """
+
+    Sigma: np.ndarray
+    V_known: np.ndarray
+    parts: dict[str, np.ndarray]
+    tau2: dict[str, float]
+    Z: dict[str, np.ndarray]
+    levels: dict[str, pd.Index]
+    row_index: pd.Index
+
+    def correlation(self) -> pd.DataFrame:
+        """``Sigma`` rescaled to a correlation matrix, labelled by row.
+
+        ``R[i, k] = Sigma[i, k] / sqrt(Sigma[i, i] * Sigma[k, k])``. Easier to
+        read than Sigma itself: it says directly how strongly two effect sizes
+        move together, on a 0-1 scale.
+        """
+        sd = np.sqrt(np.diag(self.Sigma))
+        return pd.DataFrame(self.Sigma / np.outer(sd, sd),
+                            index=self.row_index, columns=self.row_index)
+
+    def variance_table(self) -> pd.DataFrame:
+        """The DIAGONAL of Sigma, split into its sources, one row per effect size.
+
+        Columns: ``sampling`` (``V_known[i, i]``), one column per component
+        (``tau_c^2``, the same for every row), ``total`` (``Sigma[i, i]``), and
+        ``share_<source>`` = that source / total.
+
+        The shares answer "how much of the uncertainty about THIS effect size is
+        sampling noise, and how much is real between-study variation, by
+        source". Their mean over rows is a descriptive summary, not an estimate
+        of anything -- and, as nb 073 section 2.2.3 warns, the between-source
+        shares depend on how widely the sites and designs in THIS study were
+        sampled (Gelman & Hill Ch. 21, ~pp. 459-463, approximate).
+        """
+        out = pd.DataFrame({"sampling": np.diag(self.V_known)}, index=self.row_index)
+        for name, part in self.parts.items():
+            out[name] = np.diag(part)
+        out["total"] = np.diag(self.Sigma)
+        for col in ["sampling", *self.parts]:
+            out[f"share_{col}"] = out[col] / out["total"]
+        return out
+
+
+def marginal_covariance(fit: ModelFit) -> CovarianceDecomposition:
+    """Rebuild the fitted marginal covariance ``Sigma`` of a fit, piece by piece.
+
+    ``Sigma = V_known + sum_c tau_c^2 Z_c Z_c'`` -- see
+    :class:`CovarianceDecomposition` for what each piece means.
+
+    The Z matrices come from :func:`build_components`, i.e. from the SAME code
+    the fit used, and ``V_known`` from :func:`_fit_V_known`, which mirrors the
+    fit's choice of full or diagonal. For a REML fit the result is then checked
+    against the ``Sigma`` that ``mra.fit_reml`` returned: if the two disagree,
+    this function is not describing the model that was fitted, and it says so
+    rather than returning a plausible-looking wrong answer.
+
+    Works for DL fits too (one component, ``tau_u``, and a diagonal V_known),
+    which makes it the same object for every rung.
+
+    Parameters
+    ----------
+    fit : ModelFit
+        Any fitted rung, e.g. ``fits["A0c"]``.
+
+    Returns
+    -------
+    CovarianceDecomposition
+    """
+    con = fit.contrast
+    V_known = np.asarray(_fit_V_known(fit), dtype=float)
+
+    # build_components returns {"tau_d2": (Z_d, 0.0), "tau_s2": (Z_s, 0.0),
+    # "tau_u2": (I, 0.0)} -- the placeholder 0.0s are the simulator's tau_true
+    # and are ignored here. Only the components THIS spec asked for are present.
+    comps = build_components(fit.spec, con)
+
+    Z, parts, tau2, levels = {}, {}, {}, {}
+    Sigma = V_known.copy()
+    for key, (factor, _) in comps.items():
+        name = _COMPONENT_NAMES[key]
+        factor = np.asarray(factor, dtype=float)
+        # The fitted tau^2 for this component. fit.tau2 is keyed by the same
+        # "tau_d2"/"tau_s2"/"tau_u2" names build_components produces; a missing
+        # key would mean the spec and the fit disagree, so fail loudly.
+        if key not in fit.tau2:
+            raise KeyError(f"{fit.model_id}: component {key!r} is in the spec but not "
+                           f"in the fitted tau2 {sorted(fit.tau2)}")
+        t2 = float(fit.tau2[key])
+        Z[name] = factor
+        tau2[name] = t2
+        # G_c = Z_c Z_c' has a 1 wherever two rows share a level of c.
+        parts[name] = t2 * (factor @ factor.T)
+        levels[name] = _component_levels(key, con)
+        Sigma = Sigma + parts[name]
+
+    # For REML the fitter kept its own Sigma: the two must be the same matrix.
+    # (DL keeps no Sigma, and its tau2 is the DL moment estimate, so there is
+    # nothing to compare against.)
+    fitted_Sigma = fit.raw.get("Sigma")
+    if fitted_Sigma is not None and not np.allclose(Sigma, fitted_Sigma,
+                                                    rtol=1e-10, atol=1e-14):
+        raise RuntimeError(
+            f"{fit.model_id} [{fit.estimator}]: the rebuilt Sigma does not match the "
+            f"one mra.fit_reml returned (max |diff| "
+            f"{np.max(np.abs(Sigma - fitted_Sigma)):.2e}). The spec, V_known or the "
+            "component order has drifted from the fit.")
+
+    return CovarianceDecomposition(Sigma=Sigma, V_known=V_known, parts=parts,
+                                   tau2=tau2, Z=Z, levels=levels,
+                                   row_index=con.y_hat.index)
+
+
+@dataclass(frozen=True)
+class RandomEffects:
+    """The estimated effect of every site, design and row, and the leftover noise.
+
+    Attributes
+    ----------
+    effects : dict of str -> DataFrame
+        One frame per variance component, keyed ``"design"``, ``"site"``,
+        ``"row"`` (only the components the spec has). One row per LEVEL of that
+        component (51 designs, 60 sites, 120 rows), with columns
+
+        ``effect``       b_hat, on the log scale
+        ``se``           sqrt of the prediction-error variance (see below)
+        ``lo``, ``hi``   effect -/+ z * se
+        ``ratio``        exp(effect): "this site multiplies the ratio by ..."
+        ``ratio_lo``, ``ratio_hi``
+        ``reliability``  1 - PEV / tau^2, in [0, 1]: how much the data pin
+                         this level down (0 = not at all, estimate is 0)
+        ``n_rows``       rows that belong to this level
+    rows : DataFrame
+        One row per effect size: ``y``, the fixed part ``fixed`` = x_i' beta_hat,
+        one column per component giving that component's contribution to this
+        row (``design`` = d_hat_{g[i]}, ``site`` = s_hat_{sigma[i]}, ``row`` =
+        u_hat_i), ``sampling`` = eps_hat_i, and the factor columns. By
+        construction ``y == fixed + design + site + row + sampling`` exactly.
+    covariance : CovarianceDecomposition
+        The Sigma these were computed from.
+    alpha : float
+        The level the ``lo``/``hi`` bands were built at.
+    """
+
+    effects: dict[str, pd.DataFrame]
+    rows: pd.DataFrame
+    covariance: CovarianceDecomposition
+    alpha: float
+
+    def __getitem__(self, name: str) -> pd.DataFrame:
+        """``re["site"]`` -- the per-level table of one component."""
+        if name not in self.effects:
+            raise KeyError(f"no {name!r} component in this fit - it has "
+                           f"{sorted(self.effects)}")
+        return self.effects[name]
+
+    @property
+    def site(self) -> pd.DataFrame:
+        """The 60 site effects s_hat_k (only for fits with a site component)."""
+        return self["site"]
+
+    @property
+    def design(self) -> pd.DataFrame:
+        """The 51 design effects d_hat_j (only for fits with a design component)."""
+        return self["design"]
+
+    @property
+    def row(self) -> pd.DataFrame:
+        """The row-level effects u_hat_i (the design x site interaction)."""
+        return self["row"]
+
+
+def random_effects(fit: ModelFit, alpha: float = 0.05) -> RandomEffects:
+    """Estimate every random effect of a fitted model: sites, designs, rows.
+
+    THE QUESTION
+    ------------
+    tau_s = 0.086 says the SITES differ from one another by about 9 % on
+    average. It does not say WHICH sites sit high and which sit low. This
+    function answers that: one number per site (and per design, and per row),
+    with an uncertainty.
+
+    THE ESTIMATE (BLUP / partial pooling)
+    -------------------------------------
+    Because every b_c and y are jointly normal, the best estimate of b_c given
+    the data is its conditional mean (BDA3 Appendix A, the conditional-normal
+    formula, ~p. 580, approximate). With ``Cov(b_c, y) = tau_c^2 Z_c'``::
+
+        E[b_c | y] = Cov(b_c, y) Sigma^-1 (y - X beta)
+                   = tau_c^2 Z_c' Sigma^-1 r,        r = y - X beta_hat
+
+    once the unknown beta is replaced by its GLS estimate. This is Henderson's
+    best linear unbiased predictor (BLUP). The sampling-noise share of each
+    residual comes out the same way, with ``Cov(eps, y) = V_known``::
+
+        eps_hat = V_known Sigma^-1 r
+
+    Adding them up gives back the residual EXACTLY, because
+    ``V_known + sum_c tau_c^2 Z_c Z_c' = Sigma``::
+
+        sum_c Z_c b_hat_c + eps_hat = Sigma Sigma^-1 r = r .
+
+    So every effect size splits into ``fixed + design + site + row + sampling``
+    with nothing left over; :attr:`RandomEffects.rows` shows that split and it
+    is asserted here. And when X contains an intercept, the GLS normal
+    equations give ``1' Sigma^-1 r = 0``, so every component's effects sum to
+    exactly zero over its levels (``Z_c`` has one 1 per row, so
+    ``1' Z_c' = 1'``) -- also asserted.
+
+    WHY THE ESTIMATES ARE "SHRUNK"
+    ------------------------------
+    In the simplest case -- one site, its own rows independent, nothing else --
+    the formula reduces to (Gelman & Hill Ch. 12.2 eq. 12.1, ~p. 253; BDA3
+    eq. 5.17, ~p. 116; both approximate)::
+
+        s_hat_k = [tau_s^2 / (tau_s^2 + v_k / n_k)] * (mean residual at site k)
+
+    The bracket is between 0 and 1. A site measured precisely (small v_k)
+    keeps nearly all of its raw deviation; a noisy one is pulled towards zero,
+    because much of its deviation is probably noise. An analogy: a teacher
+    judging a new pupil from two test scores does not take an extreme score at
+    face value, but pulls it part-way back towards the class average -- more so
+    the fewer and noisier the tests. In the crossed model the same logic runs
+    through Sigma^-1, which also allows for the sampling errors and effects
+    that rows share.
+
+    THE UNCERTAINTY (prediction-error variance)
+    -------------------------------------------
+    With ``P = Sigma^-1 - Sigma^-1 X (X' Sigma^-1 X)^-1 X' Sigma^-1`` (the
+    REML projection matrix, which also removes the part of y used to estimate
+    beta)::
+
+        Var(b_hat_c)       = tau_c^4 Z_c' P Z_c
+        Var(b_hat_c - b_c) = tau_c^2 I - tau_c^4 Z_c' P Z_c     (PEV)
+
+    ``se`` is the square root of the diagonal of the PEV: how far the TRUE
+    effect of this site is likely to be from the estimate. It includes the
+    uncertainty from estimating beta, but NOT that from estimating tau_c^2.
+
+    ``reliability = 1 - PEV / tau_c^2 = Var(b_hat) / tau_c^2`` reads as "what
+    fraction of this level's true variation the data have captured". Near 1:
+    the data determine this site well. Near 0: the estimate is close to zero
+    simply because the data say little about this site.
+
+    CAVEATS -- READ BEFORE PLOTTING
+    -------------------------------
+    * The tau_c^2 are treated as known. The ``se`` are therefore somewhat too
+      small, most so for components estimated from few levels. The Bayesian
+      route (A4/A5) removes this; the outer bootstrap does not, since it holds
+      the tau^2 structure fixed too.
+    * A component fitted at tau_c^2 = 0 (tau_d in A0c/A1c) has every effect
+      EXACTLY zero with se zero. That is the model's statement that the data
+      show no design-to-design variation, not a numerical failure.
+    * Shrinkage pulls the estimates towards zero, and it pulls noisy levels
+      further. So a plot of s_hat against a covariate shows the PATTERN
+      faithfully but understates the SLOPE, and regressing the s_hat on a
+      covariate is not a substitute for putting the covariate in X (Gelman &
+      Hill Ch. 12.6, ~pp. 265-269, approximate). Use the plot to look, and the
+      meta-regression to measure.
+    * For that look, take the effects from the model WITHOUT the covariate
+      (e.g. A0c or A1c), so nothing has been absorbed yet. From a model WITH
+      covariates (A3a) the effects are what the covariates leave unexplained --
+      useful for checking whether a relationship is gone.
+    * The spread of the estimates is SMALLER than tau_c (shrinkage again):
+      roughly ``var(b_hat) + mean(PEV) ~ tau_c^2``. Do not compare the SD of
+      the s_hat with tau_s and conclude the fit is wrong.
+
+    Parameters
+    ----------
+    fit : ModelFit
+        Any fitted rung. REML fits are the intended use; a DL fit gives the
+        two-level version (one ``row`` component, diagonal V_known).
+    alpha : float
+        For the ``lo``/``hi`` bands: effect -/+ z_{1-alpha/2} * se. These are
+        normal-theory bands conditional on tau^2, not confidence intervals in
+        the bootstrap sense used for m.
+
+    Returns
+    -------
+    RandomEffects
+
+    Examples
+    --------
+    >>> re = fits["A0c"].random_effects()
+    >>> re.site.sort_values("effect").head()          # the lowest sites
+    >>> re.rows[["y", "fixed", "site", "row", "sampling"]].head()
+    >>> cov = fits["A0c"].covariance()
+    >>> cov.variance_table().filter(like="share_").mean()
+    """
+    con = fit.contrast
+    cov = marginal_covariance(fit)
+
+    # The fixed part, exactly as the fit built it (intercept + centred/scaled
+    # covariates), and the marginal residual r = y - X beta_hat.
+    X, _, _ = build_X(fit.spec, con)
+    y = con.y_hat.to_numpy(dtype=float)
+    fixed = X @ fit.beta
+    r = y - fixed
+
+    # Every product below needs Sigma^-1 applied to something. Solve rather
+    # than invert where only a product is needed: it is cheaper and more
+    # accurate. Sigma is symmetric positive definite, so np.linalg.solve is
+    # safe; n = 120 makes speed irrelevant.
+    Si_r = np.linalg.solve(cov.Sigma, r)          # Sigma^-1 r
+    Si_X = np.linalg.solve(cov.Sigma, X)          # Sigma^-1 X
+    XtSiX_inv = np.linalg.inv(X.T @ Si_X)         # (X' Sigma^-1 X)^-1 = Var(beta_hat)
+
+    # The sampling share of each residual, eps_hat = V_known Sigma^-1 r.
+    eps_hat = cov.V_known @ Si_r
+
+    z = stats.norm.ppf(1 - alpha / 2)
+    effects: dict[str, pd.DataFrame] = {}
+    row_parts: dict[str, np.ndarray] = {}
+
+    for name, Zc in cov.Z.items():
+        t2 = cov.tau2[name]
+
+        # --- the BLUP: b_hat_c = tau_c^2 Z_c' Sigma^-1 r ------------------------
+        b_hat = t2 * (Zc.T @ Si_r)
+
+        # --- its prediction-error variance ------------------------------------
+        # Z_c' P Z_c without forming the n x n matrix P:
+        #   Z' P Z = Z' Sigma^-1 Z  -  (Z' Sigma^-1 X)(X' Sigma^-1 X)^-1 (X' Sigma^-1 Z)
+        Si_Z = np.linalg.solve(cov.Sigma, Zc)                 # Sigma^-1 Z_c
+        ZtPZ = Zc.T @ Si_Z - (Zc.T @ Si_X) @ XtSiX_inv @ (Si_X.T @ Zc)
+        pev = t2 * np.eye(Zc.shape[1]) - t2 ** 2 * ZtPZ
+        # PEV is a variance, so any negative diagonal is round-off (it happens
+        # when tau^2 is at or near zero); clip it rather than take sqrt(-1e-18).
+        pev_diag = np.clip(np.diag(pev), 0.0, None)
+        se = np.sqrt(pev_diag)
+
+        # reliability = 1 - PEV / tau^2; undefined when tau^2 = 0, where the
+        # data have nothing to say (and the effect is 0 by construction).
+        with np.errstate(invalid="ignore", divide="ignore"):
+            reliability = np.where(t2 > 0, 1.0 - pev_diag / t2, np.nan)
+
+        effects[name] = pd.DataFrame({
+            "effect": b_hat,
+            "se": se,
+            "lo": b_hat - z * se,
+            "hi": b_hat + z * se,
+            "ratio": np.exp(b_hat),
+            "ratio_lo": np.exp(b_hat - z * se),
+            "ratio_hi": np.exp(b_hat + z * se),
+            "reliability": reliability,
+            "n_rows": Zc.sum(axis=0).astype(int),
+        }, index=cov.levels[name])
+
+        # This component's contribution to each row: Z_c b_hat_c, i.e.
+        # d_hat_{g[i]}, s_hat_{sigma[i]} or u_hat_i.
+        row_parts[name] = Zc @ b_hat
+
+    # --- the per-row split: y = fixed + sum of components + sampling -----------
+    rows = pd.DataFrame({"y": y, "fixed": fixed}, index=con.y_hat.index)
+    for name, part in row_parts.items():
+        rows[name] = part
+    rows["sampling"] = eps_hat
+    # Carry the factors so the table can be grouped, coloured or joined to
+    # covariates without another lookup. Only the columns that exist at this
+    # scope (a group-scope contrast has no site column).
+    for col in ("design_group_id", "structure_id", "n_storeys"):
+        if col in con.rows.columns:
+            rows[col] = con.rows[col].to_numpy()
+
+    # --- the two exact identities (see the docstring) ---------------------------
+    rebuilt = rows["fixed"] + sum(rows[name] for name in row_parts) + rows["sampling"]
+    if not np.allclose(rebuilt.to_numpy(), y, rtol=0, atol=1e-10):
+        raise RuntimeError(
+            f"{fit.model_id}: fixed + random + sampling does not reproduce y "
+            f"(max |diff| {np.max(np.abs(rebuilt.to_numpy() - y)):.2e}); "
+            "Sigma and the components disagree.")
+    has_intercept = np.allclose(X[:, 0], 1.0)
+    if has_intercept:
+        for name, frame in effects.items():
+            total = frame["effect"].sum()
+            if abs(total) > 1e-8:
+                raise RuntimeError(
+                    f"{fit.model_id}: the {name} effects sum to {total:.2e}, not 0. "
+                    "With an intercept they must (1' Sigma^-1 r = 0); beta_hat does "
+                    "not appear to be the GLS estimate for this Sigma.")
+
+    return RandomEffects(effects=effects, rows=rows, covariance=cov, alpha=alpha)
 
 
 # =============================================================================
@@ -1939,13 +3791,26 @@ def _style(defaults: dict, overrides: dict | None, artist_cls) -> dict:
     return out
 
 
-class ModelRegistry:
+class ModelRegistry(fcache.FitCacheMixin):
     """Every fit for one container, keyed by roadmap id. Refuses silent overwrites.
 
     The direct answer to the rebinding problem: in nb 073, re-running the A1
     block after A2 leaves the numbers of A2 sitting in variables named as though
     they belonged to A1, and nothing complains. Here a second ``fit("A1a")``
     raises unless ``overwrite=True`` is passed.
+
+    On-disk cache
+    -------------
+    Pass ``cache_dir`` and :meth:`fit` looks on disk first: a saved fit whose
+    inputs are unchanged is LOADED (minutes of bootstrap saved), anything else
+    is fitted and SAVED. Without ``cache_dir`` nothing is read or written and
+    :meth:`fit` is exactly what it always was. The rules -- what makes a file
+    valid, why a 5000-replicate file serves a 200-replicate request, the folder
+    layout -- are in the docstring of :mod:`phd_project.scripts.fit_cache`.
+    ``cache_tag`` separates two containers that share ``im_tag``, quantity and
+    storeys but hold different data (nb 034's ``theta`` and ``theta_star``);
+    without it they would overwrite each other's files on every run. ``None``
+    and ``""`` both mean no tag.
 
     Examples
     --------
@@ -1954,31 +3819,65 @@ class ModelRegistry:
     >>> fits.fit("A0a", n_boot=500)
     >>> print(fits["A0a", "REML"].summary())
     >>> fits.table()
+
+    >>> cached = ModelRegistry(theta, cache_dir=FIT_CACHE)
+    >>> for model_id in ["A0a", "A1c"]:
+    ...     cached.fit(model_id, n_boot=theta.k)
+    >>> cached.cache_summary()
     """
 
     def __init__(self, data: FragilityData,
-                 specs: dict[str, ModelSpec] | None = None):
+                 specs: dict[str, ModelSpec] | None = None, *,
+                 cache_dir: Path | str | None = None,
+                 cache_tag: str | None = None):
         self.data = data
         self.specs = dict(MODEL_SPECS if specs is None else specs)
         self._fits: dict[tuple[str, str], ModelFit] = {}
-        self._contrasts: dict[str, Contrast] = {}
+        # Keyed on (name, corrected). Keyed on the name alone, the corrected
+        # and uncorrected versions of a contrast would share one slot, and a
+        # `_bc` fit could silently reuse the uncorrected contrast (or the
+        # reverse), depending only on which was fitted first.
+        self._contrasts: dict[tuple[str, bool], Contrast] = {}
+        # Cache state: cache_dir, cache_tag, cache_log (fit_cache.FitCacheMixin).
+        self._init_fit_cache(cache_dir, cache_tag)
+        # Contrast fingerprint entries, memoised on the same key as _contrasts:
+        # hashing the 120 x 5000 replicate matrix once per contrast, not once
+        # per model and estimator.
+        self._contrast_fp: dict[tuple[str, bool], dict] = {}
+        self._container_hash: str | None = None
 
     # -- contrasts, memoised so V is computed once per contrast -------------
 
-    def contrast(self, name: str) -> Contrast:
-        """The contrast of this name, built once and cached."""
-        if name not in self._contrasts:
-            self._contrasts[name] = make_contrast(self.data, name)
-        return self._contrasts[name]
+    def contrast(self, name: str, corrected: bool = False) -> Contrast:
+        """The contrast of this name, built once per ``(name, corrected)`` and cached.
+
+        ``corrected`` exists here only so :meth:`fit` can pass the SPEC's flag
+        through. Notebooks choose corrected or uncorrected by choosing a model
+        id (``"A2"`` or ``"A2_bc"``), not by calling this.
+        """
+        key = (name, bool(corrected))
+        if key not in self._contrasts:
+            self._contrasts[key] = make_contrast(self.data, name, corrected=corrected)
+        return self._contrasts[key]
 
     # -- fitting -------------------------------------------------------------
 
     def fit(self, model_id: str, *, n_boot: int | None = None,
             overwrite: bool = False, verbose: bool = False,
+            boot_seed: int = BOOT_SEED, refit: bool = False,
             **kw) -> list[ModelFit]:
         """Fit one rung with every estimator its spec asks for.
 
         This single call replaces the six-cell block nb 073 repeats three times.
+
+        With a ``cache_dir`` on the registry, each estimator is first looked
+        up on disk and loaded if its saved inputs match (one line printed per
+        estimator, saying "loaded" or why it was refitted); otherwise it is
+        fitted and saved. DL and REML are separate files, so a valid DL file
+        is loaded even when REML has to be refitted. A loaded fit is the same
+        object a fresh one would be -- same spec, the registry's own memoised
+        contrast, replicates sliced to ``n_boot`` -- so everything downstream
+        works identically on either.
 
         Parameters
         ----------
@@ -1989,15 +3888,77 @@ class ModelRegistry:
             outer bootstrap, which means no confidence interval and only a
             model-based prediction interval. Pass an int for anything
             reportable. Use all of them (``n_boot=data.k``) for the final run.
+            With the cache, a file saved with at least this many replicates is
+            loaded and sliced; one saved with fewer is refitted.
         overwrite : bool
-            Allow replacing an existing fit of the same id.
+            Allow replacing an existing fit of the same id IN MEMORY. Applies
+            to a loaded fit exactly as to a fitted one: loading never silently
+            replaces what a later cell reports.
+        boot_seed : int
+            Seeds the random-effect draws of a HYBRID-bootstrap spec (an
+            ``_hb`` id). The default is the module constant, so the same id
+            gives the same replicates in every notebook. Has no effect on a
+            record-only spec, whose bootstrap has nothing random in it.
+        refit : bool
+            Ignore what is on disk: fit, and overwrite the saved file. No effect
+            without a ``cache_dir``. Different from ``overwrite``, which is about
+            the in-memory fit.
+
+        There is deliberately no ``bootstrap_scheme`` argument either, for the
+        reason given next for ``corrected``: the scheme is part of the spec.
+
+        There is deliberately no ``corrected`` argument. Whether a fit uses the
+        bias-corrected estimates is a property of its spec (``"A2"`` vs
+        ``"A2_bc"``), so the id alone always identifies the numbers. Passing
+        ``corrected=`` raises TypeError rather than disappearing into ``**kw``.
         """
         if model_id not in self.specs:
             raise KeyError(
                 f"unknown model {model_id!r} - known: {sorted(self.specs)}. "
                 "A new rung is a MODEL_SPECS entry, not a new block of code.")
+        if "corrected" in kw:
+            # Without this guard, `corrected=` would slip through **kw into
+            # mra.fit_reml and fail there with an error that does not say what
+            # went wrong. Worse, if fit_reml ever accepted the keyword, it would
+            # silently make "A2" mean two different things.
+            raise TypeError(
+                f"fit({model_id!r}, corrected=...) is not supported: whether a fit "
+                "uses bias-corrected estimates is part of the model's SPEC, so that "
+                f"an id always means one set of numbers. Fit {model_id + '_bc'!r} "
+                "(its corrected version) instead, adding it to MODEL_SPECS if it "
+                "does not exist yet.")
         spec = self.specs[model_id]
-        con = self.contrast(spec.contrast)
+
+        try:
+            con = self.contrast(spec.contrast, spec.corrected)
+        except KeyError as exc:
+            if not spec.corrected:
+                raise
+            # FragilityData.hat / plugin_offset name the ARM that is missing; this
+            # adds the MODEL, which is what the person running the notebook
+            # actually asked for.
+            raise KeyError(
+                f"{model_id} is a bias-corrected spec, but the data it needs is "
+                f"missing: {exc.args[0] if exc.args else exc}. The bias-corrected "
+                "estimates come from nb 070 section 2.4 via nb 072.") from exc
+
+        if spec.corrected:
+            # theta is never corrected (nb 070 section 2.2 corrects it by zero),
+            # so on a theta container a `_bc` spec reproduces its partner exactly.
+            # Fitted anyway (user decision 2026-10-07), but said out loud, so a
+            # table row labelled "bias-corrected" is not read as a correction
+            # that happened.
+            left, right = con.terms
+            if all((self.data.hat(s) == self.data.hat(s, corrected=True)).all()
+                   for s in (left, right)):
+                warnings.warn(
+                    f"{model_id}: the bias-corrected and uncorrected point estimates "
+                    f"are identical for both arms of {spec.contrast} "
+                    f"(quantity={self.data.quantity!r}), so the correction is a "
+                    f"no-op on the estimate and {model_id} gives the same summary "
+                    f"effect as {model_id.removesuffix('_bc')}. theta is never "
+                    "bias-corrected (nb 070 section 2.2).",
+                    UserWarning, stacklevel=2)
 
         out: list[ModelFit] = []
         for estimator in spec.estimators:
@@ -2009,28 +3970,125 @@ class ModelRegistry:
                     "deliberate, so a re-run cannot silently change what a later "
                     "cell reports.")
 
-            if estimator == "DL":
-                beta, se, tau2, het = fit_dl(con, spec)
-                x_names, scaling, raw = ["intercept"], {}, {}
-            elif estimator == "REML":
-                beta, se, tau2, het, x_names, scaling, raw = fit_reml(con, spec, **kw)
+            # Without a cache this is the original loop body, unchanged; with
+            # one, the same body runs only when no valid file exists.
+            if self.cache_dir is None:
+                fit_obj = self._fit_estimator(spec, con, estimator, n_boot=n_boot,
+                                              verbose=verbose, boot_seed=boot_seed, **kw)
             else:
-                raise ValueError(f"unknown estimator {estimator!r}")
-
-            reps = None
-            if n_boot is not None:
-                if verbose:
-                    print(f"  {model_id} [{estimator}]: outer bootstrap over "
-                          f"{min(n_boot, con.k)} replicates...")
-                reps = bootstrap_fits(con, spec, estimator=estimator, n_boot=n_boot)
-
-            fit_obj = ModelFit(spec=spec, estimator=estimator, contrast=con,
-                               beta=np.atleast_1d(beta), se_beta=np.atleast_1d(se),
-                               tau2=tau2, het=het, replicates=reps,
-                               x_names=x_names, scaling=scaling, raw=raw)
+                fit_obj = self._cached_fit_estimator(
+                    spec, con, estimator, n_boot=n_boot, verbose=verbose,
+                    boot_seed=boot_seed, refit=refit, **kw)
             self._fits[key] = fit_obj
             out.append(fit_obj)
         return out
+
+    def _fit_estimator(self, spec: ModelSpec, con: Contrast, estimator: str, *,
+                       n_boot: int | None, verbose: bool, boot_seed: int,
+                       **kw) -> ModelFit:
+        """One estimator of one spec: full-sample fit, then the outer bootstrap.
+
+        The body of the estimator loop of :meth:`fit`, moved here unchanged so
+        the cache can run it only when needed. It stores nothing; :meth:`fit`
+        does. This method is a root of the code hash
+        (:data:`UNIVARIATE_FIT_CODE_ROOTS`): it builds the ``boot`` record that
+        is saved with the numbers.
+        """
+        model_id = spec.model_id
+        if estimator == "DL":
+            beta, se, tau2, het = fit_dl(con, spec)
+            x_names, scaling, raw = ["intercept"], {}, {}
+        elif estimator == "REML":
+            beta, se, tau2, het, x_names, scaling, raw = fit_reml(con, spec, **kw)
+        else:
+            raise ValueError(f"unknown estimator {estimator!r}")
+
+        reps, boot = None, {}
+        if n_boot is not None:
+            hybrid = spec.bootstrap_scheme == "hybrid"
+            if verbose:
+                print(f"  {model_id} [{estimator}]: outer bootstrap over "
+                      f"{min(n_boot, con.k)} replicates"
+                      f"{' (hybrid)' if hybrid else ''}...")
+            # The full-sample fit goes in because the hybrid scheme draws
+            # its pseudo-data from it (beta_hat and the fitted tau's). The
+            # record-only scheme ignores both extra arguments.
+            reps = bootstrap_fits(con, spec, estimator=estimator, n_boot=n_boot,
+                                  full_fit={"beta": beta, "tau2": tau2},
+                                  boot_seed=boot_seed)
+            # What was actually run, carried on the fit so that no reader of
+            # the replicates has to guess the scheme.
+            boot = {"scheme": spec.bootstrap_scheme,
+                    "seed": boot_seed if hybrid else None,
+                    "zero_levels": tuple(k for k, v in tau2.items() if v == 0.0)
+                    if hybrid else ()}
+
+        return ModelFit(spec=spec, estimator=estimator, contrast=con,
+                        beta=np.atleast_1d(beta), se_beta=np.atleast_1d(se),
+                        tau2=tau2, het=het, replicates=reps,
+                        x_names=x_names, scaling=scaling, raw=raw, boot=boot)
+
+    # -- the on-disk cache (active only with cache_dir) -----------------------
+
+    def cache_path(self, model_id: str, estimator: str) -> Path:
+        """Where ``(model_id, estimator)`` is saved: ``.../<quantity>/<id>_<est>.pkl``."""
+        if self.cache_dir is None:
+            raise ValueError("this registry has no cache_dir")
+        return (fcache.cache_folder(self.cache_dir, self.data, self.cache_tag)
+                / self.data.quantity / f"{model_id}_{estimator}.pkl")
+
+    def _cache_fingerprint(self, spec: ModelSpec, con: Contrast, estimator: str,
+                           kw: dict, boot_seed: int) -> tuple[dict, dict, dict]:
+        """``(fingerprint, meta, code inventory)`` of one ``(spec, estimator)``.
+
+        The five entries of the fit_cache module docstring. Per estimator:
+        DL ignores ``**kw`` (it never reaches fit_dl or the DL bootstrap), so
+        its fingerprint has no ``kw`` entry and a change of ``n_starts`` does
+        not refit it.
+        """
+        ckey = (con.name, bool(con.corrected))
+        if ckey not in self._contrast_fp:
+            self._contrast_fp[ckey] = fcache.contrast_entry(con)
+        digest, inventory = fcache.code_hash(UNIVARIATE_FIT_CODE_ROOTS)
+        fp = fcache.build_fingerprint(
+            contrast=self._contrast_fp[ckey],
+            spec_tuple=fcache.spec_items(spec, frozenset({"note", "estimators"})),
+            code_digest=digest, n_code=len(inventory),
+            kw=dict(kw) if estimator == "REML" else None,
+            boot_seed=boot_seed if spec.bootstrap_scheme == "hybrid" else None)
+        if self._container_hash is None:
+            self._container_hash = fcache.container_hash(self.data)
+        meta = {"model_id": spec.model_id, "estimator": estimator,
+                "im_tag": self.data.im_tag, "quantity": self.data.quantity,
+                "k": con.k, "container_hash": self._container_hash,
+                "versions": fcache.library_versions()}
+        return fp, meta, inventory
+
+    def _cached_fit_estimator(self, spec: ModelSpec, con: Contrast, estimator: str, *,
+                              n_boot: int | None, verbose: bool, boot_seed: int,
+                              refit: bool, **kw) -> ModelFit:
+        """Load ``(spec, estimator)`` from the cache if valid, else fit it and save it."""
+        fp, meta, inventory = self._cache_fingerprint(spec, con, estimator, kw, boot_seed)
+        # The EFFECTIVE count: bootstrap_fits never runs more than the cloud has.
+        want = None if n_boot is None else min(int(n_boot), con.k)
+
+        def from_payload(p: dict) -> ModelFit:
+            # Rebuilt through the constructor with the registry's OWN spec and
+            # memoised contrast: nothing project-specific was pickled, a loaded
+            # fit shares its contrast with every fresh fit, and every
+            # cached_property starts empty.
+            reps, boot = fcache.slice_replicates(p, want)
+            return ModelFit(spec=spec, estimator=estimator, contrast=con,
+                            beta=p["beta"], se_beta=p["se_beta"], tau2=p["tau2"],
+                            het=p["het"], replicates=reps, x_names=p["x_names"],
+                            scaling=p["scaling"], raw=p["raw"], boot=boot)
+
+        return self._load_or_fit(
+            (spec.model_id, estimator), self.cache_path(spec.model_id, estimator),
+            fp, meta, inventory, want, refit,
+            fit_fn=lambda: self._fit_estimator(spec, con, estimator, n_boot=n_boot,
+                                               verbose=verbose, boot_seed=boot_seed, **kw),
+            to_payload=_model_fit_payload, from_payload=from_payload)
 
     # -- access --------------------------------------------------------------
 
@@ -2193,10 +4251,1655 @@ class ModelRegistry:
         ax.set_yticklabels(frame["labels"], fontsize=label_fontsize)
         # ax.set_xscale("log")
         ax.set_xlabel(f"{con.label}   ({con.quantity} ratio)")
-        ax.set_title(f"{model_id} [{fit_obj.estimator}] - {con.label}")
+        # The hybrid tag goes in the title because the CI band means something
+        # different there (population of sites and designs, not these rows).
+        ax.set_title(f"{model_id} [{fit_obj.estimator}] - {con.label}"
+                     f"{'  ' + BC_TAG if fit_obj.corrected else ''}"
+                     f"{'  ' + HB_TAG if fit_obj.hybrid else ''}")
         ax.set_ylim(-1, len(frame))
         mra.style_legend(ax, **{"loc": "best", "fontsize": 7, **(legend_kws or {})})
         return ax
+
+
+# =============================================================================
+# The joint theta / beta model (A8)
+# =============================================================================
+#
+# WHY A JOINT MODEL
+# -----------------
+# At every row, theta_hat and beta_hat come out of ONE fit to ONE set of stripe
+# counts (or capacities), so their sampling errors are correlated. Fitting
+# A0c and A4c separately is fine for each quantity alone, but wrong for any
+# statement about the PAIR -- and the MAFC propagation needs the pair: the
+# correlation between the TRUE theta and beta corrections, with the sampling
+# correlation taken out (analysis_models.md, A8).
+#
+# HOW IT IS BUILT, AND WHY THIS WAY
+# ---------------------------------
+# FragilityData stays ONE quantity per container; that rule is what keeps the
+# arm accessors free of a quantity axis (module docstring). So nothing here
+# generalises the container. Instead two univariate Contrasts -- one from a
+# theta container, one from a beta container -- are PAIRED into a
+# JointContrast, and that pairing is the only place the two quantities meet.
+#
+#     JointContrast.from_pair      stacks (theta; beta), checks the two are
+#                                  replicate-aligned, takes V from np.cov of
+#                                  the stacked 240 x k replicate matrix
+#     JointModelSpec / JOINT_MODEL_SPECS
+#                                  one A8 rung per entry, same "one id, one
+#                                  contrast" rules as MODEL_SPECS
+#     mra.fit_reml_mv              the bivariate REML (pure arrays)
+#     bootstrap_joint_fits         the outer bootstrap, column r of BOTH outcomes
+#     JointModelFit                the result, with T_l, rho_l, rho_tot,
+#                                  Sigma_pred and the MAFC draws
+#     JointModelRegistry           fits keyed by (model_id, "REML"), refusing
+#                                  overwrites, holding the two containers
+#     check_joint_inputs           step 0 of the A8 plan
+#
+# None of the univariate classes is modified, so no univariate result can move.
+
+OUTCOMES: tuple[str, ...] = ("theta", "beta")
+
+# The tag a joint fit carries in place of BC_TAG: only beta is ever corrected
+# (theta is corrected by zero in nb 070 section 2.2), so the tag says so.
+JOINT_BC_TAG = "[beta bias-corrected; theta never]"
+
+
+@dataclass(frozen=True)
+class JointContrast:
+    """One contrast for BOTH quantities, stacked theta-first, with the full joint covariance.
+
+    Built only through :meth:`from_pair`, which is where the alignment checks
+    live.
+
+    Attributes
+    ----------
+    theta, beta : Contrast
+        The two univariate contrasts, kept whole. Everything univariate (row
+        labels, ``g``, ``site_codes``, the factor table, the covariates) is read
+        from them rather than copied, so it cannot drift.
+    y_hat : Series (2n,)
+        Indexed ``(outcome, site, n_storeys)`` -- ``(outcome, design_group_id)``
+        at group scope -- theta block first.
+    y : DataFrame (2n, k)
+        Same index; columns are the replicate labels SHARED by the two outcomes.
+    V : ndarray (2n, 2n)
+        The full sample covariance of ``y``. Its diagonal blocks are exactly
+        ``theta.V`` and ``beta.V``; the off-diagonal block ``V_cross`` is the new
+        information the joint model exists to use.
+    """
+
+    theta: Contrast
+    beta: Contrast
+    y_hat: pd.Series
+    y: pd.DataFrame
+    V: np.ndarray
+
+    @classmethod
+    def from_pair(cls, con_theta: Contrast, con_beta: Contrast) -> "JointContrast":
+        """Stack two univariate contrasts into one joint contrast. Raises on misalignment.
+
+        THE CHECK THAT MATTERS. Column r of ``con_theta.y`` and column r of
+        ``con_beta.y`` must come from the SAME resample, or the cross-covariance
+        computed below is the covariance of two unrelated draws -- i.e. zero up
+        to noise -- and the joint model then silently reports no sampling
+        correlation at all (task hard requirement 3). Labels are compared with
+        ``Index.equals``, which checks values AND order. Nothing is reindexed to
+        "fix" a mismatch: a silent fix is exactly the failure being guarded.
+
+        Labels can agree while the values come from different runs; only the
+        data can show that, and :func:`check_joint_inputs` tests it.
+
+        theta is never bias-corrected, so ``con_theta.corrected`` must be False;
+        a joint ``_bc`` fit corrects beta only (the registry arranges this).
+        """
+        problems = []
+        if con_theta.quantity != "theta" or con_beta.quantity != "beta":
+            problems.append(f"quantities are ({con_theta.quantity!r}, "
+                            f"{con_beta.quantity!r}), expected ('theta', 'beta')")
+        for attr in ("name", "scope", "terms"):
+            if getattr(con_theta, attr) != getattr(con_beta, attr):
+                problems.append(f"{attr} differs: {getattr(con_theta, attr)!r} vs "
+                                f"{getattr(con_beta, attr)!r}")
+        if not con_theta.y_hat.index.equals(con_beta.y_hat.index):
+            problems.append("the row indexes differ (labels or order)")
+        if not con_theta.y.columns.equals(con_beta.y.columns):
+            problems.append(
+                "the replicate columns differ in labels or order, so column r of "
+                "theta and column r of beta are not the same resample and V_cross "
+                "would be meaningless")
+        if con_theta.corrected:
+            problems.append("the theta contrast is bias-corrected, but theta is never "
+                            "corrected (nb 070 section 2.2); build it with "
+                            "corrected=False")
+        if problems:
+            raise ValueError("cannot pair these contrasts:\n  " + "\n  ".join(problems))
+
+        # pd.concat with a dict prepends an "outcome" level and keeps the dict
+        # order, so theta is the first block -- the order fit_reml_mv assumes.
+        y_hat = pd.concat({"theta": con_theta.y_hat, "beta": con_beta.y_hat},
+                          names=["outcome"])
+        y = pd.concat({"theta": con_theta.y, "beta": con_beta.y}, names=["outcome"])
+        # The full sample covariance of the STACKED replicates -- never assembled
+        # from blocks, never given an assumed structure (CLAUDE.md section 2).
+        V = mra.bootstrap_cov(y.to_numpy(dtype=float), rowvar=True)
+        return cls(theta=con_theta, beta=con_beta, y_hat=y_hat, y=y, V=V)
+
+    # -- shape and identity ---------------------------------------------------
+
+    @property
+    def n(self) -> int:
+        """Rows PER OUTCOME (120 for the full study); the stacked length is 2n."""
+        return self.theta.n
+
+    @property
+    def k(self) -> int:
+        return self.y.shape[1]
+
+    @property
+    def name(self) -> str:
+        return self.theta.name
+
+    @property
+    def label(self) -> str:
+        return self.theta.label
+
+    @property
+    def scope(self) -> str:
+        return self.theta.scope
+
+    @property
+    def terms(self) -> tuple[str, str]:
+        return self.theta.terms
+
+    @property
+    def corrected(self) -> dict[str, bool]:
+        """Per outcome, read from the two contrasts -- never stored twice."""
+        return {"theta": self.theta.corrected, "beta": self.beta.corrected}
+
+    # -- the blocks of V --------------------------------------------------------
+    # Named V_theta / V_beta / V_cross, NOT V_tt / V_bb: FragilityData.V_bb
+    # already means the MSA fixed-set covariance, and reusing the name for "the
+    # beta block" would invite a silent mix-up.
+
+    @property
+    def V_theta(self) -> np.ndarray:
+        """(n, n) theta-theta block. Equal to ``self.theta.V`` exactly."""
+        return self.V[:self.n, :self.n]
+
+    @property
+    def V_beta(self) -> np.ndarray:
+        """(n, n) beta-beta block. Equal to ``self.beta.V`` exactly."""
+        return self.V[self.n:, self.n:]
+
+    @property
+    def V_cross(self) -> np.ndarray:
+        """(n, n) theta-beta block: ``Cov_r(y_theta_i, y_beta_k)``.
+
+        DENSE on the real data, not diagonal: rows sharing a design share the
+        IDA arm's theta-beta covariance, and the two structures at a site share
+        records in the SS arm. Its off-diagonal mass is comparable to its
+        diagonal, so per-row correlations alone would badly misdescribe it.
+        """
+        return self.V[:self.n, self.n:]
+
+    # -- sampling correlations ---------------------------------------------------
+
+    @cached_property
+    def r_samp(self) -> pd.Series:
+        """(n,) per-row sampling correlation ``V_cross[i,i] / sqrt(V_theta[i,i] V_beta[i,i])``."""
+        r = np.diag(self.V_cross) / np.sqrt(np.diag(self.V_theta) * np.diag(self.V_beta))
+        return pd.Series(r, index=self.theta.y_hat.index, name="r_samp")
+
+    @property
+    def r_samp_bar(self) -> float:
+        """Mean of :attr:`r_samp`. Report it with the median and range, which can differ a lot."""
+        return float(self.r_samp.mean())
+
+    @property
+    def r_naive(self) -> float:
+        """Pearson correlation of ``y_hat_theta`` and ``y_hat_beta`` across rows.
+
+        The "naive" correlation: true correlation plus sampling correlation plus
+        any shared-arm structure, all mixed. The joint model's rho is what is
+        left when the sampling part is taken out.
+        """
+        return float(np.corrcoef(self.theta.y_hat.to_numpy(float),
+                                 self.beta.y_hat.to_numpy(float))[0, 1])
+
+    def summary(self) -> str:
+        r = self.r_samp
+        tag = f"  {JOINT_BC_TAG}" if self.corrected["beta"] else ""
+        return (f"{self.name} = {self.terms[0]} - {self.terms[1]}  ({self.label}), "
+                f"theta+beta, {self.scope} scope, n={self.n} per outcome, k={self.k}{tag}\n"
+                f"  r_samp mean {r.mean():+.3f}, median {r.median():+.3f}, range "
+                f"{r.min():+.3f} .. {r.max():+.3f};  r_naive {self.r_naive:+.3f}")
+
+
+# -- the joint spec -------------------------------------------------------------
+
+_JOINT_LEVELS: tuple[str, ...] = ("design", "site", "row")
+
+
+@dataclass(frozen=True)
+class JointModelSpec:
+    """One A8 rung. The joint counterpart of :class:`ModelSpec`.
+
+    A separate class rather than extra fields on ModelSpec, because every
+    reader of ModelSpec (build_X, build_components, ModelFit, bootstrap_fits,
+    the forest plot) has scalar semantics; defaulted joint fields there would
+    have to be branched on or silently ignored everywhere.
+
+    Attributes
+    ----------
+    model_id : str
+        The roadmap id, e.g. ``"A8a"``. Disjoint from every MODEL_SPECS id
+        (checked at import).
+    contrast : str
+        A key of ``_CONTRAST_SPECS``. The A8 rungs use ``"y0_avg"``.
+    components : tuple of str
+        Levels beyond the row level, from {"design", "site"}, as in ModelSpec.
+        The row level is always present.
+    correlated : tuple of str
+        The levels whose theta-beta cross term is ESTIMATED, from {"design",
+        "site", "row"}. At the other levels it is fixed at zero.
+    covariates_theta, covariates_beta : tuple of str
+        Fixed-effect covariates, set SEPARATELY per outcome (columns of the
+        contrast factor table, centred and scaled exactly as build_X does).
+    estimators : tuple of str
+        REML only. DerSimonian-Laird has no bivariate form (it is one moment
+        equation, and its Q presupposes a diagonal V), so asking for it raises.
+    note : str
+    corrected : bool
+        Fit on bias-corrected BETA estimates. theta is never corrected. The
+        same rules as ModelSpec apply: an id ends in ``_bc`` exactly when this
+        is True, and a ``_bc`` spec matches its partner in every other field.
+    bootstrap_scheme : {"record", "hybrid"}
+        Which outer bootstrap :meth:`JointModelRegistry.fit` runs; keyword-only,
+        ``"record"`` by default. The same rules as ModelSpec: an id ends in
+        ``_hb`` exactly when this is ``"hybrid"``, and an ``_hb`` spec matches
+        its partner in every field but ``model_id``, this one and ``note``.
+        Every interval on a rho or a T should come from a hybrid fit; see
+        :func:`bootstrap_joint_fits`.
+    """
+
+    model_id: str
+    contrast: str = "y0_avg"
+    components: tuple[str, ...] = ()
+    correlated: tuple[str, ...] = ("row",)
+    covariates_theta: tuple[str, ...] = ()
+    covariates_beta: tuple[str, ...] = ()
+    estimators: tuple[str, ...] = ("REML",)
+    note: str = ""
+    # LAST, as in ModelSpec. Always pass it by keyword.
+    corrected: bool = False
+    # After `corrected` and keyword-only, exactly as in ModelSpec.
+    bootstrap_scheme: str = field(default="record", kw_only=True)
+
+    def __post_init__(self):
+        _check_bootstrap_scheme(self.model_id, self.bootstrap_scheme)
+        if "DL" in self.estimators:
+            raise ValueError(
+                f"{self.model_id}: DerSimonian-Laird is undefined for a bivariate "
+                "model -- it is a single moment equation for a single variance, "
+                "and its Q statistic presupposes a diagonal sampling covariance. "
+                "Joint specs are REML only.")
+        if tuple(self.estimators) != ("REML",):
+            raise ValueError(f"{self.model_id}: unknown estimator(s) {self.estimators}; "
+                             "joint specs take ('REML',)")
+        bad = sorted(set(self.components) - {"design", "site"})
+        if bad:
+            raise ValueError(f"{self.model_id}: unknown components {bad}")
+        missing = sorted(set(self.correlated) - set(self.levels))
+        if missing:
+            raise ValueError(f"{self.model_id}: correlated level(s) {missing} are not "
+                             f"in the model, whose levels are {self.levels}")
+
+    @property
+    def levels(self) -> tuple[str, ...]:
+        """The variance levels, in the order the Gs and the T's are reported."""
+        return (*self.components, "row")
+
+
+JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
+    "A8a": JointModelSpec(
+        "A8a", "y0_avg", components=(), correlated=("row",), note="""
+        Joint theta/beta version of A0b: one row-level 2x2 T_u, intercepts only.
+        Gives rho_tot, the correlation between the TRUE theta and beta
+        corrections with the sampling correlation (V_cross) taken out. Its
+        marginal tau^2's should be close to the A0c / A4c totals; with V_cross
+        set to zero they equal the univariate single-level fits exactly, and
+        with it they move a little, because each outcome's GLS weights now
+        borrow from the other's sampling errors."""),
+    
+    "A8a_bc": JointModelSpec(
+        "A8a_bc", "y0_avg", components=(), correlated=("row",), corrected=True,
+        note="""A8a on bias-corrected beta estimates (theta is never corrected).
+        See A8a and A0c_bc."""),
+    
+    "A8a_hb": JointModelSpec(
+        "A8a_hb", "y0_avg", components=(), correlated=("row",),
+        bootstrap_scheme="hybrid", note="""
+        A8a with the HYBRID outer bootstrap: each replicate is X beta_hat plus
+        new (theta, beta) row-effect pairs drawn from the fitted T_u, plus the
+        record-resample deviations y^(r) - ybar (which carry V_cross). Use this
+        fit, not A8a, for the interval on rho_tot and for mafc_draws(): the
+        record-only replicates inflate every T by the sampling covariance,
+        which pulls their rho towards the sampling correlation and makes the
+        interval too narrow. Its CIs on the two summary effects are
+        SUPERPOPULATION intervals; the intervals for these 120 rows are
+        A8a's."""),
+
+    "A8a_bc_hb": JointModelSpec(
+        "A8a_bc_hb", "y0_avg", components=(), correlated=("row",), corrected=True,
+        bootstrap_scheme="hybrid",note="""A8a on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8a_bc and A8a_hb."""),
+
+    "A8b": JointModelSpec(
+        "A8b", "y0_avg", components=("design", "site"),
+        correlated=("row",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d and
+        rho_u are estimated from levels holding a small share of the variance
+        and are expected to sit on the |rho| = 1 boundary; read their boundary
+        fractions before reading their values."""),
+    
+    "A8b_bc": JointModelSpec(
+        "A8b_bc", "y0_avg", components=("design", "site"),
+        correlated=("row",), corrected=True,
+        note="""A8b on bias-corrected beta estimates. See A8b."""),
+
+    "A8b_hb": JointModelSpec(
+        "A8b_hb", "y0_avg", components=("design", "site"),
+        correlated=("row",), bootstrap_scheme="hybrid",
+        note="""A8b on hybrid bootstrap estimates. See A8b."""),
+
+    "A8b_bc_hb": JointModelSpec(
+        "A8b_bc_hb", "y0_avg", components=("design", "site"),
+        correlated=("row",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8b on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8b_bc and A8b_hb."""),
+
+    "A8c": JointModelSpec(
+        "A8c", "y0_avg", components=("design", "site"),
+        correlated=("design", "site", "row"), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d and
+        rho_u are estimated from levels holding a small share of the variance
+        and are expected to sit on the |rho| = 1 boundary; read their boundary
+        fractions before reading their values."""),
+    
+    "A8c_bc": JointModelSpec(
+        "A8c_bc", "y0_avg", components=("design", "site"),
+        correlated=("design", "site", "row"), corrected=True,
+        note="""A8c on bias-corrected beta estimates. See A8c."""),
+
+    "A8c_hb": JointModelSpec(
+        "A8c_hb", "y0_avg", components=("design", "site"),
+        correlated=("design", "site", "row"), bootstrap_scheme="hybrid",
+        note="""A8c on hybrid bootstrap estimates. See A8c."""),
+
+    "A8c_bc_hb": JointModelSpec(
+        "A8c_bc_hb", "y0_avg", components=("design", "site"),
+        correlated=("design", "site", "row"), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8c on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8c_bc and A8c_hb."""),
+}
+
+
+def _check_joint_model_specs(specs: dict[str, JointModelSpec],
+                             univariate: dict[str, ModelSpec]) -> None:
+    """Enforce "one id, one contrast" on the joint table. Raises ValueError.
+
+    1. Every rule of :func:`_check_model_specs` (key == id, ``_bc`` <=>
+       corrected, a ``_bc`` spec equal to its partner except in model_id,
+       corrected and note).
+    2. No id appears in both tables, so an id always names one fit whichever
+       registry it is looked up in.
+    3. Each covariate list is free of duplicates (a repeated column makes X
+       singular, and the error would otherwise surface deep inside the fit).
+    """
+    _check_model_specs(specs)
+    problems = []
+    clash = sorted(set(specs) & set(univariate))
+    if clash:
+        problems.append(f"ids {clash} are in both MODEL_SPECS and JOINT_MODEL_SPECS")
+    for key, spec in specs.items():
+        for q in OUTCOMES:
+            covs = getattr(spec, f"covariates_{q}")
+            if len(set(covs)) != len(covs):
+                problems.append(f"{key!r}: covariates_{q} has duplicates")
+    if problems:
+        raise ValueError("JOINT_MODEL_SPECS is inconsistent:\n  " + "\n  ".join(problems))
+
+
+_check_joint_model_specs(JOINT_MODEL_SPECS, MODEL_SPECS)
+
+
+# -- building the inputs to mra.fit_reml_mv -------------------------------------
+
+def build_X_joint(spec: JointModelSpec, jcon: JointContrast
+                  ) -> tuple[np.ndarray, list[tuple[str, str]], dict]:
+    """Block-diagonal fixed-effects design ``X = blockdiag(X_theta, X_beta)``.
+
+    Each block is built by :func:`build_X` itself (through a throw-away
+    ModelSpec carrying that outcome's covariates), so the centring and scaling
+    are IDENTICAL to the univariate fits -- which is what lets a joint slope be
+    compared with an A3 slope at all.
+
+    Returns
+    -------
+    X : (2n, p_theta + p_beta)
+    x_names : list of (outcome, name), in the column order of X
+    scaling : {outcome: {covariate: {"mean", "sd"}}}
+    """
+    blocks, x_names, scaling = [], [], {}
+    for q in OUTCOMES:
+        con = getattr(jcon, q)
+        Xq, names, sc = build_X(
+            ModelSpec(f"{spec.model_id}[{q}]", spec.contrast,
+                      covariates=tuple(getattr(spec, f"covariates_{q}"))), con)
+        blocks.append(Xq)
+        x_names += [(q, nm) for nm in names]
+        scaling[q] = sc
+    n = jcon.n
+    X = np.zeros((2 * n, sum(b.shape[1] for b in blocks)))
+    X[:n, :blocks[0].shape[1]] = blocks[0]
+    X[n:, blocks[0].shape[1]:] = blocks[1]
+    return X, x_names, scaling
+
+
+def joint_level_gs(spec: JointModelSpec, jcon: JointContrast) -> dict[str, np.ndarray]:
+    """``{level: G}``, the UNIVARIATE n x n patterns, built the dsim way.
+
+    Goes through :func:`build_components` and ``dsim.build_component_gs``, the
+    same code every univariate REML rung uses, so a joint fit and a univariate
+    fit of the same levels use literally the same Z Z', S S' and I. The
+    Kronecker blocks are built inside ``mra.fit_reml_mv``.
+    """
+    comps = build_components(ModelSpec("_", spec.contrast, components=spec.components),
+                             jcon.theta)
+    Gs, names = dsim.build_component_gs(comps)
+    return {_COMPONENT_NAMES[nm]: G for nm, G in zip(names, Gs)}
+
+
+def fit_reml_joint(jcon: JointContrast, spec: JointModelSpec, **kw) -> tuple:
+    """Full-sample bivariate REML fit. Returns ``(raw, x_names, scaling)``.
+
+    Always the FULL joint V -- there is no diagonal option, because dropping
+    V_cross is precisely the error the joint model exists to avoid.
+    """
+    X, x_names, scaling = build_X_joint(spec, jcon)
+    raw = mra.fit_reml_mv(jcon.y_hat.to_numpy(dtype=float), X, jcon.V,
+                          joint_level_gs(spec, jcon), spec.correlated, **kw)
+    return raw, x_names, scaling
+
+
+def _joint_column(outcome: str, name: str) -> str:
+    """Replicate-frame label of one coefficient, e.g. ``beta_theta_intercept``."""
+    return f"beta_{outcome}_{name}"
+
+
+def joint_level_factors(spec: JointModelSpec, jcon: JointContrast) -> dict[str, np.ndarray]:
+    """``{level: factor (n, K)}``: the indicator matrices behind :func:`joint_level_gs`.
+
+    Built by the same :func:`build_components` call, so the hybrid bootstrap
+    draws its effect pairs on exactly the grouping whose ``factor factor'`` the
+    fit was given as G.
+    """
+    comps = build_components(ModelSpec("_", spec.contrast, components=spec.components),
+                             jcon.theta)
+    return {_COMPONENT_NAMES[nm]: np.asarray(factor, dtype=float)
+            for nm, (factor, _) in comps.items()}
+
+
+def bootstrap_joint_fits(jcon: JointContrast, spec: JointModelSpec, *,
+                         n_boot: int | None = None,
+                         T0: dict[str, np.ndarray] | None = None,
+                         n_starts: int = 1, verbose: bool = False,
+                         full_fit: dict | None = None,
+                         boot_seed: int = BOOT_SEED,
+                         **kw) -> pd.DataFrame:
+    """Refit the joint model in every outer-bootstrap replicate. One row per replicate.
+
+    Column r of ``jcon.y`` is the stacked 2n-vector of replicate r. Its theta
+    and beta halves came from the SAME resample -- JointContrast.from_pair
+    checked their labels -- so the sampling correlation between them is carried
+    into the refits for free, just as the arm coherence is in bootstrap_fits.
+
+    ``V_known``, the Gs and X are held FIXED at their full-sample values, as in
+    :func:`bootstrap_fits` (re-estimating V per replicate needs a double
+    bootstrap, Efron & Tibshirani Ch. 25).
+
+    ``T0`` is the warm start, normally the full-sample optimum, with a single
+    start per replicate: the full-sample fit has already explored the surface
+    with its restarts, and each replicate perturbs it only slightly (the
+    argument of bootstrap_fits). fit_reml_mv floors a warm start away from
+    every boundary, so a component at zero in the full sample is still free to
+    move in each replicate.
+
+    Schemes -- ``spec.bootstrap_scheme`` chooses what is refitted
+    ------------------------------------------------------------
+    The argument is the one in :func:`bootstrap_fits`, and it bites harder here.
+
+    ``"record"`` (the default)
+        Column r of ``jcon.y``. Right for ``m_theta`` / ``m_beta`` and their
+        intervals, conditional on these rows. Every replicate T is inflated by
+        the sampling covariance (two rounds of noise, one accounted for), so
+        the replicate rho's are the correlation of ``T + (sampling part)``:
+        pulled towards the sampling correlation, and far too tightly spread.
+        On A8a the interval for rho_tot came out about 2.4x too narrow.
+    ``"hybrid"``
+        ``dsim.hybrid_pseudo_data_mv``: ``X beta_hat`` plus NEW (theta, beta)
+        effect pairs drawn from the fitted T of each level, plus the stacked
+        record-resample deviations ``y^(r) - ybar``. The deviations carry the
+        whole joint sampling covariance, V_cross included, without modelling
+        it. The replicate T's then centre on the fitted ones, and
+        :meth:`JointModelFit.rho_ci`, ``boundary_fractions`` and
+        ``mafc_draws`` mean what they say. The m intervals become
+        superpopulation ones. Needs ``full_fit`` (the full-sample ``raw``
+        dict). A singular fitted T (|rho| = 1, or a variance at zero) is drawn
+        through ``dsim._psd_root``: the pairs lie on a line, or one of them is
+        zero, and replicates then pile up on that boundary -- read the
+        boundary fractions first.
+
+    ``boot_seed`` seeds the effect draws; same spec, data and seed give
+    identical replicates, and replicate r does not depend on ``n_boot``. The
+    frame's ``attrs`` record ``bootstrap_scheme`` and ``seed``.
+
+    Columns
+    -------
+    ``m_theta``, ``m_beta``           the two intercepts
+    ``beta_<outcome>_<name>``         every coefficient
+    ``T_<level>_tt/_bb/_tb``          every T entry, and ``T_total_tt/_bb/_tb``
+    ``rho_<level>``, ``rho_tot``      NaN where undefined (a variance at 0)
+    ``at_zero_<level>_theta/_beta``, ``rho_at_bound_<level>``
+    ``converged``, ``nll``
+    """
+    columns = list(jcon.y.columns)
+    if n_boot is not None:
+        columns = columns[:n_boot]
+    X, x_names, _ = build_X_joint(spec, jcon)
+    Gs = joint_level_gs(spec, jcon)
+    Y = jcon.y.to_numpy(dtype=float)
+
+    # Hybrid: swap the replicate matrix for the pseudo-data. Everything after
+    # this block is shared, so the two schemes store identical columns. The
+    # record-only path does not enter the block and is exactly what it was.
+    hybrid = spec.bootstrap_scheme == "hybrid"
+    if hybrid:
+        if full_fit is None:
+            raise ValueError(
+                f"{spec.model_id}: the hybrid bootstrap needs the full-sample fit "
+                "(full_fit=raw from mra.fit_reml_mv), because its pseudo-data are "
+                "X beta_hat plus effect pairs drawn from the fitted T's. "
+                "JointModelRegistry.fit passes it.")
+        factors = joint_level_factors(spec, jcon)
+        # The SNAPPED T's of the full-sample fit: the ones its reported Sigma
+        # and beta were computed with.
+        Y = dsim.hybrid_pseudo_data_mv(
+            Y, X @ np.asarray(full_fit["beta"], dtype=float),
+            {lev: (factors[lev], full_fit["T"][lev]) for lev in full_fit["levels"]},
+            seed=boot_seed, n_boot=len(columns))
+
+    out = []
+    report_every = max(len(columns) // 10, 1)
+    for j, col in enumerate(columns):
+        raw = mra.fit_reml_mv(Y[:, j], X, jcon.V, Gs, spec.correlated,
+                              n_starts=n_starts, T0=T0, **kw)
+        row = {_joint_column(q, nm): float(b) for (q, nm), b in zip(x_names, raw["beta"])}
+        row = {"m_theta": row[_joint_column("theta", "intercept")],
+               "m_beta": row[_joint_column("beta", "intercept")], **row}
+        for lev, T in [*raw["T"].items(), ("total", raw["T_total"])]:
+            row |= {f"T_{lev}_tt": float(T[0, 0]), f"T_{lev}_bb": float(T[1, 1]),
+                    f"T_{lev}_tb": float(T[0, 1])}
+        for lev in raw["levels"]:
+            row[f"rho_{lev}"] = raw["rho"][lev]
+            row[f"at_zero_{lev}_theta"], row[f"at_zero_{lev}_beta"] = raw["at_zero"][lev]
+            row[f"rho_at_bound_{lev}"] = raw["rho_at_bound"][lev]
+        row |= {"rho_tot": raw["rho_tot"], "converged": raw["converged"],
+                "nll": raw["nll"]}
+        out.append(row)
+        if verbose and (j + 1) % report_every == 0:
+            print(f"  {spec.model_id}: {j + 1}/{len(columns)} replicates", flush=True)
+    frame = pd.DataFrame(out, index=pd.Index(columns, name="k"))
+    # Metadata only (see bootstrap_fits): no value changes.
+    frame.attrs["bootstrap_scheme"] = spec.bootstrap_scheme
+    frame.attrs["seed"] = boot_seed if hybrid else None
+    return frame
+
+
+# -- the fit object ---------------------------------------------------------------
+
+@dataclass(frozen=True)
+class JointModelFit:
+    """One fitted A8 rung. The joint counterpart of :class:`ModelFit`.
+
+    A separate class because ModelFit's accessors are scalar throughout
+    (``m`` is ``beta[0]``, ``T_sq`` a float, the PI a pair of numbers).
+
+    Attributes
+    ----------
+    spec : JointModelSpec
+    contrast : JointContrast
+    raw : dict
+        The untouched return value of ``mra.fit_reml_mv``.
+    x_names : list of (outcome, name)
+    scaling : {outcome: {covariate: {"mean", "sd"}}}
+    replicates : DataFrame or None
+        From :func:`bootstrap_joint_fits`.
+    estimator : str
+        Always "REML"; kept so the registry key has the same shape as
+        ModelRegistry's.
+    boot : dict
+        How the outer bootstrap was run: ``{"scheme", "seed", "zero_levels"}``,
+        as on :class:`ModelFit`. ``zero_levels`` lists ``(level, outcome)``
+        pairs whose variance was zero in the full-sample fit, where the hybrid
+        scheme drew no effects.
+    """
+
+    spec: JointModelSpec
+    contrast: JointContrast
+    raw: dict
+    x_names: list
+    scaling: dict
+    replicates: pd.DataFrame | None = None
+    estimator: str = "REML"
+    boot: dict = field(default_factory=dict)
+
+    @property
+    def boot_scheme(self) -> str | None:
+        """``"record"`` or ``"hybrid"``; None without an outer bootstrap.
+
+        Read from what was run (:attr:`boot`), not from the spec. A fit built
+        by hand with no ``boot`` reads as record-only, the only scheme that
+        existed before the field did.
+        """
+        if self.replicates is None:
+            return None
+        return self.boot.get("scheme", "record")
+
+    @property
+    def hybrid(self) -> bool:
+        """True when the replicates come from the hybrid bootstrap."""
+        return self.boot_scheme == "hybrid"
+
+    # -- identity -------------------------------------------------------------
+
+    @property
+    def model_id(self) -> str:
+        return self.spec.model_id
+
+    @property
+    def quantity(self) -> str:
+        """``"theta+beta"``, so a joint row can never pass for a univariate one."""
+        return "theta+beta"
+
+    @property
+    def corrected(self) -> dict[str, bool]:
+        return self.contrast.corrected
+
+    @property
+    def n(self) -> int:
+        return self.contrast.n
+
+    # -- fixed effects --------------------------------------------------------
+
+    @property
+    def beta(self) -> np.ndarray:
+        return np.asarray(self.raw["beta"])
+
+    @property
+    def vcov_beta(self) -> np.ndarray:
+        """Model-based covariance of every coefficient (superpopulation: includes the T's)."""
+        return np.asarray(self.raw["vcov_beta"])
+
+    def _pos(self, outcome: str, name: str = "intercept") -> int:
+        return self.x_names.index((outcome, name))
+
+    @property
+    def m(self) -> np.ndarray:
+        """(2,) the two intercepts ``(m_theta, m_beta)``, log scale.
+
+        Covariates are centred, so with covariates these are the corrections at
+        the covariate MEANS.
+        """
+        return self.beta[[self._pos("theta"), self._pos("beta")]]
+
+    def ratio(self) -> np.ndarray:
+        """``exp(m)``: the bivariate correction factor (theta, beta)."""
+        return np.exp(self.m)
+
+    @property
+    def vcov_m(self) -> np.ndarray:
+        """(2, 2) MODEL-BASED covariance of ``m``. See :attr:`vcov_m_boot`."""
+        idx = [self._pos("theta"), self._pos("beta")]
+        return self.vcov_beta[np.ix_(idx, idx)]
+
+    @cached_property
+    def vcov_beta_boot(self) -> np.ndarray | None:
+        """Bootstrap covariance of every coefficient, or None without replicates.
+
+        Finite-population, like ModelFit.se_boot: records resampled, these 60
+        sites and 51 designs held fixed. That is the record-only scheme; on a
+        hybrid fit the effects are redrawn too, so this is the SUPERPOPULATION
+        covariance, comparable with :attr:`vcov_beta`.
+        """
+        if self.replicates is None:
+            return None
+        cols = [_joint_column(q, nm) for q, nm in self.x_names]
+        return np.atleast_2d(np.cov(self.replicates[cols].to_numpy(float), rowvar=False))
+
+    @property
+    def vcov_m_boot(self) -> np.ndarray | None:
+        """(2, 2) bootstrap covariance of ``(m_theta, m_beta)``."""
+        V = self.vcov_beta_boot
+        if V is None:
+            return None
+        idx = [self._pos("theta"), self._pos("beta")]
+        return V[np.ix_(idx, idx)]
+
+    def gamma(self, outcome: str) -> pd.Series:
+        """The slopes of one outcome, per SD of each (centred, scaled) covariate.
+
+        Named gamma, not beta, because beta is the dispersion.
+        """
+        names = [nm for q, nm in self.x_names if q == outcome and nm != "intercept"]
+        return pd.Series([self.beta[self._pos(outcome, nm)] for nm in names],
+                         index=pd.Index(names, name="covariate"), name=f"gamma_{outcome}",
+                         dtype=float)
+
+    def ci(self, outcome: str, alpha: float = 0.05) -> tuple[float, float]:
+        """Percentile bootstrap CI for ``m_<outcome>``, log scale.
+
+        Record-only scheme: where the mean lies for THESE sites and designs.
+        Hybrid scheme: where it lies for the population they were drawn from
+        (wider). See :meth:`ModelFit.ci`.
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id} was fitted without an outer bootstrap - "
+                             "pass n_boot to get a confidence interval")
+        lo, hi = self.replicates[f"m_{outcome}"].quantile([alpha / 2, 1 - alpha / 2])
+        return float(lo), float(hi)
+
+    def coef_table(self, alpha: float = 0.05) -> pd.DataFrame:
+        """One row per coefficient: estimate, model SE, bootstrap SE and percentile CI."""
+        idx = pd.MultiIndex.from_tuples(self.x_names, names=["outcome", "coefficient"])
+        tbl = pd.DataFrame({"estimate": self.beta,
+                            "se_model": np.sqrt(np.diag(self.vcov_beta))}, index=idx)
+        tbl["se_boot"], tbl["ci_lo"], tbl["ci_hi"] = np.nan, np.nan, np.nan
+        if self.replicates is not None:
+            for q, nm in self.x_names:
+                s = self.replicates[_joint_column(q, nm)]
+                lo, hi = s.quantile([alpha / 2, 1 - alpha / 2])
+                tbl.loc[(q, nm), ["se_boot", "ci_lo", "ci_hi"]] = [s.std(ddof=1), lo, hi]
+        return tbl
+
+    # -- variance components and correlations -------------------------------
+
+    @property
+    def levels(self) -> list[str]:
+        return list(self.raw["levels"])
+
+    @property
+    def T(self) -> dict[str, np.ndarray]:
+        """``{level: 2x2}``, each PSD by construction (Cholesky parameterisation)."""
+        return self.raw["T"]
+
+    @property
+    def T_total(self) -> np.ndarray:
+        """``sum_l T_l``: the total between-row covariance of the true corrections."""
+        return self.raw["T_total"]
+
+    @property
+    def rho(self) -> dict[str, float]:
+        """Per-level correlation. NaN where undefined (a variance at zero).
+
+        A level NOT in ``spec.correlated`` reports 0.0 because its cross term is
+        FIXED at zero by the model; the summary says "(fixed)" beside it.
+        """
+        return self.raw["rho"]
+
+    @property
+    def rho_tot(self) -> float:
+        """Correlation of the summed T's -- the overall true-correction correlation."""
+        return self.raw["rho_tot"]
+
+    # -- prediction -------------------------------------------------------------
+
+    def predictive(self, x0_theta: dict | None = None, x0_beta: dict | None = None
+                   ) -> tuple[np.ndarray, np.ndarray]:
+        """Mean and 2x2 covariance of the (theta, beta) correction for a NEW structure.
+
+        ::
+
+            mean  = A beta_hat
+            Sigma = T_total + A Var(beta_hat) A'
+
+        where A (2 x p) holds the new structure's covariate rows -- block-
+        diagonal, the theta row in the theta columns, the beta row in the beta
+        columns -- centred and scaled with the fit's own ``scaling``.
+        ``x0_theta`` / ``x0_beta`` map covariate name -> value in NATURAL
+        units; a covariate left out sits at its mean. With no covariates (or
+        none given) A picks out the intercepts and Sigma = T_total + Var(m).
+
+        Var(beta_hat) is the BOOTSTRAP covariance when replicates exist and the
+        model-based one otherwise (with a warning), the same preference as
+        :meth:`ModelFit.prediction_interval`.
+
+        A new structure has its own effects, so the Var(beta_hat) that belongs
+        here is the SUPERPOPULATION one. The hybrid bootstrap gives exactly
+        that. The record-only bootstrap gives ``W V W'``, which omits the
+        ``W (sum_l T_l kron G_l) W'`` part, so on a record-only fit this Sigma
+        is slightly too small (T_total dominates, so the effect is of the
+        order of 1%). Left as it is by decision (2026-10-13); use the ``_hb``
+        fit for a number that has to be right.
+        """
+        p = len(self.beta)
+        A = np.zeros((2, p))
+        for row, (q, x0) in enumerate((("theta", x0_theta), ("beta", x0_beta))):
+            A[row, self._pos(q)] = 1.0
+            for cov, val in (x0 or {}).items():
+                if (q, cov) not in self.x_names:
+                    raise KeyError(f"{cov!r} is not a {q} covariate of {self.model_id}")
+                sc = self.scaling[q][cov]
+                A[row, self._pos(q, cov)] = (float(val) - sc["mean"]) / sc["sd"]
+        V = self.vcov_beta_boot
+        if V is None:
+            V = self.vcov_beta
+            warnings.warn(f"{self.model_id}: no outer bootstrap, so Sigma_pred uses the "
+                          "model-based Var(beta). Pass n_boot.", RuntimeWarning,
+                          stacklevel=2)
+        return A @ self.beta, self.T_total + A @ V @ A.T
+
+    @property
+    def Sigma_pred(self) -> np.ndarray:
+        """2x2 predictive covariance at the covariate means: ``T_total + Var(m)``.
+
+        For sampling ONE correction pair for a new building from
+        ``N(m, Sigma_pred)``. For a hierarchical draw over bootstrap replicates
+        use :meth:`mafc_draws` instead -- see its docstring for why Var(m) must
+        not be added there.
+        """
+        return self.predictive()[1]
+
+    # -- diagnostics passed through from the contrast -----------------------
+
+    @property
+    def r_samp(self) -> pd.Series:
+        return self.contrast.r_samp
+
+    @property
+    def r_samp_bar(self) -> float:
+        return self.contrast.r_samp_bar
+
+    @property
+    def r_naive(self) -> float:
+        return self.contrast.r_naive
+
+    # -- covariates: explained vs residual covariance ---------------------------
+
+    def explained_covariance(self) -> dict[str, pd.DataFrame | float]:
+        """Split the total between-row covariance into covariate-explained and residual.
+
+        With covariates, the true correction of row i is
+        ``x_i' gamma + (random effects)``, so across rows::
+
+            Cov(true theta, true beta) = gamma_theta' S_x gamma_beta + T_total
+                                         \\__ explained ________/   \\_ residual
+
+        where S_x is the sample covariance of the covariates. The two outcomes
+        may use different sets, so S_x is taken over the UNION of the two sets
+        and each slope vector is zero-padded to it (a covariate absent from an
+        outcome has slope 0 there). Slopes are per SD and S_x is computed on the
+        same standardised columns, so the units match. rho_res is the residual
+        correlation; that is the number the MAFC propagation uses.
+
+        Returns ``{"explained", "residual", "total"}`` as labelled 2x2 frames,
+        plus ``"share_cov_explained"`` and the three correlations
+        ``rho_explained``, ``rho_res`` and ``rho_total``.
+        """
+        g_t, g_b = self.gamma("theta"), self.gamma("beta")
+        union = list(dict.fromkeys([*g_t.index, *g_b.index]))
+        if not union:
+            raise ValueError(f"{self.model_id} has no covariates - nothing is explained")
+        rows = self.contrast.theta.rows
+        Zx = np.column_stack([(rows[c].to_numpy(float) - rows[c].mean())
+                              / rows[c].std(ddof=1) for c in union])
+        S_x = np.atleast_2d(np.cov(Zx, rowvar=False))
+        G = np.column_stack([g_t.reindex(union).fillna(0.0).to_numpy(),
+                             g_b.reindex(union).fillna(0.0).to_numpy()])
+        explained = G.T @ S_x @ G
+        residual = self.T_total
+        total = explained + residual
+
+        def corr(M):
+            d = np.diag(M)
+            return float(M[0, 1] / np.sqrt(d[0] * d[1])) if np.all(d > 0) else np.nan
+
+        lab = list(OUTCOMES)
+        return {"explained": pd.DataFrame(explained, index=lab, columns=lab),
+                "residual": pd.DataFrame(residual, index=lab, columns=lab),
+                "total": pd.DataFrame(total, index=lab, columns=lab),
+                "share_cov_explained": (float(explained[0, 1] / total[0, 1])
+                                        if total[0, 1] != 0 else np.nan),
+                "rho_explained": corr(explained), "rho_res": corr(residual),
+                "rho_total": corr(total)}
+
+    # -- bootstrap inference on rho ------------------------------------------------
+
+    def rho_ci(self, which: str = "tot", alpha: float = 0.05,
+               method: str = "percentile") -> dict:
+        """Bootstrap interval for one correlation: a level name or ``"tot"``.
+
+        method="percentile"
+            The (alpha/2, 1-alpha/2) quantiles of the defined replicates.
+            Note: a percentile interval computed on Fisher's z = atanh(rho) and
+            mapped back with tanh is IDENTICAL to this one, because percentiles
+            respect monotone transforms (Efron & Tibshirani Ch. 13, ~pp. 170-174,
+            approximate). So that is not offered as a separate "Fisher" method.
+        method="fisher"
+            The normal-theory interval on z::
+
+                tanh( atanh(rho_hat) +/- z_{alpha/2} * sd_r(atanh rho*) )
+
+            Replicates at |rho| = 1 have z = +/- infinity; they are clipped to
+            +/-(1 - 1e-6) first and the clipped fraction is reported. When that
+            fraction is large the interval is not meaningful -- read the
+            percentile interval and the boundary fraction instead.
+
+        Replicates where rho is undefined (a variance at 0) are left out of both,
+        and that fraction is reported too.
+
+        WHICH SCHEME (the returned ``"scheme"`` says). The interval is only
+        sound on a HYBRID fit (an ``_hb`` id), whose replicate T's centre on
+        the fitted ones. On a RECORD-ONLY fit it is provisional: those
+        replicates inflate every T by the sampling covariance, so the
+        replicate rho's are the rho of ``T + (sampling part)``. On A8a that
+        centres the interval near 0 instead of on the estimate and makes it
+        about 2.4x too narrow. See :func:`bootstrap_joint_fits`.
+
+        Even on a hybrid fit, a level whose fitted T is singular (|rho| = 1 or
+        a variance at zero) is drawn singular, and its replicates pile up on
+        that boundary; read :meth:`boundary_fractions` first.
+
+        Returns ``{"lo", "hi", "estimate", "n_used", "frac_undefined",
+        "frac_clipped", "scheme"}``.
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id}: no outer bootstrap - pass n_boot")
+        col = "rho_tot" if which == "tot" else f"rho_{which}"
+        if col not in self.replicates:
+            raise KeyError(f"no {which!r} correlation in {self.model_id}; levels are "
+                           f"{self.levels}")
+        est = self.rho_tot if which == "tot" else self.rho[which]
+        vals = self.replicates[col].to_numpy(float)
+        defined = vals[np.isfinite(vals)]
+        out = {"estimate": est, "n_used": int(defined.size),
+               "frac_undefined": float(1 - defined.size / vals.size),
+               "frac_clipped": np.nan, "lo": np.nan, "hi": np.nan,
+               "scheme": self.boot_scheme}
+        if defined.size < 2 or not np.isfinite(est):
+            return out
+        if method == "percentile":
+            out["lo"], out["hi"] = (float(v) for v in
+                                    np.quantile(defined, [alpha / 2, 1 - alpha / 2]))
+            out["frac_clipped"] = 0.0
+        elif method == "fisher":
+            lim = 1 - 1e-6
+            out["frac_clipped"] = float(np.mean(np.abs(defined) > lim))
+            z = np.arctanh(np.clip(defined, -lim, lim))
+            centre = np.arctanh(np.clip(est, -lim, lim))
+            half = stats.norm.ppf(1 - alpha / 2) * np.std(z, ddof=1)
+            out["lo"], out["hi"] = float(np.tanh(centre - half)), float(np.tanh(centre + half))
+        else:
+            raise ValueError(f"method must be 'percentile' or 'fisher', got {method!r}")
+        return out
+
+    def boundary_fractions(self) -> pd.DataFrame:
+        """Per level, the fraction of replicates on each kind of boundary.
+
+        Columns: ``theta_at_zero``, ``beta_at_zero``, ``rho_undefined`` (either
+        variance at zero) and ``rho_at_bound`` (|rho| within rho_bound_tol of 1).
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id}: no outer bootstrap - pass n_boot")
+        r = self.replicates
+        return pd.DataFrame({
+            lev: {"theta_at_zero": r[f"at_zero_{lev}_theta"].mean(),
+                  "beta_at_zero": r[f"at_zero_{lev}_beta"].mean(),
+                  "rho_undefined": r[f"rho_{lev}"].isna().mean(),
+                  "rho_at_bound": r[f"rho_at_bound_{lev}"].mean()}
+            for lev in self.levels}).T.rename_axis("level")
+
+    def mafc_draws(self) -> pd.DataFrame:
+        """Per-replicate ``(m^(r), T_total^(r))``, plus slopes -- the input to the MAFC step.
+
+        One row per outer-bootstrap replicate: ``m_theta``, ``m_beta``,
+        ``T_total_tt``, ``T_total_bb``, ``T_total_tb`` and every slope.
+
+        HOW TO USE IT, and why it carries T_total and not Sigma_pred. A
+        hierarchical draw -- pick a replicate r, then draw a correction pair
+        from ``N(m^(r), T_total^(r))`` -- already contains Var(m): it IS the
+        spread of m^(r) across r. Drawing from ``N(m^(r), Sigma_pred^(r))``
+        instead would count Var(m) twice. For a single-distribution draw use
+        ``N(fit.m, fit.Sigma_pred)``.
+
+        WHICH SCHEME -- check ``draws.attrs["bootstrap_scheme"]``.
+
+        HYBRID fit (an ``_hb`` id): use the pairs as they are. Each row is one
+        refit of pseudo-data that redraws the effects, so ``m^(r)`` carries the
+        superpopulation uncertainty in the mean, ``T_total^(r)`` is a fair draw
+        of the between-row covariance, and the two are JOINT draws (same
+        refit). This is the frame the MAFC propagation should read.
+
+        RECORD-ONLY fit: the caveat found 2026-10-08 applies. The replicates
+        resample RECORDS only, so each one's data are y_hat plus a second dose
+        of sampling noise while the fit is told about one (V_known), and every
+        replicate T is inflated by roughly the mean sampling variance. On
+        y0_avg the beta variance comes out about 4x too large (replicate mean
+        0.031 against 0.0093). There, pair m^(r) with the full-sample
+        ``fit.T_total`` -- and note that m^(r) then carries only the
+        uncertainty for these rows, which is too little for a new building.
+        """
+        if self.replicates is None:
+            raise ValueError(f"{self.model_id}: no outer bootstrap - pass n_boot")
+        slopes = [_joint_column(q, nm) for q, nm in self.x_names if nm != "intercept"]
+        draws = self.replicates[["m_theta", "m_beta", "T_total_tt", "T_total_bb",
+                                 "T_total_tb", *slopes]].copy()
+        # Set from the FIT, not inherited from the frame: pandas does not
+        # promise to carry attrs through every operation, and this frame is
+        # the one that leaves the module for the MAFC step.
+        draws.attrs["bootstrap_scheme"] = self.boot_scheme
+        draws.attrs["seed"] = self.boot.get("seed")
+        return draws
+
+    # -- reporting -----------------------------------------------------------------
+
+    def to_row(self) -> dict:
+        """One row of :meth:`JointModelRegistry.table`."""
+        row = {"model": self.model_id, "estimator": self.estimator,
+               "quantity": self.quantity, "contrast": self.contrast.name,
+               "corrected": self.corrected["beta"],
+               # Which outer bootstrap the se_boot / ci / rho_tot_ci columns
+               # come from; None if none was run. See ModelFit.to_row.
+               "bootstrap": self.boot_scheme, "n": self.n}
+        se_model = np.sqrt(np.diag(self.vcov_m))
+        se_boot = (np.sqrt(np.diag(self.vcov_m_boot)) if self.vcov_m_boot is not None
+                   else [np.nan, np.nan])
+        for k, q in enumerate(OUTCOMES):
+            row |= {f"ratio_{q}": float(np.exp(self.m[k])), f"m_{q}": float(self.m[k]),
+                    f"se_model_{q}": float(se_model[k]), f"se_boot_{q}": float(se_boot[k])}
+            if self.replicates is not None:
+                lo, hi = self.ci(q)
+                row |= {f"ci_lo_{q}": np.exp(lo), f"ci_hi_{q}": np.exp(hi)}
+        for lev in self.levels:
+            row |= {f"tau_{lev}_theta": float(np.sqrt(self.T[lev][0, 0])),
+                    f"tau_{lev}_beta": float(np.sqrt(self.T[lev][1, 1]))}
+            if lev in self.spec.correlated:
+                row[f"rho_{lev}"] = self.rho[lev]
+        row["rho_tot"] = self.rho_tot
+        if self.replicates is not None:
+            ci = self.rho_ci("tot")
+            row |= {"rho_tot_ci_lo": ci["lo"], "rho_tot_ci_hi": ci["hi"]}
+            bf = self.boundary_fractions()
+            for lev in self.spec.correlated:
+                row[f"frac_bound_rho_{lev}"] = float(bf.loc[lev, "rho_at_bound"]
+                                                     + bf.loc[lev, "rho_undefined"])
+        row |= {"r_samp_bar": self.r_samp_bar, "r_naive": self.r_naive,
+                "converged": self.raw["converged"]}
+        return row
+
+    def summary(self) -> str:
+        """Multi-line report: per outcome, then the correlation block, then the note."""
+        tag = f"  {JOINT_BC_TAG}" if self.corrected["beta"] else ""
+        if self.hybrid:
+            tag += f"  {HB_TAG}"
+        con = self.contrast
+        out = [f"{self.model_id} [{self.estimator}]{tag}  {con.label}  ({con.name} = "
+               f"{con.terms[0]} - {con.terms[1]}, theta+beta, n={self.n} per outcome)"]
+        se_model = np.sqrt(np.diag(self.vcov_m))
+        for k, q in enumerate(OUTCOMES):
+            line = (f"  {q:<5s} summary effect : {np.exp(self.m[k]):.4f}   "
+                    f"(log {self.m[k]:+.4f}, SE superpop. {se_model[k]:.5f}")
+            if self.vcov_m_boot is not None:
+                line += f", SE boot {np.sqrt(self.vcov_m_boot[k, k]):.5f}"
+            out.append(line + ")")
+            if self.replicates is not None:
+                lo, hi = self.ci(q)
+                out.append(f"        95% CI         : {np.exp(lo):.4f} - {np.exp(hi):.4f}"
+                           + ("   <- for the POPULATION of sites and designs "
+                              "(effects redrawn)" if self.hybrid else ""))
+        V_m = self.vcov_m_boot if self.vcov_m_boot is not None else self.vcov_m
+        out.append(f"  corr(m_theta, m_beta) : {V_m[0, 1] / np.sqrt(V_m[0, 0] * V_m[1, 1]):+.3f}"
+                   f"   [{'bootstrap' if self.vcov_m_boot is not None else 'model-based'}]")
+
+        bf = self.boundary_fractions() if self.replicates is not None else None
+        out.append("  between-row covariance, per level (tau as SD; rho = true-correction corr.):")
+        for lev in self.levels:
+            T, (sh_t, sh_b) = self.T[lev], self.raw["share"][lev]
+            z_t, z_b = self.raw["at_zero"][lev]
+            line = (f"    {lev:<6s}  tau_theta {np.sqrt(T[0, 0]):.4f}{' (0)' if z_t else ''}"
+                    f" [{sh_t:5.1%}]  tau_beta {np.sqrt(T[1, 1]):.4f}{' (0)' if z_b else ''}"
+                    f" [{sh_b:5.1%}]  ")
+            if lev not in self.spec.correlated:
+                line += "rho fixed at 0"
+            elif not np.isfinite(self.rho[lev]):
+                line += "rho UNDEFINED (a variance is 0)"
+            else:
+                line += f"rho {self.rho[lev]:+.3f}"
+                if self.raw["rho_at_bound"][lev]:
+                    line += "  <- ON THE |rho| = 1 BOUNDARY"
+                elif min(sh_t, sh_b) < 0.05:
+                    line += "  <- weakly identified (level holds < 5% of a variance)"
+                if bf is not None:
+                    line += (f"   boot: {bf.loc[lev, 'rho_at_bound']:.0%} at bound, "
+                             f"{bf.loc[lev, 'rho_undefined']:.0%} undefined")
+            out.append(line)
+        line = f"  rho_tot          : {self.rho_tot:+.3f}"
+        if self.replicates is not None:
+            p, f = self.rho_ci("tot"), self.rho_ci("tot", method="fisher")
+            line += (f"   95% CI {p['lo']:+.3f} .. {p['hi']:+.3f} (percentile), "
+                     f"{f['lo']:+.3f} .. {f['hi']:+.3f} (Fisher z)")
+        out.append(line)
+        if self.replicates is not None and not self.hybrid:
+            # Only under the record-only scheme: the hybrid replicates are
+            # built so that their T's centre on the fitted ones.
+            out.append("    -> PROVISIONAL: record-only replicates inflate T by the sampling "
+                       "covariance, which biases these intervals (see JointModelFit.rho_ci)")
+        if self.hybrid:
+            r = self.replicates
+            out.append("    -> hybrid replicates: mean T_total "
+                       f"tt {r['T_total_tt'].mean():.5f}, bb {r['T_total_bb'].mean():.5f}, "
+                       f"tb {r['T_total_tb'].mean():+.5f}   against the fitted "
+                       f"{self.T_total[0, 0]:.5f}, {self.T_total[1, 1]:.5f}, "
+                       f"{self.T_total[0, 1]:+.5f} (they should agree, unless a "
+                       "level sits on a boundary)")
+            zero = self.boot.get("zero_levels", ())
+            if zero:
+                out.append("    -> fitted at 0, so drawn at 0: "
+                           + ", ".join(f"{lev} {q}" for lev, q in zero)
+                           + ". Replicates there can only move UP; expect the replicate "
+                           "T_total above the fitted one by that much.")
+        r = self.r_samp
+        out.append(f"  r_samp (per row) : mean {r.mean():+.3f}, median {r.median():+.3f}, "
+                   f"range {r.min():+.3f} .. {r.max():+.3f}   <- SAMPLING correlation")
+        out.append(f"  r_naive          : {self.r_naive:+.3f}   <- corr of the observed "
+                   "y_theta, y_beta: true + sampling, mixed")
+        if any(nm != "intercept" for _, nm in self.x_names):
+            ec = self.explained_covariance()
+            # Covariances rather than "share explained": when the total
+            # cross-covariance is near zero the share is a ratio of two small
+            # numbers and can read +350 %, which says nothing useful.
+            out.append(f"  covariates       : rho_res {ec['rho_res']:+.3f}, rho_explained "
+                       f"{ec['rho_explained']:+.3f}, rho_total {ec['rho_total']:+.3f}; "
+                       f"theta-beta cov explained {ec['explained'].iloc[0, 1]:+.2e}, "
+                       f"residual {ec['residual'].iloc[0, 1]:+.2e}, total "
+                       f"{ec['total'].iloc[0, 1]:+.2e}")
+            out.append(self.coef_table().to_string(float_format=lambda v: f"{v:+.5f}"))
+        out.append(f"  converged {self.raw['converged']}, start spread "
+                   f"{self.raw['start_spread']:.1e}, nll {self.raw['nll']:.4f}")
+        if self.spec.note:
+            out.append("  " + " ".join(self.spec.note.split()))
+        return "\n".join(out)
+
+
+# -- the registry -----------------------------------------------------------------
+
+class JointModelRegistry(fcache.FitCacheMixin):
+    """Every joint (A8) fit for one pair of containers, keyed ``(model_id, "REML")``.
+
+    Separate from :class:`ModelRegistry` so that nothing on the univariate path
+    branches on spec type. It keeps ModelRegistry's contract: the id alone
+    identifies the numbers, a second ``fit`` of the same id raises unless
+    ``overwrite=True``, and ``corrected=`` is refused at fit time (the corrected
+    version of a model is its own ``_bc`` spec).
+
+    ``cache_dir`` / ``cache_tag`` work as on :class:`ModelRegistry`. A joint
+    fit is ONE file per id, ``<...>/joint/<model_id>.pkl``, beside the
+    ``theta/`` and ``beta/`` folders of the same container pair: it covers both
+    quantities, so it belongs to neither. The folder is named from the theta
+    container (the constructor has already checked the two agree on im_tag
+    and rows).
+
+    Examples
+    --------
+    >>> theta = load_fragility_data(root, "AvgSA_03", quantity="theta")
+    >>> beta = load_fragility_data(root, "AvgSA_03", quantity="beta")
+    >>> print(check_joint_inputs(theta, beta)["report"])
+    >>> joint = JointModelRegistry(theta, beta)
+    >>> joint.fit("A8a", n_boot=5000)
+    >>> print(joint["A8a"].summary())
+    """
+
+    def __init__(self, theta_data: FragilityData, beta_data: FragilityData,
+                 specs: dict[str, JointModelSpec] | None = None, *,
+                 cache_dir: Path | str | None = None,
+                 cache_tag: str | None = None):
+        problems = []
+        if (theta_data.quantity, beta_data.quantity) != OUTCOMES:
+            problems.append(f"quantities are ({theta_data.quantity!r}, "
+                            f"{beta_data.quantity!r}), expected ('theta', 'beta')")
+        if theta_data.im_tag != beta_data.im_tag:
+            problems.append(f"im_tags differ: {theta_data.im_tag!r} vs {beta_data.im_tag!r}")
+        if not theta_data.rows.index.equals(beta_data.rows.index):
+            problems.append("the row spines differ (labels or order)")
+        if not theta_data.groups.equals(beta_data.groups):
+            problems.append("the design groups differ")
+        if theta_data.k != beta_data.k:
+            problems.append(f"replicate counts differ: {theta_data.k} vs {beta_data.k}")
+        if problems:
+            raise ValueError("cannot pair these containers:\n  " + "\n  ".join(problems))
+        self.theta_data, self.beta_data = theta_data, beta_data
+        # One ModelRegistry per quantity, used ONLY for its contrast cache, so a
+        # univariate and a joint fit of the same contrast in one notebook share
+        # the very same Contrast objects.
+        self._uni = {"theta": ModelRegistry(theta_data), "beta": ModelRegistry(beta_data)}
+        self.specs = dict(JOINT_MODEL_SPECS if specs is None else specs)
+        self._fits: dict[tuple[str, str], JointModelFit] = {}
+        self._contrasts: dict[tuple[str, bool], JointContrast] = {}
+        # The inner univariate registries above stay cache-less: they serve
+        # contrasts only. The cache belongs to this registry.
+        self._init_fit_cache(cache_dir, cache_tag)
+        self._contrast_fp: dict[tuple[str, bool], dict] = {}
+        self._container_hash: str | None = None
+
+    def contrast(self, name: str, corrected: bool = False) -> JointContrast:
+        """The joint contrast, built once per ``(name, corrected)``.
+
+        ``corrected`` applies to BETA only. The theta half is always the
+        uncorrected contrast -- the same object as in the uncorrected joint
+        contrast -- because theta is never corrected.
+        """
+        key = (name, bool(corrected))
+        if key not in self._contrasts:
+            self._contrasts[key] = JointContrast.from_pair(
+                self._uni["theta"].contrast(name, False),
+                self._uni["beta"].contrast(name, bool(corrected)))
+        return self._contrasts[key]
+
+    def fit(self, model_id: str, *, n_boot: int | None = None, overwrite: bool = False,
+            verbose: bool = False, boot_seed: int = BOOT_SEED, refit: bool = False,
+            **kw) -> JointModelFit:
+        """Fit one A8 rung, with an outer bootstrap if ``n_boot`` is given.
+
+        ``**kw`` is passed to ``mra.fit_reml_mv`` for the FULL-SAMPLE fit only
+        (e.g. ``n_starts``, ``method``); the replicates are warm-started from
+        its optimum, one start each.
+
+        Which outer bootstrap runs is the spec's ``bootstrap_scheme`` (an
+        ``_hb`` id is the hybrid one), never an argument here, so an id always
+        means one set of numbers. ``boot_seed`` seeds the hybrid scheme's
+        effect draws and has no effect on a record-only spec.
+
+        With a ``cache_dir`` on the registry the fit is loaded from disk when
+        its saved inputs match, and fitted and saved otherwise, exactly as in
+        :meth:`ModelRegistry.fit`; ``refit=True`` ignores the disk. Without a
+        ``cache_dir`` nothing is read or written.
+        """
+        if model_id not in self.specs:
+            hint = (" It is a univariate model: fit it with ModelRegistry."
+                    if model_id in MODEL_SPECS else "")
+            raise KeyError(f"unknown joint model {model_id!r} - known: "
+                           f"{sorted(self.specs)}.{hint}")
+        if "corrected" in kw:
+            raise TypeError(
+                f"fit({model_id!r}, corrected=...) is not supported: whether beta is "
+                "bias-corrected is part of the model's SPEC, so that an id always means "
+                f"one set of numbers. Fit {model_id + '_bc'!r} instead.")
+        spec = self.specs[model_id]
+        key = (model_id, "REML")
+        if key in self._fits and not overwrite:
+            raise ValueError(
+                f"{model_id} [REML] has already been fitted. Pass overwrite=True if you "
+                "mean to replace it - the refusal is deliberate, so a re-run cannot "
+                "silently change what a later cell reports.")
+        try:
+            jcon = self.contrast(spec.contrast, spec.corrected)
+        except KeyError as exc:
+            if not spec.corrected:
+                raise
+            raise KeyError(
+                f"{model_id} is a bias-corrected spec, but the beta data it needs is "
+                f"missing: {exc.args[0] if exc.args else exc}. The bias-corrected "
+                "estimates come from nb 070 section 2.4 via nb 072.") from exc
+
+        if spec.corrected:
+            left, right = jcon.terms
+            if all((self.beta_data.hat(s) == self.beta_data.hat(s, corrected=True)).all()
+                   for s in (left, right)):
+                warnings.warn(f"{model_id}: the bias-corrected and uncorrected beta "
+                              f"estimates are identical for both arms of {spec.contrast}, "
+                              f"so {model_id} reproduces {model_id.removesuffix('_bc')}.",
+                              UserWarning, stacklevel=2)
+
+        # Without a cache: the original body, unchanged (now in _fit_joint).
+        if self.cache_dir is None:
+            fit_obj = self._fit_joint(spec, jcon, n_boot=n_boot, verbose=verbose,
+                                      boot_seed=boot_seed, **kw)
+        else:
+            fit_obj = self._cached_fit_joint(spec, jcon, n_boot=n_boot, verbose=verbose,
+                                             boot_seed=boot_seed, refit=refit, **kw)
+        self._fits[key] = fit_obj
+        return fit_obj
+
+    def _fit_joint(self, spec: JointModelSpec, jcon: JointContrast, *,
+                   n_boot: int | None, verbose: bool, boot_seed: int,
+                   **kw) -> JointModelFit:
+        """Full-sample joint fit, then the outer bootstrap. Stores nothing.
+
+        The computing part of :meth:`fit`, moved here unchanged so the cache can
+        run it only when needed. A root of the joint code hash
+        (:data:`JOINT_FIT_CODE_ROOTS`): it builds the saved ``boot`` record.
+        """
+        model_id = spec.model_id
+        raw, x_names, scaling = fit_reml_joint(jcon, spec, **kw)
+        reps, boot = None, {}
+        if n_boot is not None:
+            hybrid = spec.bootstrap_scheme == "hybrid"
+            if verbose:
+                print(f"  {model_id} [REML]: outer bootstrap over "
+                      f"{min(n_boot, jcon.k)} replicates"
+                      f"{' (hybrid)' if hybrid else ''}...")
+            # `raw` goes in because the hybrid scheme draws its pseudo-data
+            # from the full-sample fit; the record-only scheme ignores it.
+            reps = bootstrap_joint_fits(jcon, spec, n_boot=n_boot, T0=raw["T"],
+                                        verbose=verbose, full_fit=raw,
+                                        boot_seed=boot_seed)
+            # What was actually run. zero_levels: every (level, outcome) whose
+            # variance is zero in the full-sample fit, where no effect is drawn.
+            boot = {"scheme": spec.bootstrap_scheme,
+                    "seed": boot_seed if hybrid else None,
+                    "zero_levels": tuple(
+                        (lev, q) for lev in raw["levels"]
+                        for q, zero in zip(OUTCOMES, raw["at_zero"][lev]) if zero)
+                    if hybrid else ()}
+        return JointModelFit(spec=spec, contrast=jcon, raw=raw, x_names=x_names,
+                             scaling=scaling, replicates=reps, boot=boot)
+
+    # -- the on-disk cache (active only with cache_dir) -----------------------
+
+    def cache_path(self, model_id: str) -> Path:
+        """Where a joint fit is saved: ``.../joint/<model_id>.pkl``."""
+        if self.cache_dir is None:
+            raise ValueError("this registry has no cache_dir")
+        return (fcache.cache_folder(self.cache_dir, self.theta_data, self.cache_tag)
+                / "joint" / f"{model_id}.pkl")
+
+    def _cache_fingerprint(self, spec: JointModelSpec, jcon: JointContrast,
+                           kw: dict, boot_seed: int) -> tuple[dict, dict, dict]:
+        """``(fingerprint, meta, code inventory)`` of one joint spec.
+
+        As :meth:`ModelRegistry._cache_fingerprint`, except that only ``note``
+        is left out of the spec (``estimators`` is always ``("REML",)``) and the
+        code hash is the JOINT one, so editing a univariate-only function does
+        not refit the joint models and vice versa.
+        """
+        ckey = (jcon.name, bool(jcon.beta.corrected))
+        if ckey not in self._contrast_fp:
+            self._contrast_fp[ckey] = fcache.joint_contrast_entry(jcon)
+        digest, inventory = fcache.code_hash(JOINT_FIT_CODE_ROOTS)
+        fp = fcache.build_fingerprint(
+            contrast=self._contrast_fp[ckey],
+            spec_tuple=fcache.spec_items(spec, frozenset({"note"})),
+            code_digest=digest, n_code=len(inventory), kw=dict(kw),
+            boot_seed=boot_seed if spec.bootstrap_scheme == "hybrid" else None)
+        if self._container_hash is None:
+            self._container_hash = fcache._sha(
+                fcache.container_hash(self.theta_data) + "|"
+                + fcache.container_hash(self.beta_data))
+        meta = {"model_id": spec.model_id, "estimator": "REML",
+                "im_tag": self.theta_data.im_tag, "quantity": "theta+beta",
+                "k": jcon.k, "container_hash": self._container_hash,
+                "versions": fcache.library_versions()}
+        return fp, meta, inventory
+
+    def _cached_fit_joint(self, spec: JointModelSpec, jcon: JointContrast, *,
+                          n_boot: int | None, verbose: bool, boot_seed: int,
+                          refit: bool, **kw) -> JointModelFit:
+        """Load a joint fit from the cache if valid, else fit it and save it."""
+        fp, meta, inventory = self._cache_fingerprint(spec, jcon, kw, boot_seed)
+        want = None if n_boot is None else min(int(n_boot), jcon.k)
+
+        def from_payload(p: dict) -> JointModelFit:
+            # Same rebuild rule as the univariate registry: the registry's own
+            # spec and memoised joint contrast, through the constructor.
+            reps, boot = fcache.slice_replicates(p, want)
+            return JointModelFit(spec=spec, contrast=jcon, raw=p["raw"],
+                                 x_names=p["x_names"], scaling=p["scaling"],
+                                 replicates=reps, boot=boot)
+
+        return self._load_or_fit(
+            (spec.model_id, "REML"), self.cache_path(spec.model_id),
+            fp, meta, inventory, want, refit,
+            fit_fn=lambda: self._fit_joint(spec, jcon, n_boot=n_boot, verbose=verbose,
+                                           boot_seed=boot_seed, **kw),
+            to_payload=_joint_fit_payload, from_payload=from_payload)
+
+    def __getitem__(self, key) -> JointModelFit:
+        """``joint["A8a"]`` or ``joint["A8a", "REML"]``."""
+        model_id, estimator = key if isinstance(key, tuple) else (key, "REML")
+        if (model_id, estimator) not in self._fits:
+            raise KeyError(f"{model_id} [{estimator}] has not been fitted - call "
+                           f"fit({model_id!r}) first. Fitted: {sorted(self._fits)}")
+        return self._fits[(model_id, estimator)]
+
+    def __contains__(self, key) -> bool:
+        try:
+            self[key]
+        except KeyError:
+            return False
+        return True
+
+    @property
+    def fitted(self) -> list[tuple[str, str]]:
+        return list(self._fits)
+
+    def table(self, ids: Sequence[str] | None = None) -> pd.DataFrame:
+        """One row per joint fit. Kept apart from ModelRegistry.table: the columns differ."""
+        rows = [f.to_row() for (mid, _), f in self._fits.items()
+                if ids is None or mid in ids]
+        if not rows:
+            raise ValueError("no joint fits yet - call fit() first")
+        return pd.DataFrame(rows).set_index(["model", "estimator"])
+
+
+# -- the on-disk fit cache: what is saved, and which code it depends on ---------------
+#
+# The mechanics live in fit_cache; these are the parts that must know the
+# project's classes.
+
+def _model_fit_payload(fit: ModelFit) -> dict:
+    """The RESULTS of a ModelFit as a plain dict, for the cache file.
+
+    Builtin, numpy and pandas objects only -- no project class -- so unpickling
+    never depends on the dataclass definitions. ``spec`` and ``contrast`` are
+    deliberately NOT saved: the registry supplies its own on load (the contrast
+    alone holds the 120 x 5000 replicate matrix, which would otherwise be
+    duplicated in every file). The replicate frame's ``attrs`` are stored
+    separately as well, so they survive even a pandas that dropped them on pickle.
+    """
+    reps = fit.replicates
+    return {"estimator": fit.estimator, "beta": fit.beta, "se_beta": fit.se_beta,
+            "tau2": fit.tau2, "het": fit.het, "x_names": fit.x_names,
+            "scaling": fit.scaling, "raw": fit.raw, "boot": fit.boot,
+            "replicates": reps,
+            "replicates_attrs": None if reps is None else dict(reps.attrs)}
+
+
+def _joint_fit_payload(fit: JointModelFit) -> dict:
+    """The results of a JointModelFit as a plain dict (see :func:`_model_fit_payload`)."""
+    reps = fit.replicates
+    return {"raw": fit.raw, "x_names": fit.x_names, "scaling": fit.scaling,
+            "boot": fit.boot, "replicates": reps,
+            "replicates_attrs": None if reps is None else dict(reps.attrs)}
+
+
+# The entry points of the CODE HASH (fit_cache.code_hash; user decision Q3,
+# 2026-10-19). Starting from these, the hash follows every function and module
+# constant they reach in fragility_data_models, metaregression_analysis and
+# data_simulation, so a helper deep in the call tree is covered without being
+# listed. What must be listed by hand is what a static walk cannot resolve:
+# methods reached through an instance, ``con.v`` / ``con.g`` / ``jcon.n``.
+# Hashing ignores comments and docstrings, so documenting any of these never
+# triggers a refit; changing logic or a constant they use always does.
+#
+# Not here, on purpose: make_contrast, _CONTRAST_SPECS, mra.bootstrap_cov and
+# JointContrast.from_pair. The contrast is fingerprinted by CONTENT, so how it
+# was built cannot change a fit without changing that hash. Nor anything run
+# after loading (ci, tau_ci, random_effects, marginal_covariance, forest,
+# summary): editing those must never refit.
+#
+# Two lists, one per registry, so editing the bivariate REML does not refit the
+# univariate ladder and vice versa.
+UNIVARIATE_FIT_CODE_ROOTS: tuple = (
+    fit_dl, fit_reml, bootstrap_fits, ModelRegistry._fit_estimator,
+    Contrast.n, Contrast.k, Contrast.v, Contrast.diag_V, Contrast.g,
+    Contrast.site_codes,
+)
+JOINT_FIT_CODE_ROOTS: tuple = (
+    fit_reml_joint, bootstrap_joint_fits, JointModelRegistry._fit_joint,
+    JointContrast.n, JointContrast.k, Contrast.n, Contrast.g, Contrast.site_codes,
+)
+
+
+def fit_code_inventory(joint: bool = False) -> dict[str, str]:
+    """``{function or constant: sha256}`` the code hash covers. For inspection.
+
+    Shows exactly which functions a refit can be triggered by; the same mapping
+    is written into every cache manifest (``_meta.code_inventory``).
+    """
+    return fcache.code_hash(JOINT_FIT_CODE_ROOTS if joint
+                            else UNIVARIATE_FIT_CODE_ROOTS)[1]
+
+
+# -- step 0: input checks -------------------------------------------------------------
+
+def check_joint_inputs(theta_data: FragilityData, beta_data: FragilityData,
+                       contrast: str = "y0_avg", n_skew_rows: int = 10,
+                       alpha: float = 0.01) -> dict:
+    """Step 0 of the A8 plan: is the pair of containers fit for a joint model?
+
+    Raises on the two failures that would make the joint fit silently wrong
+    (items 1-3); reports everything else. Returns a dict of the results with a
+    printable ``"report"`` string.
+
+    1. **Labels.** For every loaded arm, theta and beta replicate columns are
+       equal in labels and order, and so are the unit indexes.
+    2. **Same usable replicates.** NaN / inf patterns identical between theta
+       and beta, ``{arm}_n_obs`` identical across the containers. A screened
+       replicate is rejected per FIT and one fit gives both quantities, so these
+       should agree by construction; a re-run that broke it would put theta and
+       beta on different replicate sets. Units with ``n_obs < k`` are listed,
+       because np.cov on a NaN column poisons V.
+    3. **Statistical alignment.** Labels can agree while the values come from
+       different resamples (two files from two runs). Under that failure the
+       per-row sampling correlations r_i are pure noise, ``r_i sqrt(k) ~ N(0,1)``,
+       so ``k sum r_i^2 ~ chi2_n``. The check raises if the data are consistent
+       with that (p > alpha). On the real data the statistic is far in the
+       tail, so a genuine near-zero sampling correlation is not a practical
+       worry; if it ever were, it would show here first.
+    4. **Conditioning** of the 2n x 2n V_known and of its blocks, and k against
+       2n. Reported, not acted on: the default is always the full np.cov (the
+       alternatives and their costs are in dump/plan_joint_theta_beta_model.md, D8).
+    5. **Skewness** of the theta and ln beta replicates of the contrast, per row,
+       with the ``n_skew_rows`` most skewed beta rows listed for a Q-Q plot.
+    6. **Context**: r_samp summary, r_naive and the per-arm within-unit
+       theta-beta correlation of the replicates.
+    """
+    lines, problems, out = [], [], {}
+    k = theta_data.k
+
+    # -- 1 and 2: labels, NaN patterns, n_obs, per arm ---------------------
+    arm_corr = {}
+    for sym in theta_data.available:
+        rt, rb = theta_data.rep(sym), beta_data.rep(sym)
+        if not rt.columns.equals(rb.columns):
+            problems.append(f"{sym}: replicate columns differ in labels or order")
+        if not rt.index.equals(rb.index):
+            problems.append(f"{sym}: unit indexes differ")
+        vt, vb = rt.to_numpy(float), rb.to_numpy(float)
+        if vt.shape == vb.shape:
+            if not np.array_equal(~np.isfinite(vt), ~np.isfinite(vb)):
+                problems.append(f"{sym}: theta and beta have different NaN/inf patterns, "
+                                "i.e. different usable replicates")
+            if np.isfinite(vt).all() and np.isfinite(vb).all():
+                # per-unit corr(theta*, beta*), vectorised over units
+                zt = (vt - vt.mean(1, keepdims=True)) / vt.std(1, keepdims=True)
+                zb = (vb - vb.mean(1, keepdims=True)) / vb.std(1, keepdims=True)
+                arm_corr[sym] = (zt * zb).mean(1)
+        col = f"{ARM_OF_SYMBOL[sym]}_n_obs"
+        if col in theta_data.rows and col in beta_data.rows:
+            if not (theta_data.rows[col] == beta_data.rows[col]).all():
+                problems.append(f"{col} differs between the theta and beta containers")
+            short = theta_data.rows.index[theta_data.rows[col] < k]
+            if len(short):
+                problems.append(f"{col} < k={k} for {len(short)} unit(s), e.g. "
+                                f"{list(short[:3])}: screened-out replicates are NaN")
+    if problems:
+        raise ValueError("joint inputs are not aligned:\n  " + "\n  ".join(problems))
+    lines.append(f"  labels / NaN patterns / n_obs : ok for every arm "
+                 f"({', '.join(theta_data.available)}); k = {k}")
+
+    # -- the joint contrast (from_pair re-checks the contrast's labels) ----
+    jcon = JointContrast.from_pair(make_contrast(theta_data, contrast),
+                                   make_contrast(beta_data, contrast))
+    n = jcon.n
+
+    # -- 3: statistical alignment --------------------------------------------
+    r = jcon.r_samp.to_numpy()
+    stat = float(k * np.sum(r ** 2))
+    p = float(stats.chi2.sf(stat, n))
+    out["alignment_chi2"], out["alignment_p"] = stat, p
+    if p > alpha:
+        raise ValueError(
+            f"the theta and beta replicates of {contrast} look UNALIGNED: the per-row "
+            f"theta-beta sampling correlations are consistent with zero (k sum r^2 = "
+            f"{stat:.1f} on {n} df, p = {p:.3f}). Labels match, so the likely cause is "
+            "theta and beta bootstrap files written by different runs of nb 070.")
+    lines.append(f"  statistical alignment         : ok (k sum r_samp^2 = {stat:.0f} on "
+                 f"{n} df; ~{n} if unaligned)")
+
+    # -- 4: conditioning -------------------------------------------------------
+    def cond(M):
+        ev = np.linalg.eigvalsh(M)
+        return {"min_eig": float(ev.min()), "max_eig": float(ev.max()),
+                "cond": float(ev.max() / ev.min()) if ev.min() > 0 else np.inf,
+                "n_small": int(np.sum(ev < 1e-10 * ev.max()))}
+    out["conditioning"] = {"joint": cond(jcon.V), "theta": cond(jcon.V_theta),
+                           "beta": cond(jcon.V_beta)}
+    cj = out["conditioning"]["joint"]
+    lines.append(f"  V_known {2 * n}x{2 * n}               : min eig {cj['min_eig']:.2e}, "
+                 f"cond {cj['cond']:.2e} (theta block "
+                 f"{out['conditioning']['theta']['cond']:.1e}, beta block "
+                 f"{out['conditioning']['beta']['cond']:.1e}); k/2n = {k / (2 * n):.1f}")
+    if cj["n_small"] or k < 4 * n:
+        lines.append("    -> WARNING: V_known is near-singular or k is small against 2n; "
+                     "see plan D8 for the options (default stays the full np.cov)")
+
+    # -- 5: skewness -----------------------------------------------------------
+    sk_t = pd.Series(stats.skew(jcon.theta.y.to_numpy(float), axis=1),
+                     index=jcon.theta.y.index, name="skew_theta")
+    sk_b = pd.Series(stats.skew(jcon.beta.y.to_numpy(float), axis=1),
+                     index=jcon.beta.y.index, name="skew_beta")
+    out["skew"] = pd.concat([sk_t, sk_b], axis=1)
+    out["most_skewed_beta_rows"] = sk_b.abs().sort_values(ascending=False).index[:n_skew_rows]
+    lines.append(f"  skewness of replicates        : ln beta median {sk_b.median():+.2f}, "
+                 f"range {sk_b.min():+.2f}..{sk_b.max():+.2f}; theta median "
+                 f"{sk_t.median():+.2f}, range {sk_t.min():+.2f}..{sk_t.max():+.2f}")
+
+    # -- 6: context --------------------------------------------------------------
+    out["r_samp"], out["r_naive"] = jcon.r_samp, jcon.r_naive
+    out["arm_corr"] = {s: pd.Series(v) for s, v in arm_corr.items()}
+    lines.append(f"  r_samp per row                : mean {r.mean():+.3f}, median "
+                 f"{np.median(r):+.3f}, range {r.min():+.3f}..{r.max():+.3f}")
+    lines.append(f"  r_naive                       : {jcon.r_naive:+.3f}")
+    for s, v in arm_corr.items():
+        lines.append(f"  arm {s:<6s} corr(theta*, beta*) : mean {v.mean():+.3f}, range "
+                     f"{v.min():+.3f}..{v.max():+.3f}")
+    out["contrast"] = jcon
+    out["report"] = f"joint input checks ({contrast}):\n" + "\n".join(lines)
+    return out
 
 
 # =============================================================================

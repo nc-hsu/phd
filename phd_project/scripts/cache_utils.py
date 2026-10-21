@@ -196,20 +196,33 @@ def _manifest_path(artifact_fp: Path) -> Path:
     return artifact_fp.with_name(artifact_fp.name + ".manifest.json")
 
 
-def write_manifest(artifact_fp: Path, fp_dict: dict) -> Path:
-    """Write the ``<artifact>.manifest.json`` sidecar next to ``artifact_fp``."""
+def write_manifest(artifact_fp: Path, fp_dict: dict,
+                   extra_meta: dict | None = None) -> Path:
+    """Write the ``<artifact>.manifest.json`` sidecar next to ``artifact_fp``.
+
+    ``extra_meta`` is merged into the ``_meta`` block. Like the rest of ``_meta``
+    it is recorded for diagnostics and NEVER compared by :func:`load_or_compute`,
+    :func:`manifest_matches` or :func:`verify` -- only ``inputs`` is. The model-fit
+    cache (``fit_cache``) uses it for the number of replicates saved, library
+    versions and the per-function code inventory. It must be JSON-serialisable;
+    numpy arrays and scalars are converted (:func:`_np_default`). Defaulted, so
+    every existing caller writes exactly the manifest it wrote before.
+    """
     artifact_fp = Path(artifact_fp)
+    meta = {
+        "artifact": artifact_fp.name,
+        "git_commit": _git_commit(),
+        "written_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if extra_meta:
+        meta.update(extra_meta)
     manifest = {
         "inputs": fp_dict,
-        "_meta": {
-            "artifact": artifact_fp.name,
-            "git_commit": _git_commit(),
-            "written_at": datetime.now(timezone.utc).isoformat(),
-        },
+        "_meta": meta,
     }
     mp = _manifest_path(artifact_fp)
     with open(mp, "w") as f:
-        json.dump(manifest, f, indent=2)
+        json.dump(manifest, f, indent=2, default=_np_default)
     return mp
 
 

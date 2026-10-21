@@ -2572,6 +2572,471 @@ def fit_reml(y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
 
 
 # ---------------------------------------------------------------------------
+# Bivariate (joint theta / beta) REML -- the A8 models of analysis_models.md
+# ---------------------------------------------------------------------------
+#
+# THE MODEL
+# ---------
+# Two outcomes per row (theta and beta), stacked theta-first into a 2n-vector
+#
+#     y = X b + sum_l (T_l kron G_l) part + eps,      eps ~ N(0, V_known)
+#
+#     Sigma = V_known + sum_l  T_l kron G_l
+#
+# where G_l is the ordinary n x n univariate pattern of level l (Z Z', S S', I)
+# and T_l is the 2 x 2 covariance of that level's (theta, beta) effect pair:
+#
+#     T_l = [[ tau2_theta,   tau_thetabeta ],
+#            [ tau_thetabeta, tau2_beta     ]]
+#
+# `T kron G` is the 2n x 2n matrix whose (a, b) n x n block is T[a, b] * G. So
+# the theta-theta block of Sigma gets tau2_theta * G, the beta-beta block gets
+# tau2_beta * G and BOTH off-diagonal blocks get tau_thetabeta * G -- exactly the
+# three G-matrices of the roadmap pseudocode, built here rather than by the
+# caller so the block layout cannot be got wrong outside this function.
+#
+# WHY A NEW ESTIMATOR, NOT fit_reml
+# ---------------------------------
+# fit_reml parameterises every component as exp(x) >= 0. A cross term can be
+# negative, and it is only admissible when |tau_tb| <= tau_t * tau_b, i.e. when
+# T_l is positive semi-definite. Bounding each entry separately cannot express
+# that joint constraint. So each T_l is written through a Cholesky factor,
+#
+#     T_l = L_l L_l',   L_l = [[l11, 0], [l21, l22]]   (correlated level)
+#     T_l = diag(l1^2, l2^2)                            (independent level)
+#
+# with the l's UNCONSTRAINED reals. Any real l gives a PSD T, so the
+# constraint holds by construction: nothing is clipped and nothing penalised.
+#
+# The factor is deliberately the PLAIN one, not the log-Cholesky (exp on the
+# diagonal). A 2 x 2 covariance has two kinds of boundary: a variance at zero,
+# and rank one (|rho| = 1) with both variances positive. A log-diagonal can
+# reach either only as a parameter goes to -infinity, a slow ill-conditioned
+# crawl; the plain factor reaches both at finite values (l = 0, l22 = 0). The
+# price is a sign symmetry (L and -L give the same T), harmless because only T
+# is ever reported.
+#
+# One consequence to know about: l = 0 is a STATIONARY point of the objective
+# (the gradient with respect to l is proportional to l). An optimiser started
+# exactly on a boundary therefore stays there. Every start is floored away from
+# zero for that reason (see _pack_T), including the warm starts of the
+# bootstrap -- otherwise a component at zero in the full-sample fit would be
+# pinned at zero in every replicate and the boundary fraction would read 100 %
+# whatever the data said.
+
+_MV_OUTCOMES = ("theta", "beta")
+
+
+def _mv_n_params(levels: Sequence[str], correlated) -> int:
+    """Number of optimiser parameters: 3 per correlated level, 2 per independent one."""
+    return sum(3 if lev in correlated else 2 for lev in levels)
+
+
+def _unpack_T(x: np.ndarray, levels: Sequence[str], correlated
+              ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Optimiser vector -> ``{level: (T, L)}`` with ``T = L L'``.
+
+    The parameter layout, in level order, is ``(l11, l21, l22)`` for a
+    correlated level and ``(l1, l2)`` for an independent one. ``L`` is returned
+    alongside ``T`` because the gradient is taken with respect to L.
+    """
+    out, i = {}, 0
+    for lev in levels:
+        if lev in correlated:
+            L = np.array([[x[i], 0.0], [x[i + 1], x[i + 2]]])
+            i += 3
+        else:
+            # Independent: the cross term is FIXED at zero, not estimated. A
+            # diagonal L gives exactly that.
+            L = np.diag([x[i], x[i + 1]])
+            i += 2
+        out[lev] = (L @ L.T, L)
+    return out
+
+
+def _pack_T(Ts: dict[str, np.ndarray], levels: Sequence[str], correlated,
+            floors: Sequence[float]) -> np.ndarray:
+    """``{level: T}`` -> optimiser vector, floored away from the boundary.
+
+    Used for every start, including warm starts. ``floors[q]`` is the smallest
+    diagonal entry of L allowed for outcome q: a T on a boundary (a variance at
+    zero, or |rho| = 1) is nudged just inside, because the objective is
+    stationary in l at l = 0 and an optimiser started there cannot leave.
+    """
+    x = []
+    for lev in levels:
+        T = np.asarray(Ts[lev], dtype=float)
+        if lev in correlated:
+            # Cholesky of the 2 x 2, written out so a singular T does not
+            # raise: l11 = sqrt(T00), l21 = T01 / l11, l22 = sqrt(T11 - l21^2).
+            l11 = max(np.sqrt(max(T[0, 0], 0.0)), floors[0])
+            l21 = T[0, 1] / l11
+            l22 = max(np.sqrt(max(T[1, 1] - l21 ** 2, 0.0)), floors[1])
+            x += [l11, l21, l22]
+        else:
+            x += [max(np.sqrt(max(T[0, 0], 0.0)), floors[0]),
+                  max(np.sqrt(max(T[1, 1], 0.0)), floors[1])]
+    return np.asarray(x, dtype=float)
+
+
+def _build_sigma_mv(V_known: np.ndarray, Ts: dict[str, np.ndarray],
+                    level_Gs: dict[str, np.ndarray]) -> np.ndarray:
+    """``Sigma = V_known + sum_l T_l kron G_l`` (the bivariate ``_build_sigma``)."""
+    Sigma = V_known.copy()
+    for lev, T in Ts.items():
+        Sigma = Sigma + np.kron(T, level_Gs[lev])
+    return Sigma
+
+
+def _reml_mv_value_and_grad(x: np.ndarray, y: np.ndarray, X: np.ndarray,
+                            V_known: np.ndarray, level_Gs: dict[str, np.ndarray],
+                            levels: Sequence[str], correlated,
+                            want_grad: bool = True):
+    """Negative restricted log-likelihood of the bivariate model, and its gradient.
+
+    THE VALUE is exactly the objective of :func:`reml_nll_chol` (Viechtbauer
+    2005), evaluated at the Sigma the Cholesky parameters imply::
+
+        nll = 1/2 [ log|Sigma| + log|X' Sigma^-1 X| + r' Sigma^-1 r ],
+        r = y - X b_gls
+
+    THE GRADIENT. For any parameter t of Sigma, the standard REML result
+    (e.g. Searle, Casella & McCulloch, "Variance Components", Ch. 6) is::
+
+        d nll / d t = 1/2 [ tr(P dSigma/dt) - y' P (dSigma/dt) P y ]
+
+    with P the REML projection of reml_nll and ``P y = Sigma^-1 r``. Here
+    ``dSigma = dT kron G``, and because of the Kronecker form the trace and the
+    quadratic split into n x n blocks::
+
+        d nll / d T[a, b] = 1/2 [ sum(P_ab * G) - s_a' G s_b ],   s = P y
+
+    where P_ab is the (a, b) block of P and s_a the a-th half of s (sum of the
+    elementwise product is tr(P_ab' G); G is symmetric). That is a 2 x 2
+    matrix ``Gr`` per level. With T = L L' the chain rule gives
+    ``d nll / d L = 2 Gr L`` (Gr symmetric), from which the free entries of L
+    are read off. This is what makes L-BFGS-B viable: a numerical gradient
+    costs one objective evaluation PER PARAMETER, nine for A8c.
+
+    Returns
+    -------
+    float, or (float, ndarray) when ``want_grad``. A Sigma that will not
+    factorise returns a large finite value (and a zero gradient), the same
+    convention as reml_nll -- although with V_known positive definite and every
+    T PSD by construction, it should never happen.
+    """
+    n = y.size // 2
+    Ts = _unpack_T(x, levels, correlated)
+    Sigma = _build_sigma_mv(V_known, {lev: T for lev, (T, _) in Ts.items()}, level_Gs)
+
+    try:
+        cf = cho_factor(Sigma, lower=True, check_finite=False)
+    except np.linalg.LinAlgError:
+        return (1e10, np.zeros_like(x)) if want_grad else 1e10
+    logdet_Sigma = 2.0 * np.sum(np.log(np.diag(cf[0])))
+
+    if not want_grad:
+        # Value only (Nelder-Mead and the finite-difference test): the same
+        # residual form as reml_nll_chol, never materialising Sigma^-1.
+        Si_X = cho_solve(cf, X, check_finite=False)
+        XtSiX = X.T @ Si_X
+        try:
+            cfx = cho_factor(XtSiX, lower=True, check_finite=False)
+        except np.linalg.LinAlgError:
+            return 1e10
+        b = cho_solve(cfx, Si_X.T @ y, check_finite=False)
+        resid = y - X @ b
+        quad = float(resid @ cho_solve(cf, resid, check_finite=False))
+        val = 0.5 * (logdet_Sigma + 2.0 * np.sum(np.log(np.diag(cfx[0]))) + quad)
+        return val if np.isfinite(val) else 1e10
+
+    # With the gradient, P is needed explicitly, and P needs Sigma^-1. At
+    # 2n = 240 that is one triangular solve against the identity -- a few ms.
+    Si = cho_solve(cf, np.eye(Sigma.shape[0]), check_finite=False)
+    Si_X = Si @ X
+    XtSiX = X.T @ Si_X
+    try:
+        cfx = cho_factor(XtSiX, lower=True, check_finite=False)
+    except np.linalg.LinAlgError:
+        return 1e10, np.zeros_like(x)
+    logdet_XtSiX = 2.0 * np.sum(np.log(np.diag(cfx[0])))
+    b = cho_solve(cfx, Si_X.T @ y, check_finite=False)
+    resid = y - X @ b
+    s = Si @ resid                                   # = P y
+    val = 0.5 * (logdet_Sigma + logdet_XtSiX + float(resid @ s))
+    if not np.isfinite(val):
+        return 1e10, np.zeros_like(x)
+
+    # P = Sigma^-1 - Sigma^-1 X (X' Sigma^-1 X)^-1 X' Sigma^-1
+    P = Si - Si_X @ cho_solve(cfx, Si_X.T, check_finite=False)
+    halves = (slice(0, n), slice(n, 2 * n))
+
+    grad = []
+    for lev in levels:
+        G = level_Gs[lev]
+        _, L = Ts[lev]
+        Gr = np.empty((2, 2))
+        for a in range(2):
+            for c in range(2):
+                Gr[a, c] = 0.5 * (np.sum(P[halves[a], halves[c]] * G)
+                                  - s[halves[a]] @ G @ s[halves[c]])
+        Gr = 0.5 * (Gr + Gr.T)                       # symmetric up to rounding
+        dL = 2.0 * Gr @ L
+        if lev in correlated:
+            grad += [dL[0, 0], dL[1, 0], dL[1, 1]]
+        else:
+            grad += [dL[0, 0], dL[1, 1]]
+    return val, np.asarray(grad)
+
+
+def reml_nll_mv(x: np.ndarray, y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
+                level_Gs: dict[str, np.ndarray], levels: Sequence[str],
+                correlated) -> float:
+    """Value-only bivariate REML objective. See :func:`_reml_mv_value_and_grad`."""
+    return _reml_mv_value_and_grad(x, y, X, V_known, level_Gs, levels, correlated,
+                                   want_grad=False)
+
+
+def reml_grad_mv(x: np.ndarray, y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
+                 level_Gs: dict[str, np.ndarray], levels: Sequence[str],
+                 correlated) -> np.ndarray:
+    """Analytic gradient of :func:`reml_nll_mv`. Exposed for the finite-difference test."""
+    return _reml_mv_value_and_grad(x, y, X, V_known, level_Gs, levels, correlated)[1]
+
+
+def _mv_outcome_columns(X: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Which columns of a stacked X belong to theta and which to beta.
+
+    X must be block-diagonal: every column lives in exactly one half. That is
+    asserted, because a column spanning both halves would be a fixed effect
+    SHARED by the two outcomes -- a different model, and one the univariate
+    start values and the reported (m_theta, m_beta) would silently misdescribe.
+    """
+    top = np.any(X[:n] != 0, axis=0)
+    bottom = np.any(X[n:] != 0, axis=0)
+    if np.any(top & bottom) or np.any(~top & ~bottom):
+        raise ValueError(
+            "X must be block-diagonal: each column belongs to theta (rows 0..n-1) "
+            "or to beta (rows n..2n-1), never both and never neither")
+    theta_cols, beta_cols = np.flatnonzero(top), np.flatnonzero(bottom)
+    if not len(theta_cols) or not len(beta_cols):
+        raise ValueError("X needs at least one column (an intercept) per outcome")
+    return theta_cols, beta_cols
+
+
+def fit_reml_mv(y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
+                level_Gs: dict[str, np.ndarray], correlated: Sequence[str] = (),
+                *, n_starts: int = 4, seed: int = 0,
+                T0: dict[str, np.ndarray] | None = None,
+                zero_tol: float = _REML_ZERO_TOL, rho_bound_tol: float = 1e-3,
+                method: str = "L-BFGS-B", verbose: bool = False) -> dict:
+    """Fit the bivariate (theta, beta) linear mixed model with KNOWN sampling covariance, by REML.
+
+    The model and the parameterisation are described in the block comment
+    above. This is a pure-array function so it can be tested with no data on
+    disk; ``fragility_data_models`` builds its inputs.
+
+    Parameters
+    ----------
+    y : ndarray (2n,)
+        Theta effect sizes, then beta effect sizes, in the same row order.
+    X : ndarray (2n, p_theta + p_beta)
+        Block-diagonal fixed-effects design (checked). Each outcome has its own
+        intercept and may have its own covariates.
+    V_known : ndarray (2n, 2n)
+        The full sampling covariance of the stacked replicates.
+    level_Gs : dict of str -> (n, n) ndarray
+        One UNIVARIATE pattern per level, e.g. ``{"design": ZZ', "site": SS',
+        "row": I}``. Insertion order is the parameter order.
+    correlated : sequence of str
+        The levels whose cross term is estimated; at the others it is fixed at
+        0. A8a: ``("row",)``; A8b: ``("site",)``; A8c: all three.
+    n_starts : int
+        Restarts. Start 0 is built from two univariate ``fit_reml`` fits (one
+        per outcome, same levels, cross terms 0) unless ``T0`` is given; the rest
+        jitter it and draw a random starting correlation in (-0.5, 0.5).
+    seed : int
+        Seeds the restart jitter, so a fit is reproducible.
+    T0 : dict of str -> (2, 2), optional
+        Warm start, e.g. the full-sample optimum inside the outer bootstrap.
+        Skips the univariate start fits.
+    zero_tol : float
+        A variance below this is snapped to exactly 0, and its cross term with it.
+    rho_bound_tol : float
+        ``rho_at_bound`` is set when ``1 - |rho| < rho_bound_tol``.
+    method : {"L-BFGS-B", "Nelder-Mead"}
+        L-BFGS-B uses the analytic gradient and is the default -- about 5-13x
+        faster than Nelder-Mead on the real A8 fits, to the same optimum.
+        Nelder-Mead is kept to cross-check it.
+
+    Returns
+    -------
+    dict with keys
+        beta, se_beta, vcov_beta   GLS fixed effects (theta columns first, as in X)
+        theta_cols, beta_cols      which entries of beta belong to which outcome
+        levels, correlated
+        T            {level: (2, 2)} fitted covariance, zero-snapped
+        rho          {level: float}  NaN when either variance is 0 (UNDEFINED,
+                                     which is not the same as zero correlation)
+        at_zero      {level: (bool, bool)} theta / beta variance at zero
+        rho_at_bound {level: bool}
+        share        {level: (float, float)} the level's variance as a share of
+                     that outcome's total -- a rho at a level holding a tiny
+                     share is weakly identified even off the boundary
+        T_total, rho_tot           sum of the T's, and its correlation
+        converged, nll, start_spread, method, Sigma (2n, 2n), x, T_start
+    """
+    y = np.asarray(y, dtype=float).ravel()
+    X = np.asarray(X, dtype=float)
+    V_known = np.asarray(V_known, dtype=float)
+    N = y.size
+    if N % 2:
+        raise ValueError(f"y must stack two outcomes of equal length, got {N} entries")
+    n = N // 2
+    if X.shape[0] != N:
+        raise ValueError(f"X has {X.shape[0]} rows but y has {N}")
+    if V_known.shape != (N, N):
+        raise ValueError(f"V_known must be {N} x {N}, got {V_known.shape}")
+    levels = list(level_Gs)
+    level_Gs = {lev: np.asarray(G, dtype=float) for lev, G in level_Gs.items()}
+    for lev, G in level_Gs.items():
+        if G.shape != (n, n):
+            raise ValueError(f"level_Gs[{lev!r}] must be the UNIVARIATE {n} x {n} "
+                             f"pattern (the Kronecker blocks are built here), got {G.shape}")
+    correlated = tuple(correlated)
+    unknown = sorted(set(correlated) - set(levels))
+    if unknown:
+        raise ValueError(f"correlated levels {unknown} are not among the levels {levels}")
+    theta_cols, beta_cols = _mv_outcome_columns(X, n)
+    halves = (slice(0, n), slice(n, N))
+    col_sets = (theta_cols, beta_cols)
+
+    if method not in ("L-BFGS-B", "Nelder-Mead"):
+        raise ValueError(f"method must be 'L-BFGS-B' or 'Nelder-Mead', got {method!r}")
+
+    # The smallest diagonal entry of L any start may have, per outcome: small
+    # against the data's spread, but not zero (l = 0 is stationary).
+    floors = [max(np.sqrt(1e-4 * float(np.var(y[h]))), 1e-6) for h in halves]
+
+    # -- start 0 ----------------------------------------------------------
+    if T0 is None:
+        # Two univariate fits, one per outcome, on that outcome's own block of
+        # V_known and its own columns of X. Their variances are the natural
+        # diagonal; the cross terms start at 0. method="cholesky" because
+        # these are just start values.
+        uni = [fit_reml(y[h], X[h][:, cols], V_known[h, h],
+                        [level_Gs[lev] for lev in levels], names=levels,
+                        n_starts=2, seed=seed, method="cholesky")
+               for h, cols in zip(halves, col_sets)]
+        T0 = {lev: np.diag([uni[0]["tau2"][j], uni[1]["tau2"][j]])
+              for j, lev in enumerate(levels)}
+    x_first = _pack_T(T0, levels, correlated, floors)
+
+    rng = np.random.default_rng(seed)
+    starts = [x_first]
+    for _ in range(max(n_starts - 1, 0)):
+        jittered = {}
+        for lev in levels:
+            T = np.asarray(T0[lev], dtype=float)
+            # jitter each variance by a factor of exp(N(0, 0.75)), floored
+            sd = np.sqrt(np.maximum(np.diag(T), np.square(floors)))
+            sd = sd * np.exp(rng.normal(0.0, 0.75, 2))
+            r = rng.uniform(-0.5, 0.5) if lev in correlated else 0.0
+            jittered[lev] = np.array([[sd[0] ** 2, r * sd[0] * sd[1]],
+                                      [r * sd[0] * sd[1], sd[1] ** 2]])
+        starts.append(_pack_T(jittered, levels, correlated, floors))
+
+    args = (y, X, V_known, level_Gs, levels, correlated)
+    results = []
+    for x0 in starts:
+        if method == "L-BFGS-B":
+            res = minimize(_reml_mv_value_and_grad, x0, args=args, jac=True,
+                           method="L-BFGS-B",
+                           options={"maxiter": 10000, "ftol": 1e-14, "gtol": 1e-9})
+        else:
+            res = minimize(reml_nll_mv, x0, args=args, method="Nelder-Mead",
+                           options={"xatol": 1e-9, "fatol": 1e-11, "maxiter": 40000,
+                                    "maxfev": 40000})
+        results.append(res)
+
+    objs = np.array([r.fun for r in results])
+    best = results[int(np.argmin(objs))]
+    start_spread = float(objs.max() - objs.min())
+    if start_spread > 1e-4 and verbose:
+        print(f"[fit_reml_mv] objective spread across {len(starts)} starts: "
+              f"{start_spread:.3e} -- surface may be flat or multi-modal")
+
+    # L-BFGS-B often stops with "ABNORMAL_TERMINATION_IN_LNSRCH" when it is
+    # already at the optimum to machine precision (the line search cannot find
+    # a decrease because there is none). So a small gradient also counts as
+    # converged; Nelder-Mead reports its own success.
+    converged = bool(best.success)
+    if not converged and method == "L-BFGS-B":
+        g = reml_grad_mv(best.x, *args)
+        converged = bool(np.max(np.abs(g)) < 1e-4)
+
+    # -- reporting at the optimum ------------------------------------------
+    T, rho, at_zero, rho_at_bound = {}, {}, {}, {}
+    for lev, (T_l, _) in _unpack_T(best.x, levels, correlated).items():
+        T_l = T_l.copy()
+        zero = [bool(T_l[q, q] < zero_tol) for q in range(2)]
+        for q in range(2):
+            if zero[q]:
+                # A variance at zero takes its cross term with it, which also
+                # keeps the snapped T exactly PSD.
+                T_l[q, :] = 0.0
+                T_l[:, q] = 0.0
+        T[lev] = T_l
+        at_zero[lev] = tuple(zero)
+        if any(zero):
+            rho[lev] = np.nan
+            rho_at_bound[lev] = False
+        else:
+            r = T_l[0, 1] / np.sqrt(T_l[0, 0] * T_l[1, 1])
+            rho[lev] = float(np.clip(r, -1.0, 1.0))   # rounding can give 1 + 1e-16
+            rho_at_bound[lev] = bool(1.0 - abs(rho[lev]) < rho_bound_tol)
+
+    T_total = sum(T.values())
+    totals = np.diag(T_total)
+    share = {lev: tuple(float(T[lev][q, q] / totals[q]) if totals[q] > 0 else np.nan
+                        for q in range(2)) for lev in levels}
+    rho_tot = (float(np.clip(T_total[0, 1] / np.sqrt(totals[0] * totals[1]), -1, 1))
+               if np.all(totals > 0) else np.nan)
+
+    # Final GLS quantities at the SNAPPED T, so beta, its covariance and the
+    # Sigma reported all describe the same model.
+    Sigma = _build_sigma_mv(V_known, T, level_Gs)
+    cf = cho_factor(Sigma, lower=True, check_finite=False)
+    Si_X = cho_solve(cf, X, check_finite=False)
+    vcov = np.linalg.inv(X.T @ Si_X)
+    beta = vcov @ (X.T @ cho_solve(cf, y, check_finite=False))
+
+    return {
+        "beta": beta,
+        "se_beta": np.sqrt(np.diag(vcov)),
+        "vcov_beta": vcov,
+        "theta_cols": theta_cols,
+        "beta_cols": beta_cols,
+        "levels": levels,
+        "correlated": correlated,
+        "T": T,
+        "rho": rho,
+        "at_zero": at_zero,
+        "rho_at_bound": rho_at_bound,
+        "share": share,
+        "T_total": T_total,
+        "rho_tot": rho_tot,
+        "converged": converged,
+        "nll": float(best.fun),
+        "start_spread": start_spread,
+        "method": method,
+        "Sigma": Sigma,
+        "x": best.x,
+        "T_start": {lev: np.asarray(T0[lev], dtype=float) for lev in levels},
+    }
+
+
+# ---------------------------------------------------------------------------
 # Convenience wrappers -- these just choose the right Gs and V_known
 # ---------------------------------------------------------------------------
 
