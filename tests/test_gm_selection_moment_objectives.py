@@ -1,6 +1,6 @@
 """Tests for the moment-based selection objectives (``__mu_sigma``, ``__ks_mu_sigma``).
 
-Plan: ``dump/plan_record_selection_moment_objectives.md`` (section 10). Two kinds of test:
+Two kinds of test:
 
 - **Synthetic tests** that need nothing on disk: the objective formulas against hand
   computations, the parameter validation, the lambda normalisation, target lookup by
@@ -29,8 +29,11 @@ try:
     from phd_project.config import config
 
     _CFG = config.load_config()
-    _ORIG = Path(_CFG["results"]["AvgSA_03_record_selection"])
-    _OPT = Path(_CFG["results"]["AvgSA_03_record_selection_optimised"])
+    # the stripe pickles of the original and the KS-optimised record sets
+    _ORIG = config.ss_dir(_CFG, "results", "record_selection", "AvgSA_03__ks")
+    _OPT = config.ss_dir(_CFG, "results", "record_selection", "AvgSA_03__opt_ks")
+    # Both were selected on the same frozen stripe grid (the IMLs as they were then).
+    _GRID = config.stripe_grid_path(_CFG, "AvgSA_03__ks")
     _GCIM = Path(_CFG["proc_data"]["gcim_dists"]) / "gcim_dist_AvgSA_03.pickle"
     _SHARDS = Path(_CFG["proc_data"]["AvgSA_03_disagg_data_shards"])
     _HAVE_SETS = _ORIG.is_dir() and _OPT.is_dir() and _GCIM.is_file()
@@ -378,13 +381,12 @@ def _gcim_key(gcim_dists, site, iml):
 
 
 @needs_sets
-@pytest.mark.parametrize("folder_key", ["AvgSA_03_record_selection",
-                                        "AvgSA_03_record_selection_optimised"])
-def test_ks_refactor_and_jprime_100_bit_identical_on_real_sets(gcim_dists, folder_key):
+@pytest.mark.parametrize("ss_id", ["AvgSA_03__ks", "AvgSA_03__opt_ks"])
+def test_ks_refactor_and_jprime_100_bit_identical_on_real_sets(gcim_dists, ss_id):
     ctx = _light_ctx()
     jctx = _light_ctx(0.25, {"objective": "ks_mu_sigma", "lambda_ks": 1,
                              "lambda_mu": 0, "lambda_sigma": 0})
-    for site, iml, e in _stored_sets(_CFG["results"][folder_key]):
+    for site, iml, e in _stored_sets(config.ss_dir(_CFG, "results", "record_selection", ss_id)):
         key = _gcim_key(gcim_dists, site, iml)
         cols = gms._record_im_columns(e, ctx)
         x = np.log(e["recs"]["ims_scaled"].drop(columns="AvgSA([0, 3])").to_numpy())
@@ -405,7 +407,7 @@ def test_moment_terms_on_real_set_match_stored_moments(gcim_dists):
     # The z / r computed by the objective's helper must agree with the stripe's own
     # stored mu_lnIM_recs / sig_lnIM_recs (written by assemble_ensemble_dict).
     ctx = _light_ctx()
-    for site, iml, e in _stored_sets(_CFG["results"]["AvgSA_03_record_selection_optimised"], 3):
+    for site, iml, e in _stored_sets(_OPT, 3):
         if "sig_lnIM_recs" not in e:
             continue
         key = _gcim_key(gcim_dists, site, iml)
@@ -425,16 +427,16 @@ def test_moment_terms_on_real_set_match_stored_moments(gcim_dists):
 def plain_setup():
     from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
         setup_AvgSA03_gcim_gm_selection)
-    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
+    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=(), imls_for_selection_fp=_GRID)
     return disagg_stats, ctx
 
 
 @needs_setup
-@pytest.mark.parametrize("config_name,folder_key", [
-    ("SELECTION_CONFIG", "AvgSA_03_record_selection"),
-    ("SELECTION_CONFIG_OPTIMISED", "AvgSA_03_record_selection_optimised"),
+@pytest.mark.parametrize("config_name,ss_id", [
+    ("SELECTION_CONFIG", "AvgSA_03__ks"),
+    ("SELECTION_CONFIG_OPTIMISED", "AvgSA_03__opt_ks"),
 ])
-def test_existing_stripes_still_valid(plain_setup, config_name, folder_key):
+def test_existing_stripes_still_valid(plain_setup, config_name, ss_id):
     """Every wanted stripe of the original / KS-optimised selection is VALID under the
     new code -- exactly as the existing notebooks compute the check (plain setup,
     their own config). If this fails, the next nb 032 run would reselect them."""
@@ -442,8 +444,8 @@ def test_existing_stripes_still_valid(plain_setup, config_name, folder_key):
     disagg_stats, ctx = plain_setup
     sc = getattr(su, config_name)
     fp_fn, superseded = su.stripe_fingerprints(sc, su.stripe_source_fps(), ctx, disagg_stats)
-    wanted = su.wanted_stripe_keys()
-    to_compute, valid = gms.find_stale_stripes(wanted, _CFG["results"][folder_key], fp_fn,
+    wanted = su.wanted_stripe_keys(imls_for_selection_fp=config.stripe_grid_path(_CFG, ss_id))
+    to_compute, valid = gms.find_stale_stripes(wanted, config.ss_dir(_CFG, "results", "record_selection", ss_id), fp_fn,
                                                superseded=superseded)
     assert to_compute == [], f"{len(to_compute)} stripes read as stale, e.g. {to_compute[:5]}"
     assert len(valid) == len(wanted)

@@ -73,6 +73,7 @@ import pandas as pd
 
 from standes.groundmotion import esm_record_identifier, ngasub_record_identifier, record_json_filename
 
+from phd_project.config import config as _config
 from phd_project.config.config import load_config
 
 
@@ -82,10 +83,9 @@ from phd_project.config.config import load_config
 
 _CFG = load_config()
 _PROC = _CFG["proc_data"]["root"]
-# per-structure MSA collapse-flag JSONs (nb 060): which record ran in which slot of each stripe
-SITE_FRAGILITY_DIR = _CFG["proc_data"]["wp1_sites_fragility_curves"]
-# per-(site, stripe) GCIM selection pickles, whose "recs" table lists the 30 records in slot order
-AVGSA03_SELECTION_DIR = _CFG["results"]["AvgSA_03_record_selection"]
+# (The per-structure MSA collapse-flag JSONs and the GCIM stripe pickles that
+# msa_record_usage reads belong to ONE site-specific record set, so they are no longer
+# module constants: msa_record_usage resolves them from its ``ss_id`` argument.)
 TH_SPECTRA_FP = _PROC / "07_gm_records" / "spectra" / "acc_spectra.pickle"
 DB_FP = _PROC / "04_gm_database_for_selection" / "ESM-NGAsub_combined.csv"
 # The original ESM downloads (ASDF / HDF5, one file per event-station-location) on the HSU share
@@ -765,17 +765,20 @@ def summarise_channel_layouts(inventory: pd.DataFrame, summary: pd.DataFrame | N
 _FLAGS_NAME_RE = r"^(?P<ns>\d+)s_cbf_dc2_site(?P<site>\d+)_msa_collapseflags_(?P<im>.+)\.json$"
 
 
-def msa_record_usage(record_tags, im: str = "AvgSA_03", flags_dir: str | Path | None = None,
+def msa_record_usage(record_tags, ss_id: str, im: str = "AvgSA_03",
+                     flags_dir: str | Path | None = None,
                      selection_dir: str | Path | None = None,
                      verify: bool = True) -> pd.DataFrame:
     """Every (site, structure, stripe, record slot) at which one of ``record_tags`` was run.
 
     record_tags    record tags (JSON stems), e.g. "GR-1999-0001_ATH2_0__V"
+    ss_id          the site-specific record set whose MSA is searched, e.g. "AvgSA_03__ks"
+                   (a record_sets.ss id). It fixes both default folders below.
     im             intensity measure of the MSA (file-name suffix of the collapse-flag JSONs)
-    flags_dir      root of the per-site collapse-flag folders (default: the config's
-                   wp1_sites_fragility_curves)
-    selection_dir  folder of the GCIM stripe pickles (default: the config's
-                   AvgSA_03_record_selection; only used when ``verify``)
+    flags_dir      root of the per-site collapse-flag folders (default: that set's
+                   09_structure_fragility_curves/ss/{ss_id}/)
+    selection_dir  folder of the GCIM stripe pickles (default: that set's
+                   results/04_record_selection/ss/{ss_id}/; only used when ``verify``)
     verify         check every hit against the stripe pickle: the record in slot k of the
                    pickle's "recs" table must be the same file as the MSA ran in slot k.
                    Raises if any hit disagrees or its pickle is missing.
@@ -794,7 +797,8 @@ def msa_record_usage(record_tags, im: str = "AvgSA_03", flags_dir: str | Path | 
     from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
         iml_filename_tag, stripe_pickle_path)
 
-    flags_dir = Path(flags_dir) if flags_dir is not None else Path(SITE_FRAGILITY_DIR)
+    flags_dir = (Path(flags_dir) if flags_dir is not None else
+                 _config.ss_dir(_CFG, "proc_data", "structure_fragility_curves", ss_id))
     wanted = {f"{t}.json" for t in record_tags}      # the MSA logs name records by file
 
     rows = []
@@ -816,7 +820,8 @@ def msa_record_usage(record_tags, im: str = "AvgSA_03", flags_dir: str | Path | 
                                       "record_tag", "_iml"])
 
     if verify and len(out):
-        sel_dir = Path(selection_dir) if selection_dir is not None else Path(AVGSA03_SELECTION_DIR)
+        sel_dir = (Path(selection_dir) if selection_dir is not None else
+                   _config.ss_dir(_CFG, "results", "record_selection", ss_id))
         bad = []
         # one pickle read per (site, stripe), shared by both structures and all hits in it
         for (site, iml), grp in out.groupby(["site", "_iml"]):

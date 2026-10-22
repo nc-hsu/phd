@@ -3,7 +3,7 @@
 Pure-array tests with no data on disk, which is why the estimator lives in
 ``mra`` and the simulator in ``dsim`` (the layering rule of
 ``fragility_data_models``). They cover, in the order of the task's acceptance
-criteria (dump/task_joint_theta_beta_model.md):
+criteria:
 
 - separability: with no theta-beta sampling covariance and no cross terms, the
   joint fit IS two univariate fits (the joint model's DL <-> REML regression test);
@@ -273,7 +273,7 @@ def test_recovery_of_T_rho_and_m_and_the_bias_from_omitting_V_cross():
 
 
 # --------------------------------------------------------------------------- #
-# The hybrid bootstrap, joint version (dump/plan_hybrid_bootstrap.md)         #
+# The hybrid bootstrap, joint version                                         #
 # --------------------------------------------------------------------------- #
 #
 # The record-only bootstrap inflates every replicate T by the sampling

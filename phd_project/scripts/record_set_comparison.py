@@ -2,8 +2,8 @@
 
 This module is the reusable logic behind nb 034
 (``notebooks/03_WP1_ground_motion_set/034-comparison_original_and_optimised_gm_sets.ipynb``).
-The plan it implements is ``dump/plan_record_set_rerun_decision.md``; read that first; the
-section numbers below (Step 1-5, D1-D6) refer to it.
+The step numbers below (Step 1-5) are the sections of nb 034, whose introduction states
+the question and the decision rule; decisions D1-D6 are explained where they are applied.
 
 The question in one paragraph
 -----------------------------
@@ -137,7 +137,7 @@ def load_record_sets(folder: Path | str) -> dict[tuple[int, float], dict]:
 
     The key uses the pickle's OWN ``cond_iml``, not the IML in the filename. The filename tag is
     rounded to 3 decimals (0.6049 is stored as ``00pt605``), while the MSA stripe IMLs are not;
-    keying on the filename made 64 of the 437 run sets unmatchable (plan 0.2).
+    keying on the filename made 64 of the 437 run sets unmatchable.
 
     The folder is opened read-only; nothing is ever written back to it.
     """
@@ -276,7 +276,7 @@ def map_structure_stripes(flags: pd.DataFrame, sets: dict, frag_root: Path | str
 # bit-identical to the ones the optimiser recomputes from nb 031's GCIM file (checked in the
 # tests), so this is the same number without loading the 77 MB GCIM pickle.
 #
-# What the objective is (plan 0.4). For IM m with KS distance D_m (the largest vertical gap
+# What the objective is. For IM m with KS distance D_m (the largest vertical gap
 # between the set's empirical CDF and the target CDF),
 #
 #     J = sum_m w_m D_m  +  c * sum_m (squared amounts by which the empirical CDF pokes out of
@@ -406,7 +406,7 @@ def score_table(orig: dict, opt: dict, weights: np.ndarray) -> tuple[pd.DataFram
 def change_table(long: pd.DataFrame) -> pd.DataFrame:
     """Optimised minus original, per (set, IM): Delta D, Delta mean ln IM, Delta SD ln IM.
 
-    Adds the noise-floor flag (plan Step 2). The mean of 30 independent draws from the target
+    Adds the noise-floor flag (Step 2). The mean of 30 independent draws from the target
     wanders by about ``sigma_GCIM / sqrt(30)`` (the standard error of a mean), so a shift in the
     set mean smaller than that cannot be told apart from ordinary selection noise; the flag
     ``within_noise`` marks those.
@@ -608,7 +608,7 @@ def plot_ecdf_grid(ens_orig: dict, ens_opt: dict, title: str, extra: Sequence[tu
 # =============================================================================
 
 # ---- 4a. Firth-penalised logistic regression --------------------------------
-# Why Firth (plan D2). With ~150 runs per row a plain maximum-likelihood logistic fit is fine
+# Why Firth (decision D2). With ~150 runs per row a plain maximum-likelihood logistic fit is fine
 # most of the time, but where some combination of predictors happens to split collapses from
 # non-collapses perfectly ("separation"), the ML coefficient runs off to infinity. Firth (1993)
 # adds the Jeffreys-prior penalty 1/2 ln|I(gamma)| to the log-likelihood. That keeps every
@@ -699,7 +699,7 @@ def firth_logit(X: np.ndarray, y: np.ndarray, *, firth: bool = True,
 
 
 def separation_flags(X: np.ndarray, y: np.ndarray, firth_fit: dict) -> dict:
-    """Detect (quasi-)separation by fitting plain ML beside the Firth fit (plan D2).
+    """Detect (quasi-)separation by fitting plain ML beside the Firth fit (decision D2).
 
     A row is flagged if ANY of: ML fails to converge; an ML coefficient exceeds 10 in absolute
     value (predictors are standardised, so 10 means a factor of e^10 per SD -- implausible);
@@ -721,7 +721,7 @@ def separation_flags(X: np.ndarray, y: np.ndarray, firth_fit: dict) -> dict:
     return {"separation": bool(reasons), "separation_reasons": ";".join(reasons)}
 
 
-# ---- 4b. predictors (plan D3) -----------------------------------------------
+# ---- 4b. predictors (decision D3) -----------------------------------------------
 # Within a stripe every record has the same AvgSA, so the 21 spectral IMs vary only through
 # spectral SHAPE and are strongly collinear; putting all of them into a model with ~70
 # collapses would fit noise. One model is used:
@@ -1024,7 +1024,7 @@ def records_long(sets: dict, keys: Sequence[tuple[int, float]], version: str) ->
 def lognorm_mle_fit_expected(intensity_levels, n_collapses, n_records) -> tuple[float, float]:
     """Lognormal MSA fragility fit that accepts NON-INTEGER (expected) collapse counts.
 
-    Why this exists (plan 0.5). ``standes.fitting.lognorm_mle_fit`` maximises
+    Why this exists. ``standes.fitting.lognorm_mle_fit`` maximises
     ``sum_j binom.logpmf(z_j, n_j, p_j)``, and ``scipy.stats.binom.logpmf`` returns -inf for
     non-integer z -- so the predicted counts n * p_hat of Step 3 would break it silently.
 
@@ -1308,8 +1308,8 @@ def record_covariates(sets: dict, smap: pd.DataFrame, fragilities: dict, rows: p
                   the same ``smap`` serves both.
     smap        : ``map_structure_stripes`` output (site, n_storeys, stripe_iml -> set key).
     fragilities : ``mra.load_site_msa_fragilities`` output; ``[n][site]["efc"][0]`` are the IMLs.
-    rows        : indexed (site, n_storeys), with ``T1`` and the FEMA statistics
-                  ``fema_ln_{saratio, ds595}_{mean, sigma}`` (nb 072's covariate components).
+    rows        : indexed (site, n_storeys), with ``T1`` and the fixed-set statistics
+                  ``fx_ln_{saratio, ds595}_{mean, sigma}`` (nb 072's covariate components).
     spectra     : the fine-grid PSA table (acc_spectra.pickle).
 
     Returns a frame indexed like ``rows`` with the four columns of :data:`RECORD_COVARIATES`.
@@ -1327,7 +1327,7 @@ def record_covariates(sets: dict, smap: pd.DataFrame, fragilities: dict, rows: p
                 cache[ck] = stripe_record_stats(sets[key], float(r["T1"]), spectra)
             per_stripe.append(cache[ck])
         st = pd.DataFrame(per_stripe).mean()          # equal weight 1 / n_i over the fitted stripes
-        out[(site, n)] = {col: st[f"{q}_{s}"] - r[f"fema_ln_{q}_{s}"]
+        out[(site, n)] = {col: st[f"{q}_{s}"] - r[f"fx_ln_{q}_{s}"]
                           for col, (q, s) in RECORD_COVARIATES.items()}
     res = pd.DataFrame.from_dict(out, orient="index")
     res.index = pd.MultiIndex.from_tuples(res.index, names=rows.index.names)

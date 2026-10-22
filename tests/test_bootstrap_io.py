@@ -179,3 +179,38 @@ def test_select_storeys_names_what_it_has():
     merged = mra.stack_cloud_frames({3: cloud(units, 3)})
     with pytest.raises(KeyError, match=r"\[3\]"):
         mra.select_storeys(merged, 5, axis=1)
+
+
+
+# --------------------------------------------------------------------------- #
+# Arm tokens: generic in the fixed record set                                  #
+# --------------------------------------------------------------------------- #
+
+def test_fx_arm_names_round_trip_through_parse_arm():
+    """Every FX arm token is built from the FX id and parses back to (kind, fx); the
+    FEMA P695 tokens are exactly the historical file names."""
+    for fx in ("femap695", "nearfield2"):
+        names = mra.fx_arm_names(fx)
+        assert set(names) == set(mra.FX_ARM_KINDS)
+        for kind, token in names.items():
+            assert mra.parse_arm(token) == (kind, fx)
+    assert mra.fx_arm_names("femap695") == {
+        "msa": "msa_femap695", "ida": "ida_femap695",
+        "ida_ub": "ida_femap695_ub", "ida_avg": "ida_femap695_avg"}
+    assert mra.parse_arm("site_msa") == ("site_msa", None)
+    with pytest.raises(ValueError):
+        mra.parse_arm("ida_fema_p695")          # an FX id may not contain "_"
+    with pytest.raises(ValueError):
+        mra.fx_arm_names("fema_p695")
+
+
+def test_arm_labels_and_colours_follow_the_kind():
+    assert mra.arm_label("ida_femap695_ub", "FEMA P695") == "IDA FEMA P695 (upper bound)"
+    assert mra.arm_label("msa_nearfield2") == "MSA nearfield2"     # no label: the id
+    assert mra.arm_label("site_msa") == "MSA site-specific"
+    assert mra.arm_colour("msa_femap695") == mra.arm_colour("msa_nearfield2")
+
+
+def test_load_estimates_default_arms_need_the_fx_id(tmp_path):
+    with pytest.raises(ValueError):
+        mra.load_estimates(tmp_path, IM_TAG, scope="by_group")

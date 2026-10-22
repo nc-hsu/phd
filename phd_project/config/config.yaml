@@ -4,6 +4,98 @@ executables:
 
 project_root: "../../"
 
+# =====================================================================================
+# RECORD SETS - which ground-motion record sets exist, and which pairings are studied.
+# =====================================================================================
+# This section is NOT a list of paths: config.py leaves it as plain strings (every other
+# section has its strings turned into absolute Paths). Use the helpers in config.py
+# (study(), ss_dir(), fx_dir(), study_dir(), run-folder names) rather than reading it by hand.
+#
+# Three kinds of thing depend on record sets, and each gets its own folder level at every
+# pipeline stage where it applies (06, 09, 10, 11, 12, 13 in data_processed; 04, 05, 06 in
+# results; the run folders on the analysis drive):
+#
+#   ss/{ss_id}/        depends on ONE site-specific (SS) set   - selection, MSA-SS, SS bootstrap
+#   fx/{fx_id}/        depends on ONE fixed (FX) set           - IDA-FX, MSA-FX, FX bootstrap, A2
+#   studies/{study}/   depends on one SS set AND one FX set    - nb 072 dataset, A0/A1/A3 fits
+#
+# Naming: SS ids carry the IM, because the records are selected FOR that IM
+# ("{IM}__{scheme}"); FX ids do not, because a fixed set is the same records whatever the IM
+# - IM-specific FX products carry the IM in their own name (e.g. msa_AvgSA_03__femap695).
+# A study is "{ss_id}__vs__{fx_id}". The double underscore separates the parts of every id,
+# so an id whose own name contains single underscores (opt_ks_mu_sigma) still reads cleanly.
+record_sets:
+  # The study the main-line notebooks work on. Side-quest notebooks never read this: they
+  # name their record sets explicitly, so changing it cannot change their results.
+  active_study: "AvgSA_03__opt_ks_mu_sigma__vs__femap695"
+
+  # Site-specific sets: GCIM-based selection per (site, stripe IML).
+  #   scheme       the selection-config constant in
+  #                scripts/WP1_ground_motion_set/setup_AvgSA03_gm_selection.py
+  #   stripe_grid  which (site, IML) stripes the set is selected for:
+  #                "live"  - proc_data.AvgSA_03_imls_for_selection, which nb 017 extends
+  #                          with nb 060's remediation IMLs (the main line);
+  #                an ss id - the FROZEN copy kept in that set's 06_gm_selection folder
+  #                          (imls_for_selection_{im}.json), so re-running the set's
+  #                          notebooks can never add stripes to it.
+  #   stripe_grid_base  (live sets only, optional) the set whose stripes this one was
+  #                started from. The live grid is rebuilt by nb 017 every run, so it must
+  #                keep folding in the remediation IMLs nb 060 found for the base set too -
+  #                otherwise re-running nb 017 would drop those stripes from the grid and
+  #                nb 033 would prune them. nb 050 likewise runs the reserve stripes 060
+  #                flagged for the base set (config.stripe_lineage).
+  # (The MSA run folder names on the analysis drive follow from the id, see
+  #  config.ss_msa_names.)
+  ss:
+    AvgSA_03__ks:
+      im: "AvgSA_03"
+      scheme: "SELECTION_CONFIG"
+      stripe_grid: "AvgSA_03__ks"
+      description: "Original selection: SSE record picking, KS acceptance test. Frozen (side quest nb 034); its MSA-SS was run on the analysis machine."
+    AvgSA_03__opt_ks:
+      im: "AvgSA_03"
+      scheme: "SELECTION_CONFIG_OPTIMISED"
+      stripe_grid: "AvgSA_03__ks"
+      description: "Every stripe optimised against the weighted-KS objective. Side quest only (no MSA)."
+    AvgSA_03__opt_mu_sigma:
+      im: "AvgSA_03"
+      scheme: "SELECTION_CONFIG_MU_SIGMA"
+      stripe_grid: "AvgSA_03__ks"
+      description: "Optimised against the set moments (mean, SD) of ln IM; KS not required. Side quest only (no MSA)."
+    AvgSA_03__opt_ks_mu_sigma:
+      im: "AvgSA_03"
+      scheme: "SELECTION_CONFIG_KS_MU_SIGMA"
+      stripe_grid: "live"
+      stripe_grid_base: "AvgSA_03__ks"
+      description: "Weighted KS + moments objective, KS required. The main-line SS set."
+
+  # Fixed sets: the same records at every stripe and for every design group.
+  #   The id (letters and digits only, no "_") names every FX folder AND the arm tokens in
+  #   the processed file names: msa_{fx}, ida_{fx}, ida_{fx}_ub, ida_{fx}_avg
+  #   (e.g. ..._ida_femap695_collapsefragility_AvgSA_03.json, ida_femap695_bootstrap_...).
+  #   records:                   folder name under raw_data.fixed_record_sets (in-repo copy)
+  #   records_analysis_machine:  where the run configs on the analysis machine read the JSONs
+  #   record_glob:               the set's record JSONs within those folders. A record's
+  #                              position in the SORTED listing is its record tag ("0", "1",
+  #                              ...), which the IDA / MSA runs and the bootstrap key on.
+  #   label:                     how figures name the set ("MSA FEMA P695", ...)
+  fx:
+    femap695:
+      records: "femap695"
+      records_analysis_machine: "D:/gm_records_p695"
+      record_glob: "fema_p695_*.json"
+      label: "FEMA P695"
+      description: "FEMA P695 far-field set, 22 records."
+
+  # Pairings. Every main-line stage from nb 072 on works on one of these.
+  studies:
+    AvgSA_03__ks__vs__femap695:
+      ss: "AvgSA_03__ks"
+      fx: "femap695"
+    AvgSA_03__opt_ks_mu_sigma__vs__femap695:
+      ss: "AvgSA_03__opt_ks_mu_sigma"
+      fx: "femap695"
+
 raw_data:
   root: "data_raw"
   gm_flatfiles: "data_raw/gm_flatfiles"
@@ -13,9 +105,10 @@ raw_data:
   eu_shapefile: "data_raw/eu_shapefile"
   rho_models: "data_raw/correlation_models"
   esm_download_manifest: "data_raw/gm_records/ESM/esm_hdf5_download_manifest.csv"
-  # The 22 FEMA P695 far-field record JSONs (in-repo copy of D:/gm_records_p695).
-  # Used by nb 052 / 054 to compute each record's AvgSA_03 without the analysis drive attached.
-  femap695_records: "data_raw/fema_P695_records"
+  # In-repo copies of the fixed record sets, one folder per FX set (record_sets.fx.*.records),
+  # e.g. fixed_record_sets/femap695/ = the 22 FEMA P695 JSONs (copy of D:/gm_records_p695).
+  # Used by nb 052 / 054 / 070 / 072 to compute record IMs without the analysis drive attached.
+  fixed_record_sets: "data_raw/fixed_record_sets"
   esm_hdf5_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/01_ESM"
   ngasub_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/02_NGASub"
   
@@ -54,36 +147,34 @@ proc_data:
   AvgSA_03_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_03_disagg_stats_wp1sites_eps4.pickle"
   AvgSA_06_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_06_disagg_data_wp1sites_eps4.pickle"
   AvgSA_06_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_06_disagg_stats_wp1sites_eps4.pickle"
-  # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-036)
+  # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-033).
+  # This is the LIVE stripe grid of the main line: nb 017 extends it with the remediation
+  # IMLs that nb 060 asks for. The frozen grid the AvgSA_03__ks set (and nb 034) was built
+  # on is the copy in 06_gm_selection/ss/AvgSA_03__ks/imls_for_selection_AvgSA_03.json.
   AvgSA_03_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_03.json"
   AvgSA_06_imls_for_selection: "data_processed/05_gcim_distributions/imls_for_selection_AvgSA_06.json"
-  # Stripe-coverage remediation from nb 060: reserve stripes that can be run against the
-  # record ensembles already selected, and the additional IMLs that need a fresh
-  # disaggregation. Both are folded back into the IML lists by nb 017.
-  AvgSA_03_reserve_stripes: "data_processed/05_gcim_distributions/reserve_stripes_to_run_AvgSA_03.json"
-  AvgSA_03_additional_imls: "data_processed/05_gcim_distributions/additional_imls_for_disagg_AvgSA_03.json"
+  # (The stripe-coverage remediation files nb 060 writes - reserve_stripes_to_run_{IM}.json and
+  # additional_imls_for_disagg_{IM}.json - depend on the MSA-SS outcomes, so they live in that
+  # SS set's folder: 09_structure_fragility_curves/ss/{ss_id}/.)
   corr_model: "data_processed/02_im_correlation_model"
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
   gcim_dists: "data_processed/05_gcim_distributions"
+  # Record selection, one folder per SS set: 06_gm_selection/ss/{ss_id}/ holds that set's
+  # stage-1 rounds, final ensembles and download / conversion lists (nb 032/033/040/042).
+  # Use config.ss_dir(cfg, "proc_data", "gm_selection", ss_id).
+  # 06_gm_selection/ss/AvgSA_03__ks/ also holds swapped_esm_records_msa_usage_AvgSA_03.csv:
+  # the ESM records with swapped U/V labels (nb 043, archived) and every place that set's
+  # MSA used them - one row per (site, "3s"/"5s", stripe_iml token, record_index 0-29).
   gm_selection: "data_processed/06_gm_selection"
-  # Second, "optimised" AvgSA_03 selection (nbs 032/033/040/042 -optimised copies): round 1
-  # bounds M + Vs30 but not distance, then optimises every stripe. Kept apart from the
-  # original selection above (which must stay unchanged) so the two can be compared.
-  gm_selection_optimised: "data_processed/06_gm_selection/AvgSA_03_optimised"
-  # Third and fourth AvgSA_03 selections, whose objectives target the set MOMENTS of ln IM
-  # (nbs 032/033/040/042 -optimised__mu_sigma / -optimised__ks_mu_sigma copies; scheme configs
-  # SELECTION_CONFIG_MU_SIGMA / SELECTION_CONFIG_KS_MU_SIGMA in setup_AvgSA03_gm_selection.py).
-  gm_selection_optimised__mu_sigma: "data_processed/06_gm_selection/AvgSA_03_optimised__mu_sigma"
-  gm_selection_optimised__ks_mu_sigma: "data_processed/06_gm_selection/AvgSA_03_optimised__ks_mu_sigma"
+  # Converted record JSONs: ONE pool shared by every set, because a JSON is named after the
+  # physical record ({record_identifier}__{component}.json), so a record chosen by two sets
+  # is one file. On this computer the JSONs themselves are not present (they live on the
+  # analysis machine); the spectra pickle is.
   gm_records: "data_processed/07_gm_records"
   # Fine-grid (0.01 s) 5 %-damped PSA of every selected record, one row per record_id
   # (written by scripts/compute_record_spectra.py). nb 072 §8.10 reads record-side SaRatio from it.
   gm_record_spectra: "data_processed/07_gm_records/spectra/acc_spectra.pickle"
-  # ESM records whose JSON U/V labels are swapped (converter on HN2/HN3 HDF5 files, nb 043 §5),
-  # and every place the site-specific MSA used them: one row per (site, structure "3s"/"5s",
-  # stripe_iml token e.g. "00pt270", record_index 0-29), plus the record_tag.
-  swapped_esm_records_msa_usage_AvgSA_03: "data_processed/07_gm_records/swapped_esm_records_msa_usage_AvgSA_03.csv"
   # Building Datasets
   dc2_casestudy_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_cbfs.pickle"
   dc2_scA_reference_dataset: "data_processed/08_casestudy_structure_datasets/ec8_gen2_dc2_scA_reference_cbfs.pickle"
@@ -94,42 +185,40 @@ proc_data:
   # Fragility Curves
   ec8_gen2_scA_fragility_curves: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference
   dc2_scA_reference_collapse_fc_summary: data_processed/09_structure_fragility_curves/ec8_gen2_scA_reference/dc2_scA_collapsefragility_summary.csv
-  # statistical models
-  regression_models: data_processed/10_fragility_curve_statistical_analysis/statistical_models
-  # Site case-study converted fragilities (nb 014, and nb 053 which fans the
-  # per-design-group conversion back out into exactly these per-site files)
-  wp1_sites_fragility_curves: data_processed/09_structure_fragility_curves/wp1_casestudy_sites
-  wp1_sites_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_femap695_collapsefragility_summary.csv
-  # Per-design-group converted fragilities (nb 053) - the artefact the per-site files
-  # above are copied from, one folder per group_{n}s_{gid}.
-  wp1_groups_fragility_curves: data_processed/09_structure_fragility_curves/wp1_design_groups
-  wp1_groups_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_design_groups/group_femap695_collapsefragility_summary.csv
-  # Per-record collapse capacities the fragilities above are fitted from (nb 053),
-  # one CSV per IM: this stem + _{im}, a group x record table in units of g.
-  wp1_groups_femap695_collapse_imls: data_processed/09_structure_fragility_curves/wp1_design_groups/group_femap695_collapse_imls.csv
-  # Per-design-group MSA-FEMAP695 fragilities (nb 061) - collected from the group MSA
-  # runs and fanned back out into the per-site files above.
-  wp1_groups_msa_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_collapsefragility_summary.csv
-  wp1_sites_msa_femap695_fc_summary: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_msa_femap695_collapsefragility_summary.csv
-  # Per-record collapse outcomes behind the MSA fragilities (nb 061): a
-  # (group, stripe_iml) x record table of 0/1 flags, one CSV per IM - this stem plus
-  # _{im}, exactly as for the IDA collapse IMLs above.
-  wp1_groups_msa_femap695_collapse_flags: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_collapse_flags.csv
-  # Per-record collapse outcomes behind the site-specific MSA fragilities (nb 060):
-  # a (site, n_storeys, stripe_iml) x record table of 0/1 flags, one CSV per IM -
-  # this stem plus _{im}, as for the group MSA flags above. NOTE the records differ
-  # at every stripe and every site (GCIM selects per site/IML), so column k is NOT a
-  # stable record identity: the table must never be joined across stripes on it.
-  wp1_sites_msa_collapse_flags: data_processed/09_structure_fragility_curves/wp1_casestudy_sites/site_msa_collapse_flags.csv
-  # Extra MSA-FEMAP695 stripes nb 061 asks for, one row per (group, tail); read back
-  # by nb 054, which adds exactly these to each group's stripe list.
-  wp1_groups_msa_femap695_additional_stripes: data_processed/09_structure_fragility_curves/wp1_design_groups/group_msa_femap695_additional_stripes.csv
-  # boostrapping stuff
-  bootstrapping: data_processed/10_fragility_curve_statistical_analysis/bootstrapping
-  # fragility curve dataset for regression
-  fragility_curve_dataset: data_processed\10_fragility_curve_statistical_analysis\fragility_regression_dataset_AvgSA_03.csv
-  # Original vs optimised SS record sets (nb 034, scripts/record_set_comparison.py): the
-  # CSV tables of the re-run decision. Both record-set folders are read-only inputs.
+  # WP1 case-study fragilities, split by what they depend on:
+  #   ss/{ss_id}/site_{i}/{tag}_msa_collapsefragility_{IM}.json (+ _msa_collapseflags_)   nb 060
+  #   ss/{ss_id}/site_msa_collapse_flags_{IM}.csv  - (site, n_storeys, stripe_iml) x record
+  #       0/1 flags. The records differ at every stripe and site (GCIM selects per site/IML),
+  #       so column k is NOT a stable record identity: never join across stripes on it.
+  #   ss/{ss_id}/reserve_stripes_to_run_{IM}.json, additional_imls_for_disagg_{IM}.json
+  #       - nb 060's stripe-coverage remediation, read back by nb 050 and nb 017.
+  #   fx/{fx_id}/design_groups/group_{n}s_{gg}/   per-group IDA / MSA-FX fragilities (053, 061)
+  #   fx/{fx_id}/design_groups/group_*_summary / _collapse_imls_{IM} / _collapse_flags_{IM}
+  #       / group_msa_{fx_id}_additional_stripes.csv  (053, 061; 054 reads the last back)
+  #   fx/{fx_id}/sites/site_{i}/   the per-site copies 053 / 061 fan the group files out to,
+  #       plus site_*_summary.csv
+  # Use config.ss_dir / config.fx_dir with key "structure_fragility_curves".
+  structure_fragility_curves: data_processed/09_structure_fragility_curves
+  # Statistical analysis, split the same way:
+  #   ss/{ss_id}/bootstrapping/          site_msa_* replicates (nb 070) - one stripe at a time
+  #   fx/{fx_id}/bootstrapping/          ida_* / msa_* replicates + the shared record resample
+  #   fx/{fx_id}/models/                 A2 fits (b - c: FX only)
+  #   studies/{study}/                   nb 072 dataset, stripes, covariates, intermediates,
+  #                                      plots, site_regression_variables (nb 078),
+  #                                      models/ (A0 / A1 / A3 fits, nb 073)
+  #   regression_coefficients/, gm_property_plots/   shared (hazard / GCIM only)
+  fragility_statistical_analysis: data_processed/10_fragility_curve_statistical_analysis
+  # Ground-motion properties of the fixed sets (spectra, Ds5-95): fx/{fx_id}/  (nb 072)
+  record_set_properties: data_processed/11_record_set_properties
+  # nb 074: per-site GCIM covariate trends (shared), and studies/{study}/ for the part that
+  # reads the regression dataset.
+  site_covariate_trends: data_processed/12_site_covariate_trends
+  # nb 075: studies/{study}/
+  collapse_capacity_vs_hazard: data_processed/13_collapse_capacity_vs_hazard
+  # Side quest: original vs optimised SS record sets (nb 034, scripts/record_set_comparison.py).
+  # The CSV tables of the re-run decision, plus models/ (its fit cache: refits on PREDICTED
+  # SS medians, tagged __ks / __opt_ks / __opt_mu_sigma / __opt_ks_mu_sigma - NOT results of
+  # new NLTHA). Frozen: reads only the AvgSA_03__ks stripes.
   record_set_comparison: "data_processed/14_record_set_comparison"
 
   # SDOF stuff is kinda of irrelevant now. It will probably crash
@@ -150,25 +239,20 @@ results:
   psha: "results/03_psha"
   hazard_curve_plots: "results/03_psha/hc_plots"
   disaggregation_plots: "results/03_psha/disagg_plots"
-  AvgSA_03_record_selection: "results/04_record_selection/AvgSA_03"
-  # Stripe pickles of the second, "optimised" selection (see gm_selection_optimised).
-  AvgSA_03_record_selection_optimised: "results/04_record_selection/AvgSA_03_optimised"
-  # Stripe pickles of the moment-objective selections (see gm_selection_optimised__mu_sigma).
-  AvgSA_03_record_selection_optimised__mu_sigma: "results/04_record_selection/AvgSA_03_optimised__mu_sigma"
-  AvgSA_03_record_selection_optimised__ks_mu_sigma: "results/04_record_selection/AvgSA_03_optimised__ks_mu_sigma"
-  AvgSA_06_record_selection: "results/04_record_selection/AvgSA_06"
-  # MSA-FEMAP695 stripe selections (nb 054): the same 22 FEMA P695 records at every
-  # stripe, one set per design group rather than per site.
-  AvgSA_03_FEMAP695_record_selection: "results/04_record_selection/AvgSA_03_FEMAP695"
-  # Per-design-group FEMA P695 IDA runs (nb 052): the group -> member-site map.
-  group_ida_femap695: "results/06_group_ida_femap695"
-  # Per-design-group MSA-FEMAP695 runs (nb 054): the fragility figures written by nb 061.
-  group_msa_femap695: "results/07_group_msa_femap695"
+  # Stripe selection pickles:
+  #   ss/{ss_id}/site_{i}__stripe_iml_{iml}__gm_selection.pickle   (nb 032/033)
+  #   fx/{fx_id}/{IM}/group_{n}s_{gg}__stripe_iml_{iml}__gm_selection.pickle  (MSA-FX, nb 054:
+  #       the same fixed records at every stripe, one stripe list per design group)
+  record_selection: "results/04_record_selection"
+  # MSA-SS fragility figures: ss/{ss_id}/  (nb 060)
+  site_fragility_curves: "results/05_site_fragility_curves"
+  # Per-design-group FX analyses: fx/{fx_id}/ida/ (nb 052: group -> member-site map, figures)
+  # and fx/{fx_id}/msa/ (nb 061: the fragility figures).
+  group_fx_analyses: "results/06_group_fx_analyses"
   # Per-design-group cyclic-pushover figures (nb 056): one curve+envelope+backbone
   # plot per design, plus the per-storey overview sheets used for manual review.
   group_cpo: "results/08_group_cpo"
-  site_fragility_curves: "results/05_site_fragility_curves"
-  # Figures of the original vs optimised SS record-set comparison (nb 034).
+  # Side quest: figures of the original vs optimised SS record-set comparison (nb 034).
   record_set_comparison: "results/09_record_set_comparison"
 
 hazard_models:
@@ -238,10 +322,16 @@ templates:
 analysis_data:
   root: "E:"
   dc2_sdof_fitting: "E:/03_wp1pt4pt1_dc2_sdof_fitting"
+  # On the analysis drive the STRUCTURE folders stay put; the analysis folders inside each
+  # one are named after the record set they ran (names built by the config.py helpers):
+  #   site_{i}/{n}s/mdof/  msa_{ss_id}/  {ss_id}_stripes/  config_msa_{ss_id}.py
+  # e.g. msa_AvgSA_03__ks/ - the ss_id already carries the IM, so it is not repeated.
   wp1_casestudy_sites: "D:/07_wp1_casestudy_sites"
   reference_structures_dc2_scA: "D:/06_reference_structures_dc2_scA"
   # Analyses driven by a FIXED record set (same records at every stripe), organised
-  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052 (IDA) and 054 (MSA).
+  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052 (IDA) and 054 (MSA):
+  #   ida__{fx_id}/  config_ida_htf__{fx_id}.py
+  #   msa_{IM}__{fx_id}/  {IM}__{fx_id}_stripes/  config_msa_{IM}__{fx_id}.py
   wp1_fixed_record_sets: "D:/08_wp1_fixed_record_sets"
 
 

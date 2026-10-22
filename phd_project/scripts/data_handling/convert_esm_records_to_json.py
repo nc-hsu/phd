@@ -122,7 +122,7 @@ COMPONENTS = ("U", "V", "W")
 #
 # Used only when the requested "{network_code}.{station}" group is NOT in the file; the aliases are
 # then tried and exactly one must be present (two or more is ambiguous and fails). Source: every
-# failure in dump/network_code_errors.txt (2026-10-01, 75 rows), each of which had exactly one
+# conversion failure of the 2026-10-01 run (75 rows), each of which had exactly one
 # station group in the file:
 #   IV -> 8P (T12xx, 2016 Central Italy), 8H (RMxx, 2009 L'Aquila), 5G (T08xx, 2012 Emilia),
 #         9N (T0721), EU (GMN, 1976 Friuli)

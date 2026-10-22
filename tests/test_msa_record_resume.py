@@ -119,11 +119,16 @@ def test_launcher_redispatches_only_stale_and_missing(tmp_path, monkeypatch):
 # delete_msa_record_results
 # ---------------------------------------------------------------------------
 
+# The MSA results folder of one SS record set, as config.ss_msa_names names it.
+RESULTS_FOLDER = "msa_AvgSA_03__ks"
+
+
 @pytest.fixture
 def results_tree(tmp_path):
     """site_0/3s stripe 00pt310 with slots 2, 4 and 29 run; a CSV listing 2, 4, 7."""
     root = tmp_path / "sites"
-    stripe_dir = root / "site_0" / "3s" / "mdof" / "msa_AvgSA_03" / "stripe_00pt310"
+    # the per-record-set MSA run folder (config.ss_msa_names): msa_{ss_id}
+    stripe_dir = root / "site_0" / "3s" / "mdof" / RESULTS_FOLDER / "stripe_00pt310"
     write_record(stripe_dir, 2, "R2.json", 1.0)
     write_record(stripe_dir, 4, "OTHER.json", 1.0)   # slot re-selected since the CSV
     write_record(stripe_dir, 29, "R29.json", 1.0)    # not listed: must survive
@@ -137,7 +142,7 @@ def results_tree(tmp_path):
 def test_delete_dry_run_touches_nothing(results_tree):
     root, stripe_dir, csv = results_tree
     before = sorted(p.name for p in stripe_dir.iterdir())
-    plans = dmr.run(csv, root, dry_run=True)
+    plans = dmr.run(csv, root, RESULTS_FOLDER, dry_run=True)
     assert [p.status for p in plans] == [dmr.DELETE, dmr.MISMATCH, dmr.NOTHING]
     assert len(plans[0].files) == 5
     assert sorted(p.name for p in stripe_dir.iterdir()) == before
@@ -145,7 +150,7 @@ def test_delete_dry_run_touches_nothing(results_tree):
 
 def test_delete_removes_only_listed_matching_slots(results_tree):
     root, stripe_dir, csv = results_tree
-    dmr.run(csv, root, dry_run=False)
+    dmr.run(csv, root, RESULTS_FOLDER, dry_run=False)
     left = {p.name.split("_")[1] for p in stripe_dir.iterdir()}
     assert left == {"4", "29"}                       # slot 2 gone; 4 (mismatch) and 29 kept
     assert len(list(stripe_dir.glob("record_29_*"))) == 5
@@ -153,4 +158,4 @@ def test_delete_removes_only_listed_matching_slots(results_tree):
 
 def test_delete_missing_root_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
-        dmr.run(tmp_path / "x.csv", tmp_path / "not_mounted", dry_run=True)
+        dmr.run(tmp_path / "x.csv", tmp_path / "not_mounted", RESULTS_FOLDER, dry_run=True)

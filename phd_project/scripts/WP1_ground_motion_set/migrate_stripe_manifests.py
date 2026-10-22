@@ -82,7 +82,13 @@ from pathlib import Path
 
 import pickle
 
+from phd_project.config import config as config_mod
 from phd_project.config.config import load_config
+
+# Every migration here was written for, and run on, the ORIGINAL selection - record set
+# "AvgSA_03__ks" (its stripe pickles and its batch artefacts). They are historical one-offs;
+# the other record sets were selected after them and never needed one.
+SS_ID = "AvgSA_03__ks"
 from phd_project.scripts import disagg_shards
 from phd_project.scripts.cache_utils import (
     _manifest_path,
@@ -162,7 +168,8 @@ def migrate(*, write: bool = False) -> int:
     batch_entry = fingerprint(
         disagg_shards_digest=disagg_shards.shards_digest(shard_dir))["disagg_shards_digest"]
 
-    roots = [cfg["results"]["AvgSA_03_record_selection"], cfg["proc_data"]["gm_selection"]]
+    roots = [config_mod.ss_dir(cfg, "results", "record_selection", SS_ID),
+             config_mod.ss_dir(cfg, "proc_data", "gm_selection", SS_ID)]
     counts: dict[str, int] = {}
     changed = []
 
@@ -250,7 +257,7 @@ def migrate_to_content_hashes(*, write: bool = False) -> int:
     cfg = load_config()
     shard_dir = Path(cfg["proc_data"]["AvgSA_03_disagg_data_shards"])
     stats_fp = Path(cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"])
-    result_folder = Path(cfg["results"]["AvgSA_03_record_selection"])
+    result_folder = config_mod.ss_dir(cfg, "results", "record_selection", SS_ID)
 
     if not disagg_shards.content_hashes_path(shard_dir).is_file():
         print(f"ERROR: no {disagg_shards.CONTENT_HASHES_NAME} in {shard_dir}.\n"
@@ -372,7 +379,8 @@ def migrate_to_network_code_db(*, write: bool = False) -> int:
         print("ERROR: the database has no network_code column yet -- run nb 030 first.")
         return 1
 
-    roots = [cfg["results"]["AvgSA_03_record_selection"], cfg["proc_data"]["gm_selection"]]
+    roots = [config_mod.ss_dir(cfg, "results", "record_selection", SS_ID),
+             config_mod.ss_dir(cfg, "proc_data", "gm_selection", SS_ID)]
     counts: dict[str, int] = {}
     changed = []
 
@@ -448,7 +456,7 @@ def migrate_to_recorded_exclusions(*, write: bool = False) -> int:
     carry a ``db_exclusions`` key are candidates; the original selection has four.
     """
     cfg = load_config()
-    result_folder = Path(cfg["results"]["AvgSA_03_record_selection"])
+    result_folder = config_mod.ss_dir(cfg, "results", "record_selection", SS_ID)
     print(f"results    : {result_folder}")
     print(f"exclusion list: current version v{EXCLUSION_LIST_VERSION}\n")
 

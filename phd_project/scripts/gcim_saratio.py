@@ -27,7 +27,7 @@ visibly separate here:
 
 HOW IT IS WRITTEN
 -----------------
-The structure follows ``admin/rough_algorithm_for_SARatio.txt``: one visible
+The structure follows the algorithm step by step: one visible
 loop per level of the algorithm, the formulas spelled the way the literature
 spells them, and every intermediate quantity in a local variable a debugger can
 see. Scenarios are evaluated one at a time.
@@ -441,7 +441,7 @@ def conditional_spectra(site: int, periods: np.ndarray, disagg_df: pd.DataFrame,
                         max_scenarios: int | None = None) -> ConditionalSpectra:
     """The conditional log-spectrum of every disaggregated rupture at a site.
 
-    Steps 3.1 to 3.5 of ``admin/rough_algorithm_for_SARatio.txt``: for each
+    Steps 3.1 to 3.5 of the SaRatio algorithm: for each
     rupture scenario, how far above its median the conditioning level sits, and
     what that implies for the mean and spread of every ordinate.
 

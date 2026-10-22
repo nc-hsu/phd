@@ -1,4 +1,5 @@
-"""Data model for the A-series meta-analysis models of ``admin/analysis_models.md``.
+"""Data model for the A-series meta-analysis models (the A0-A16 ladder of contrasts
+between the MSA-SS, MSA-FX and IDA-FX arms).
 
 Why this module exists
 ----------------------
@@ -73,7 +74,7 @@ intentionally absent from ``MODEL_SPECS``. The machinery is all present
 When you add them, pass the FULL ``Contrast.V`` (the default), never
 ``np.diag(v)``: the shared-b_j sampling covariance has the same block structure
 as a design random effect, so a diagonal V lets tau_d^2 absorb it and read too
-high. That is the identifiability trap of ``analysis_models.md`` section A1c.
+high. That is the identifiability trap of the crossed A1c model.
 
 The joint theta/beta model (A8)
 -------------------------------
@@ -83,13 +84,13 @@ not change the one-quantity-per-container rule: a ``JointContrast`` pairs a
 theta Contrast with a beta Contrast, and the A8 rungs live in their own table
 (``JOINT_MODEL_SPECS``), fit object (``JointModelFit``) and registry
 (``JointModelRegistry``). The bivariate REML is ``mra.fit_reml_mv``. See the
-section "The joint theta / beta model (A8)" below, and
-``dump/plan_joint_theta_beta_model.md`` for the design decisions.
+section "The joint theta / beta model (A8)" below, which also records the design
+decisions.
 
 Two bootstrap schemes
 ---------------------
 Every spec carries ``bootstrap_scheme``, and the two schemes answer different
-questions (``dump/plan_hybrid_bootstrap.md``):
+questions:
 
 ``"record"`` (the default; every id without an ``_hb`` suffix)
     Refit each record-resampling replicate as it is. Right for the mean m and
@@ -136,7 +137,7 @@ Page numbers are from standard printings and should be treated as approximate.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from functools import cached_property
 from pathlib import Path
@@ -165,7 +166,13 @@ import phd_project.scripts.metaregression_analysis as mra
 # The ORDER matters: nb 072 uses it to order the dataset columns, so changing it
 # changes the CSV. Keep it as it is unless you mean to rewrite the dataset.
 #
-# The three ida_femap695* arms are ONE analysis read off the collapse bracket
+# The VALUES are the arm tokens of the saved files (mra.fx_arm_names), as templates:
+# "{fx}" is the fixed record set's id (record_sets.fx in config.yaml), so a second fixed
+# set has its own files. Fill them with :func:`arm_file_name` / :func:`arm_file_names`.
+# The dataset columns are named by the KEYS, so the dataset schema is the same for every
+# FX set.
+#
+# The three ida_{fx}* arms are ONE analysis read off the collapse bracket
 # three ways -- the lower bound (the published fragility), the upper bound, and
 # the geometric mean of the bracket (nb 053 section 10, nb 070 section 1.5).
 # They are therefore three alternative `c` terms, not three independent results,
@@ -173,15 +180,42 @@ import phd_project.scripts.metaregression_analysis as mra
 # than as three separate findings.
 
 ARMS: dict[str, str] = {
-    "msa_fx":  "msa_femap695",      # MSA, fixed FEMA P695 set        (by design group)
-    "ida_fx":  "ida_femap695",      # IDA, bracket lower bound        (by design group)
-    "ida_ub":  "ida_femap695_ub",   # IDA, bracket upper bound        (by design group)
-    "ida_avg": "ida_femap695_avg",  # IDA, bracket geometric mean     (by design group)
+    "msa_fx":  "msa_{fx}",          # MSA, fixed record set           (by design group)
+    "ida_fx":  "ida_{fx}",          # IDA, bracket lower bound        (by design group)
+    "ida_ub":  "ida_{fx}_ub",       # IDA, bracket upper bound        (by design group)
+    "ida_avg": "ida_{fx}_avg",      # IDA, bracket geometric mean     (by design group)
     "msa_ss":  "site_msa",          # MSA, site-specific GCIM records (by site)
 }
 
+
+def arm_file_name(arm: str, fx: str) -> str:
+    """The file token of one arm for the fixed set ``fx``: ``("ida_ub", "femap695") ->
+    "ida_femap695_ub"``. Agrees with ``mra.fx_arm_names`` (asserted at import)."""
+    if not fx.isalnum():
+        raise ValueError(f"FX id {fx!r} must be letters and digits only")
+    return ARMS[arm].format(fx=fx)
+
+
+def arm_file_names(fx: str) -> dict[str, str]:
+    """``{arm key: file token}`` for every arm, in ``ARMS`` (= dataset column) order."""
+    return {arm: arm_file_name(arm, fx) for arm in ARMS}
+
+
+def fx_of(root) -> str:
+    """The FX id a bootstrapping ``root`` belongs to: ``root["fx_id"]`` of the
+    ``config.bootstrap_roots`` mapping. The FX arms' files are named by it, so a loader
+    given a bare folder cannot know which files to read and refuses."""
+    if isinstance(root, Mapping) and "fx_id" in root:
+        return root["fx_id"]
+    raise TypeError("pass root=config.bootstrap_roots(cfg, study): the FX arms' file "
+                    "names depend on the fixed record set, which a bare folder does not say")
+
+
+# the two places that spell the tokens must agree (msa_{fx}, ida_{fx}, ida_{fx}_ub/_avg)
+assert {arm_file_name(a, "x") for a in ARMS} - {mra.SS_ARM} == set(mra.fx_arm_names("x").values())
+
 # The mathematical notation of the roadmap. a_i, b_j, c_j are LOG medians (or
-# log dispersions, when quantity="beta"); see analysis_models.md section 0. The
+# log dispersions, when quantity="beta"). The
 # two IDA variants are alternative c terms and are named to say so.
 SYMBOLS: dict[str, str] = {
     "msa_ss": "a", "msa_fx": "b",
@@ -193,9 +227,8 @@ ARM_OF_SYMBOL: dict[str, str] = {v: k for k, v in SYMBOLS.items()}
 # retires the `_gr` suffix of nb 073. MSA-FX and IDA-FX do not have "a site
 # version and a group version" -- they have ONE scope, the design group, because
 # the fixed-set stripe IMLs are chosen from the span of the fragility curve
-# rather than from site hazard, so they depend on the design only
-# (analysis_models.md section 1(b), corrected). When a 120-row contrast needs
-# them, Z expands them; that is what `FragilityData.expand` is for.
+# rather than from site hazard, so they depend on the design only. When a
+# 120-row contrast needs them, Z expands them; that is what `FragilityData.expand` is for.
 SCOPE_OF_ARM: dict[str, str] = {
     "msa_ss": "by_site",
     "msa_fx": "by_group", "ida_fx": "by_group",
@@ -230,32 +263,46 @@ assert not any(p != q and p.startswith(q) for p in ARMS for q in ARMS), (
     "no arm prefix may be a prefix of another - see nb 072 section 4.0")
 
 
-def dataset_csv_path(root: Path | str, im_tag: str) -> Path:
+def dataset_csv_path(root: Path | str | Mapping, im_tag: str) -> Path:
     """Canonical filename for the nb-072 regression dataset.
 
     Mirrors ``mra.bootstrap_csv_path`` / ``mra.estimates_csv_path``: the write
-    (nb 072) and every read go through here, so the name cannot drift. ``root``
-    is the bootstrapping directory, i.e. ``cfg["proc_data"]["bootstrapping"]``;
-    the dataset sits one level above it, beside the bootstrap folder.
+    (nb 072) and every read go through here, so the name cannot drift.
+
+    ``root`` is either
+
+    * the folder mapping from ``config.bootstrap_roots`` (``{"ss", "fx", "study"}``):
+      the dataset pairs one SS set with one FX set, so it lives in that STUDY's folder
+      (10_.../studies/{study}/), not with either set's bootstrap files; or
+    * a single bootstrapping folder (the unit tests): the dataset then sits one level
+      above it, beside the bootstrap folder.
     """
-    return Path(root).parent / f"fragility_regression_dataset_{im_tag}.csv"
+    name = f"fragility_regression_dataset_{im_tag}.csv"
+    if isinstance(root, Mapping):
+        return Path(root["study"]) / name
+    return Path(root).parent / name
 
 
-def arm_label(symbol_or_arm: str) -> str:
+def arm_label(symbol_or_arm: str, fx_label: str = "FX") -> str:
     """Human-readable arm name, reusing the labels ``mra`` already fixed.
 
     Figures across the chapter must name the arms identically, so the labels
-    live in one place (``mra._ARM_LABELS``) and are looked up rather than
-    retyped in each notebook.
+    live in one place (``mra.arm_label``) and are looked up rather than
+    retyped in each notebook. ``fx_label`` names the fixed record set
+    (config.yaml ``record_sets.fx.{fx}.label``, e.g. "FEMA P695").
     """
     arm = ARM_OF_SYMBOL.get(symbol_or_arm, symbol_or_arm)
-    return mra._ARM_LABELS.get(ARMS.get(arm, arm), arm)
+    if arm not in ARMS:
+        return arm
+    return mra.arm_label(arm_file_name(arm, "fx"), fx_label)
 
 
 def arm_colour(symbol_or_arm: str) -> str:
-    """Fixed colour for an arm, from ``mra._ARM_COLORS``. See :func:`arm_label`."""
+    """Fixed colour for an arm (by kind, the same for every FX set). See :func:`arm_label`."""
     arm = ARM_OF_SYMBOL.get(symbol_or_arm, symbol_or_arm)
-    return mra._ARM_COLORS.get(ARMS.get(arm, arm), "k")
+    if arm not in ARMS:
+        return "k"
+    return mra.arm_colour(arm_file_name(arm, "fx"))
 
 
 # =============================================================================
@@ -796,7 +843,8 @@ def _load_cloud(root, arm: str, quantity: str, im_tag: str,
     """
     scope = SCOPE_OF_ARM[arm]
     frames = mra.load_saved_bootstrap(
-        root, ARMS[arm], (quantity,), None, im_tag, scope, k_samples=k_samples)
+        root, arm_file_name(arm, fx_of(root)), (quantity,), None, im_tag, scope,
+        k_samples=k_samples)
     if frames is None:
         return None
 
@@ -857,8 +905,11 @@ def load_fragility_data(
 
     Parameters
     ----------
-    root : Path or str
-        The bootstrapping directory, ``cfg["proc_data"]["bootstrapping"]``.
+    root : mapping, or Path / str
+        The study's folders, ``config.bootstrap_roots(cfg, study)`` - SS bootstrap,
+        FX bootstrap and the study folder holding the dataset (see
+        :func:`dataset_csv_path` and ``mra.arm_root``). A single folder holding
+        everything also works (the unit tests use one).
     im_tag : str
         e.g. ``"AvgSA_03"``.
     quantity : {"theta", "beta"}
@@ -946,7 +997,7 @@ def load_fragility_data(
             if arm in CORE_ARMS:
                 raise FileNotFoundError(
                     f"no saved {quantity} bootstrap for the core arm {arm!r} "
-                    f"({ARMS[arm]}) - run nb 070 first")
+                    f"({arm_file_name(arm, fx_of(root))}) - run nb 070 first")
             if verbose:
                 print(f"  {arm:8s} ({symbol:5s}): no saved bootstrap - skipped")
             reps[symbol] = estimates[symbol] = estimates_bc[symbol] = None
@@ -1143,8 +1194,8 @@ def _check_against_estimate_files(data: FragilityData, root: Path | str) -> None
     for symbol in data.available:
         arm = ARM_OF_SYMBOL[symbol]
         scope = SCOPE_OF_ARM[arm]
-        ests = mra.load_estimates(root, data.im_tag, scope=scope,
-                                  arms=[ARMS[arm]])[ARMS[arm]]
+        token = arm_file_name(arm, fx_of(root))
+        ests = mra.load_estimates(root, data.im_tag, scope=scope, arms=[token])[token]
         got = np.log(ests[data.quantity])
         if scope == "by_group":
             got = got.droplevel("n_storeys").reindex(data.groups)
@@ -1153,22 +1204,20 @@ def _check_against_estimate_files(data: FragilityData, root: Path | str) -> None
         np.testing.assert_allclose(
             data.hat(symbol).to_numpy(), got.to_numpy(), rtol=1e-12,
             err_msg=f"dataset {arm}_log_{data.quantity} disagrees with "
-                    f"{mra.estimates_csv_path(root, ARMS[arm], data.im_tag, scope).name}")
+                    f"{mra.estimates_csv_path(root, token, data.im_tag, scope).name}")
 
 
 # =============================================================================
 # Contrasts
 # =============================================================================
 #
-# Everything in the roadmap is a contrast of a, b and c (analysis_models.md
-# section 0). Making a contrast a first-class object is what stops nb 073
+# Everything in the roadmap is a contrast of a, b and c. Making a contrast a first-class object is what stops nb 073
 # rebinding `y0` to mean three different things in three different sections.
 #
 # The scope of a contrast is a property of the contrast, not a suffix on its
 # name. y0 and y1 are 120-row quantities; y2 is a 51-row quantity and STAYS one.
 # Replicating y2 to 120 rows would invent 69 rows of information that does not
-# exist and shrink SE(m2) by roughly sqrt(120/51) ~ 1.53 for nothing
-# (analysis_models.md section 1(b)).
+# exist and shrink SE(m2) by roughly sqrt(120/51) ~ 1.53 for nothing.
 
 # name -> (left symbol, right symbol, scope, label)
 _CONTRAST_SPECS: dict[str, tuple[str, str, str, str]] = {
@@ -1192,8 +1241,7 @@ class Contrast:
     whole point of this object. The DerSimonian-Laird estimator can only use
     ``v``; REML needs ``V``; and the gap between the two IS a finding -- a
     diagonal V understates SE(m) for every contrast that touches a fixed-record
-    -set arm, because those arms share sampling error across rows
-    (analysis_models.md section 0). Having both on one object makes that
+    -set arm, because those arms share sampling error across rows. Having both on one object makes that
     comparison one line instead of a reconstruction.
 
     Attributes
@@ -1255,7 +1303,7 @@ class Contrast:
         variance of the DIFFERENCE, rather than assembling it as
         ``v_left + v_right``, is both algebraically identical and less
         error-prone, and it automatically carries any covariance between the two
-        arms rather than assuming there is none (analysis_models.md, A1 and A2).
+        arms rather than assuming there is none.
         """
         return pd.Series(np.diag(self.V), index=self.y_hat.index,
                          name=f"v_{self.name}")
@@ -1439,7 +1487,7 @@ def _check_bootstrap_scheme(model_id: str, scheme: str) -> None:
 
 @dataclass(frozen=True)
 class ModelSpec:
-    """One rung of the ladder in ``admin/analysis_models.md``.
+    """One rung of the A-series model ladder (A0 ... A16).
 
     Attributes
     ----------
@@ -3064,8 +3112,7 @@ def bootstrap_fits(con: Contrast, spec: ModelSpec, *, estimator: str,
                    boot_seed: int = BOOT_SEED, **kw) -> pd.DataFrame:
     """Refit the model inside every bootstrap replicate: one row per replicate.
 
-    This is the INFERENTIAL result (Efron & Tibshirani Ch. 6-7, and
-    analysis_models.md section 0). It carries every sampling covariance,
+    This is the INFERENTIAL result (Efron & Tibshirani Ch. 6-7). It carries every sampling covariance,
     including ones never written down, which the model-based standard error
     cannot.
 
@@ -3812,6 +3859,14 @@ class ModelRegistry(fcache.FitCacheMixin):
     without it they would overwrite each other's files on every run. ``None``
     and ``""`` both mean no tag.
 
+    ``fx_cache_dir`` (optional) is where the fits of models whose contrast uses
+    ONLY fixed-record-set arms (the A2 family, y2 = b - c) are cached instead of
+    ``cache_dir``. Those fits do not depend on the site-specific record set, so
+    they belong to the FX set rather than to one study: every study that pairs an
+    SS set with this FX set then shares them. Sharing is safe because a fit's
+    fingerprint holds only its own contrast, spec and code - the whole-container
+    hash is recorded in the metadata but never compared.
+
     Examples
     --------
     >>> theta = load_fragility_data(root, "AvgSA_03", quantity="theta")
@@ -3829,9 +3884,11 @@ class ModelRegistry(fcache.FitCacheMixin):
     def __init__(self, data: FragilityData,
                  specs: dict[str, ModelSpec] | None = None, *,
                  cache_dir: Path | str | None = None,
-                 cache_tag: str | None = None):
+                 cache_tag: str | None = None,
+                 fx_cache_dir: Path | str | None = None):
         self.data = data
         self.specs = dict(MODEL_SPECS if specs is None else specs)
+        self.fx_cache_dir = None if fx_cache_dir is None else Path(fx_cache_dir)
         self._fits: dict[tuple[str, str], ModelFit] = {}
         # Keyed on (name, corrected). Keyed on the name alone, the corrected
         # and uncorrected versions of a contrast would share one slot, and a
@@ -3972,7 +4029,7 @@ class ModelRegistry(fcache.FitCacheMixin):
 
             # Without a cache this is the original loop body, unchanged; with
             # one, the same body runs only when no valid file exists.
-            if self.cache_dir is None:
+            if self._model_cache_dir(model_id) is None:
                 fit_obj = self._fit_estimator(spec, con, estimator, n_boot=n_boot,
                                               verbose=verbose, boot_seed=boot_seed, **kw)
             else:
@@ -4030,11 +4087,22 @@ class ModelRegistry(fcache.FitCacheMixin):
 
     # -- the on-disk cache (active only with cache_dir) -----------------------
 
+    def _model_cache_dir(self, model_id: str) -> Path | None:
+        """``fx_cache_dir`` for a model whose contrast uses only fixed-set arms, else
+        ``cache_dir`` (see the class docstring)."""
+        spec = self.specs.get(model_id)
+        if self.fx_cache_dir is not None and spec is not None:
+            arms = _CONTRAST_SPECS.get(spec.contrast, ("a",))[:2]
+            if "a" not in arms:
+                return self.fx_cache_dir
+        return self.cache_dir
+
     def cache_path(self, model_id: str, estimator: str) -> Path:
         """Where ``(model_id, estimator)`` is saved: ``.../<quantity>/<id>_<est>.pkl``."""
-        if self.cache_dir is None:
+        cache_dir = self._model_cache_dir(model_id)
+        if cache_dir is None:
             raise ValueError("this registry has no cache_dir")
-        return (fcache.cache_folder(self.cache_dir, self.data, self.cache_tag)
+        return (fcache.cache_folder(cache_dir, self.data, self.cache_tag)
                 / self.data.quantity / f"{model_id}_{estimator}.pkl")
 
     def _cache_fingerprint(self, spec: ModelSpec, con: Contrast, estimator: str,
@@ -4272,7 +4340,7 @@ class ModelRegistry(fcache.FitCacheMixin):
 # A0c and A4c separately is fine for each quantity alone, but wrong for any
 # statement about the PAIR -- and the MAFC propagation needs the pair: the
 # correlation between the TRUE theta and beta corrections, with the sampling
-# correlation taken out (analysis_models.md, A8).
+# correlation taken out (model A8).
 #
 # HOW IT IS BUILT, AND WHY THIS WAY
 # ---------------------------------
@@ -5801,7 +5869,8 @@ def check_joint_inputs(theta_data: FragilityData, beta_data: FragilityData,
        worry; if it ever were, it would show here first.
     4. **Conditioning** of the 2n x 2n V_known and of its blocks, and k against
        2n. Reported, not acted on: the default is always the full np.cov (the
-       alternatives and their costs are in dump/plan_joint_theta_beta_model.md, D8).
+       alternatives - shrinkage or a block-diagonal V - would each trade a known
+       bias for a smaller variance, so they are not used by default).
     5. **Skewness** of the theta and ln beta replicates of the contrast, per row,
        with the ``n_skew_rows`` most skewed beta rows listed for a Q-Q plot.
     6. **Context**: r_samp summary, r_naive and the per-arm within-unit
@@ -5875,7 +5944,7 @@ def check_joint_inputs(theta_data: FragilityData, beta_data: FragilityData,
                  f"{out['conditioning']['beta']['cond']:.1e}); k/2n = {k / (2 * n):.1f}")
     if cj["n_small"] or k < 4 * n:
         lines.append("    -> WARNING: V_known is near-singular or k is small against 2n; "
-                     "see plan D8 for the options (default stays the full np.cov)")
+                     "shrinkage or a block-diagonal V are the alternatives (default stays the full np.cov)")
 
     # -- 5: skewness -----------------------------------------------------------
     sk_t = pd.Series(stats.skew(jcon.theta.y.to_numpy(float), axis=1),

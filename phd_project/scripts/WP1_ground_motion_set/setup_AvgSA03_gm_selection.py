@@ -207,11 +207,11 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict] | None = N
 # Second, "optimised" selection (nbs 032/033/040/042 "-optimised" copies)
 # =============================================================================
 # A complete second AvgSA([0,3]) record selection, run alongside the original so
-# the two record sets can be compared. The original (SELECTION_CONFIG above, the
-# folders cfg["proc_data"]["gm_selection"] and cfg["results"]["AvgSA_03_record_
-# selection"]) is NOT touched by any of this: the optimised selection has its own
-# config constant and writes to its own folders (cfg["proc_data"]
-# ["gm_selection_optimised"], cfg["results"]["AvgSA_03_record_selection_optimised"]).
+# the two record sets can be compared. The original (SELECTION_CONFIG above, record
+# set "AvgSA_03__ks") is NOT touched by any of this: the optimised selection has its
+# own config constant and writes to its own record-set folders ("AvgSA_03__opt_ks":
+# 06_gm_selection/ss/AvgSA_03__opt_ks/ and results/04_record_selection/ss/AvgSA_03__opt_ks/).
+# Every scheme constant here is named, per set, by record_sets.ss.*.scheme in config.yaml.
 #
 # Why a separate constant rather than editing SELECTION_CONFIG: the per-stripe
 # fingerprint hashes the selection config, so editing SELECTION_CONFIG's round
@@ -305,10 +305,10 @@ SELECTION_CONFIG_OPTIMISED = {
 # unaffected. "weight_rsd595" is fingerprinted through imt_weights, as always.
 # Changing any value here therefore reselects the stripes of that selection only.
 #
-# Folders: cfg["proc_data"]["gm_selection_optimised__<scheme>"] and
-# cfg["results"]["AvgSA_03_record_selection_optimised__<scheme>"]. The GCIM file
-# (nb 031), the disaggregation inputs and the record JSON folder are shared and
-# read only, as for the KS-optimised selection.
+# Folders: each scheme is its own record set ("AvgSA_03__opt_mu_sigma",
+# "AvgSA_03__opt_ks_mu_sigma"), so its files sit in 06_gm_selection/ss/{ss_id}/ and
+# results/04_record_selection/ss/{ss_id}/. The GCIM file (nb 031), the disaggregation
+# inputs and the record JSON folder are shared and read only.
 
 # __mu_sigma rounds (user decision D2 = (a), 2026-10-19):
 #
@@ -484,22 +484,43 @@ def _select_stripe_keys(iml_keys_by_site: dict, disagg_stats, imls_for_selection
     return sorted(keys, key=lambda x: x[0]), invalid
 
 
-def wanted_stripe_keys(imt: str = DISAGG_IMT) -> list[tuple[int, float]]:
+def _imls_for_selection_path(imls_for_selection_fp=None):
+    """The stripe-grid JSON to use: the given one, else the live main-line grid.
+
+    The live grid (cfg["proc_data"]["AvgSA_03_imls_for_selection"]) keeps growing as
+    nb 017 adds remediation IMLs for the main-line record set. A record set that is
+    frozen (the side-quest sets, built on the grid as it was when the original "__ks" set
+    was selected) passes its own frozen copy instead -
+    06_gm_selection/ss/AvgSA_03__ks/imls_for_selection_AvgSA_03.json - so re-running its
+    notebooks can never add stripes to it. The grid is not part of any stripe
+    fingerprint (see stripe_source_fps), so the choice changes WHICH stripes are wanted,
+    never whether an existing stripe is stale.
+    """
+    if imls_for_selection_fp is None:
+        return cfg["proc_data"]["AvgSA_03_imls_for_selection"]
+    return imls_for_selection_fp
+
+
+def wanted_stripe_keys(imt: str = DISAGG_IMT, imls_for_selection_fp=None
+                       ) -> list[tuple[int, float]]:
     """The full wanted ``(site, iml)`` key set, without opening a disagg shard.
 
     Reads only the shard ``_index.json``, the 0.1 MB disagg-stats pickle and the
     IML-subset JSON, so it runs in milliseconds. Notebooks 031/032/033 use it to
     run the stale check *before* deciding which shards (if any) to load.
 
-    Guaranteed to equal ``list(setup_AvgSA03_gcim_gm_selection()[0].keys())`` --
-    both go through :func:`_select_stripe_keys`.
+    ``imls_for_selection_fp``: the stripe grid (see :func:`_imls_for_selection_path`);
+    ``None`` is the live main-line grid.
+
+    Guaranteed to equal ``list(setup_AvgSA03_gcim_gm_selection()[0].keys())`` for the
+    same grid -- both go through :func:`_select_stripe_keys`.
     """
     index = read_index(cfg["proc_data"]["AvgSA_03_disagg_data_shards"])
     iml_keys_by_site = {site: d[imt] for site, d in index.items() if imt in d}
 
     with open(cfg["proc_data"]["AvgSA_03_disagg_stats_gm_selection"], "rb") as f:
         disagg_stats = pickle.load(f)
-    with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
+    with open(_imls_for_selection_path(imls_for_selection_fp)) as f:
         imls_for_selection = json.load(f)
 
     keys, _ = _select_stripe_keys(iml_keys_by_site, disagg_stats, imls_for_selection, imt)
@@ -534,7 +555,8 @@ def setup_AvgSA03_gcim_gm_selection_w_IA(weight_rsd595=0.125, weight_ia=0.125, s
                              nonSA_imt_strs, sa_periods, t_upper, sites)
 
 
-def setup_AvgSA03_gcim_gm_selection_for_scheme(selection_config: dict, sites=None):
+def setup_AvgSA03_gcim_gm_selection_for_scheme(selection_config: dict, sites=None,
+                                               imls_for_selection_fp=None):
     """:func:`setup_AvgSA03_gcim_gm_selection` for a given selection scheme.
 
     Every notebook of a moment-objective selection (032/033 "__mu_sigma" /
@@ -552,12 +574,13 @@ def setup_AvgSA03_gcim_gm_selection_for_scheme(selection_config: dict, sites=Non
 
     For ``SELECTION_CONFIG`` / ``SELECTION_CONFIG_OPTIMISED`` it returns exactly what
     the plain setup function returns (weight 0.25, no scheme entry).
-    Same return value and ``sites`` semantics as the plain function.
+    Same return value, ``sites`` and ``imls_for_selection_fp`` semantics as the plain
+    function.
     """
     site_iml_disaggs, disagg_stats, site_model, basic_selection_ctx, gm_db = \
         setup_AvgSA03_gcim_gm_selection(
             weight_rsd595=selection_config.get("weight_rsd595", DEFAULT_WEIGHT_RSD595),
-            sites=sites)
+            sites=sites, imls_for_selection_fp=imls_for_selection_fp)
     scheme = normalise_selection_scheme(selection_config)
     if scheme["objective"] != "ks" or scheme["acceptance"] != "ks":
         # Only a non-default scheme is stored, so the default context stays exactly
@@ -571,8 +594,12 @@ def setup_AvgSA03_gcim_gm_selection_for_scheme(selection_config: dict, sites=Non
 DEFAULT_WEIGHT_RSD595 = 0.25
 
 
-def setup_AvgSA03_gcim_gm_selection(weight_rsd595=DEFAULT_WEIGHT_RSD595, sites=None):
+def setup_AvgSA03_gcim_gm_selection(weight_rsd595=DEFAULT_WEIGHT_RSD595, sites=None,
+                                    imls_for_selection_fp=None):
     """Build everything the AvgSA([0,3]) record selection needs.
+
+    ``imls_for_selection_fp`` picks the stripe grid (see :func:`_imls_for_selection_path`):
+    ``None`` is the live main-line grid; a frozen record set passes its own copy.
 
     ``sites`` selects which per-site disagg shards to load: ``None`` loads every
     site with a wanted stripe (the old whole-monolith behaviour), an iterable loads
@@ -595,7 +622,8 @@ def setup_AvgSA03_gcim_gm_selection(weight_rsd595=DEFAULT_WEIGHT_RSD595, sites=N
     imt_weights = _im_weights(selection_imts, {"RSD595": weight_rsd595})
 
     return _set_up_selection(conditioning_imt, selection_imts, imt_weights, 
-                             nonSA_imt_strs, sa_periods, t_upper, sites)
+                             nonSA_imt_strs, sa_periods, t_upper, sites,
+                             imls_for_selection_fp)
 
 
 def _im_weights(selection_imts, spec_weights: dict[str, float]):
@@ -619,7 +647,7 @@ def _im_weights(selection_imts, spec_weights: dict[str, float]):
 
 def _set_up_selection(
         conditioning_imt, selection_imts, imt_weights,
-        nonSA_imt_strs, sa_periods, t_upper, sites=None):
+        nonSA_imt_strs, sa_periods, t_upper, sites=None, imls_for_selection_fp=None):
 
     # some other things
     assumed_rake = -90  # assumed rake for RSD595 calculation
@@ -641,7 +669,7 @@ def _set_up_selection(
     # Only build ensembles for a per-site subset of IMLs (one MSA stripe each), listed in the
     # imls_for_selection JSON: {site_id_str: {structure_tag: [iml, ...], ..., "union": [iml, ...]}}.
     # We use the per-site "union" (all IMLs any structure at the site requests).
-    with open(cfg["proc_data"]["AvgSA_03_imls_for_selection"]) as f:
+    with open(_imls_for_selection_path(imls_for_selection_fp)) as f:
         imls_for_selection = json.load(f)
 
     # organise the disagg data, keyed by (site, iml). iml is the native key of the

@@ -27,7 +27,11 @@ Two very different things get confused here, so it names them explicitly:
 
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes
     python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --show 20
-    python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --selection optimised
+    python -m phd_project.scripts.WP1_ground_motion_set.diagnose_stale_stripes --selection AvgSA_03__opt_ks
+
+``--selection`` is any SS record-set id of config.yaml's ``record_sets.ss`` (default: the
+SS set of ``active_study``). The set's selection scheme and stripe grid come from the same
+registry, so the check is the one that set's own notebooks run.
 """
 
 from __future__ import annotations
@@ -39,6 +43,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from phd_project.config import config as config_mod
 from phd_project.config.config import load_config
 from phd_project.scripts import disagg_shards
 from phd_project.scripts.cache_utils import _manifest_path
@@ -49,24 +54,31 @@ from phd_project.scripts.WP1_ground_motion_set.gm_selection import (
     manifest_exclusion_version,
     stripe_pickle_path,
 )
+from phd_project.scripts.WP1_ground_motion_set import setup_AvgSA03_gm_selection as setup
 from phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection import (
     EXCLUSION_LIST_VERSION,
-    SELECTION_CONFIG,
-    SELECTION_CONFIG_OPTIMISED,
     UNAVAILABLE_RECORDS,
-    setup_AvgSA03_gcim_gm_selection,
+    setup_AvgSA03_gcim_gm_selection_for_scheme,
     stripe_fingerprints,
     stripe_source_fps,
     wanted_stripe_keys,
 )
 
-# Each selection's result folder (cfg["results"] key), selection config, and the
-# notebook that would (re)compute its stale stripes.
-SELECTIONS = {
-    "original": ("AvgSA_03_record_selection", SELECTION_CONFIG, "031 / 032"),
-    "optimised": ("AvgSA_03_record_selection_optimised", SELECTION_CONFIG_OPTIMISED,
-                  "032-optimised"),
-}
+
+def _selection(cfg: dict, ss_id: str) -> tuple[Path, dict, Path, str]:
+    """(result folder, selection config, stripe grid, notebook to re-run) of one SS set.
+
+    Everything comes from the record-set registry: the folder from the id, the scheme
+    constant from ``record_sets.ss.{id}.scheme``, the grid from ``.stripe_grid``. The
+    notebook is the set's own nb 032 - the main-line one for the live grid, the
+    side-quest copy for a frozen set.
+    """
+    info = config_mod.ss_info(cfg, ss_id)
+    folder = config_mod.ss_dir(cfg, "results", "record_selection", ss_id)
+    grid = config_mod.stripe_grid_path(cfg, ss_id)
+    nb = ("032 (main line)" if info.get("stripe_grid", "live") == "live"
+          else "032 in side-quest_gm_selection_optimisation/")
+    return folder, getattr(setup, info["scheme"]), grid, nb
 
 NO_PICKLE = "no stripe pickle on disk (never selected, or pruned)"
 NO_MANIFEST = "stripe pickle present but no .manifest.json (unmanaged)"
@@ -125,10 +137,10 @@ def _reason(stripe_fp: Path, site, iml, fp_fn, superseded) -> tuple[str, list[st
     return f"input mismatch (vs exclusion list v{v})", diff, None
 
 
-def diagnose(show: int = 10, selection: str = "original") -> int:
+def diagnose(show: int = 10, selection: str | None = None) -> int:
     cfg = load_config()
-    results_key, selection_config, recompute_nb = SELECTIONS[selection]
-    result_folder = Path(cfg["results"][results_key])
+    selection = config_mod.study(cfg)["ss"] if selection is None else selection
+    result_folder, selection_config, grid_fp, recompute_nb = _selection(cfg, selection)
     shard_dir = Path(cfg["proc_data"]["AvgSA_03_disagg_data_shards"])
 
     # --- environment first: a missing shard set makes EVERY stripe stale -----
@@ -162,8 +174,11 @@ def diagnose(show: int = 10, selection: str = "original") -> int:
           f"{len(list(result_folder.glob('*__stripe_iml_*.manifest.json')))} manifests")
 
     # --- the stale check, exactly as the notebooks run it -------------------
-    wanted = wanted_stripe_keys()
-    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection(sites=())
+    # The scheme-aware setup, as the notebooks use it: for a moment-objective scheme the
+    # plain setup would give a different IM weight, and so a different fingerprint.
+    wanted = wanted_stripe_keys(imls_for_selection_fp=grid_fp)
+    _, disagg_stats, _, ctx, _ = setup_AvgSA03_gcim_gm_selection_for_scheme(
+        selection_config, sites=(), imls_for_selection_fp=grid_fp)
     fp_fn, superseded = stripe_fingerprints(
         selection_config, stripe_source_fps(), ctx, disagg_stats)
 
@@ -235,8 +250,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--show", type=int, default=10,
                     help="how many stale stripes to list (default 10)")
-    ap.add_argument("--selection", choices=sorted(SELECTIONS), default="original",
-                    help="which selection's result folder to check (default: original)")
+    ap.add_argument("--selection", default=None,
+                    help="SS record-set id to check, e.g. AvgSA_03__ks "
+                         "(default: the SS set of record_sets.active_study)")
     args = ap.parse_args(argv)
     return diagnose(args.show, args.selection)
 

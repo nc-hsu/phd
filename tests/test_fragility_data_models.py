@@ -33,7 +33,9 @@ try:
     from phd_project.config import config
 
     _CFG = config.load_config()
-    _ROOT = _CFG["proc_data"]["bootstrapping"]
+    # The tests check the data that exist: the original study (__ks sets vs FEMA P695),
+    # pinned rather than read from record_sets.active_study.
+    _ROOT = config.bootstrap_roots(_CFG, "AvgSA_03__ks__vs__femap695")   # {"ss", "fx", "study"}
     _IM_TAG = "AvgSA_03"
     _HAVE_DATA = fm.dataset_csv_path(_ROOT, _IM_TAG).is_file()
 except Exception:  # pragma: no cover - config missing in a bare checkout
@@ -423,7 +425,7 @@ def test_arm_column_block_column_names_match_the_schema():
     That schema is what FragilityData reads the dataset by, so producer and
     consumer are checked against the same constant here.
     """
-    block = fm.arm_column_block(_ROOT, "msa_ss", fm.ARMS["msa_ss"], 3, _IM_TAG)
+    block = fm.arm_column_block(_ROOT, "msa_ss", fm.arm_file_name("msa_ss", _ROOT["fx_id"]), 3, _IM_TAG)
     assert block is not None
     cols, parts = block
     expected = {t.format(arm="msa_ss", q=q)
@@ -1269,7 +1271,7 @@ def test_real_A8a_matches_the_univariate_single_level_fits(real_theta, real_beta
 
 
 # --------------------------------------------------------------------------- #
-# The hybrid bootstrap (dump/plan_hybrid_bootstrap.md)                         #
+# The hybrid bootstrap                                                         #
 # --------------------------------------------------------------------------- #
 #
 # `bootstrap_scheme` on a spec chooses the outer bootstrap. "record" (the
@@ -1652,3 +1654,28 @@ def test_real_hybrid_bootstrap_removes_the_tau2_inflation(real_theta, real_beta)
     # The honest interval is the wider one, and it contains the estimate.
     assert hc["hi"] - hc["lo"] > rc["hi"] - rc["lo"]
     assert hc["lo"] < hyb.rho_tot < hc["hi"]
+
+
+
+# --------------------------------------------------------------------------- #
+# Arm file names are built from the fixed record set's id                      #
+# --------------------------------------------------------------------------- #
+
+def test_arm_file_names_are_generic_in_the_fixed_set():
+    """The dataset columns are named by the arm KEYS (the same for every FX set); the
+    files by tokens built from the FX id, which for FEMA P695 are the historical names."""
+    assert fm.arm_file_names("femap695") == {
+        "msa_fx": "msa_femap695", "ida_fx": "ida_femap695", "ida_ub": "ida_femap695_ub",
+        "ida_avg": "ida_femap695_avg", "msa_ss": "site_msa"}
+    other = fm.arm_file_names("nearfield2")
+    assert list(other) == list(fm.ARMS)
+    assert other["ida_ub"] == "ida_nearfield2_ub"
+    assert fm.arm_label("c_ub", "FEMA P695") == "IDA FEMA P695 (upper bound)"
+
+
+def test_loader_needs_the_study_mapping_to_know_the_fixed_set(tmp_path):
+    """A bare folder does not say which fixed set's files to read, so it is refused."""
+    assert fm.fx_of({"ss": tmp_path, "fx": tmp_path, "study": tmp_path,
+                     "fx_id": "femap695"}) == "femap695"
+    with pytest.raises(TypeError):
+        fm.fx_of(tmp_path)

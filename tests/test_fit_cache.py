@@ -1,7 +1,6 @@
 """Tests for the on-disk model-fit cache (``phd_project/scripts/fit_cache.py``).
 
-The task is ``dump/task_fit_cache.md`` and the plan ``dump/plan_fit_cache.md``.
-What these tests pin down, in the order of the plan's section 2.5:
+What these tests pin down:
 
 1. A loaded fit is the SAME fit: every saved number identical to the fresh one,
    and the loaded fit hangs off the registry's own memoised contrast.
@@ -533,3 +532,27 @@ def test_round_trip_on_the_real_container(tmp_path):
     for f, l in zip(fresh, loaded):
         assert reg.cache_log[("A0a", l.estimator)].startswith("loaded")
         assert_same_fit(f, l)
+
+
+# --------------------------------------------------------------------------- #
+# FX-only models are cached in the fixed record set's folder                   #
+# --------------------------------------------------------------------------- #
+
+def test_fx_only_models_are_cached_in_fx_cache_dir(toy, tmp_path):
+    """A2 (MSA-FX vs IDA-FX) uses no site-specific arm, so with ``fx_cache_dir`` set its
+    fit goes to (and is loaded from) the FX folder, shared by every study; a model using
+    the SS arm (A0a) stays in the study's ``cache_dir``. Without ``fx_cache_dir`` both
+    go to ``cache_dir`` as before."""
+    specs = {"A0a": _A0A, "A2": fm.MODEL_SPECS["A2"]}
+    study, fx = tmp_path / "study", tmp_path / "fx"
+    reg = _reg(toy[0], study, specs=specs, fx_cache_dir=fx)
+    assert reg.cache_path("A2", "REML").is_relative_to(fx)
+    assert reg.cache_path("A0a", "REML").is_relative_to(study)
+    reg.fit("A2", n_boot=20)
+    assert reg.cache_path("A2", "REML").is_file()
+    assert not any(study.rglob("A2_*.pkl"))
+    again = _reg(toy[0], tmp_path / "another_study", specs=specs, fx_cache_dir=fx)
+    again.fit("A2", n_boot=20)
+    assert _status(again, "A2").startswith("loaded")          # shared across studies
+    plain = _reg(toy[0], study, specs=specs)
+    assert plain.cache_path("A2", "REML").is_relative_to(study)

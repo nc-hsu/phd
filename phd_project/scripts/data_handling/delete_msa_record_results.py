@@ -16,7 +16,7 @@ ordinary launch of each building re-runs only those records.
 Input CSV
 ---------
 One row per slot to delete, with columns (as written by nb 043, e.g.
-``data_processed/07_gm_records/swapped_esm_records_msa_usage_AvgSA_03.csv``)::
+``data_processed/06_gm_selection/ss/AvgSA_03__ks/swapped_esm_records_msa_usage_AvgSA_03.csv``)::
 
     site, structure, stripe_iml, record_index[, record_tag]
 
@@ -32,7 +32,12 @@ What is deleted
 ---------------
 Per row, every file matching ``record_{k}_*`` in
 
-    <root>/site_{site}/{structure}/mdof/msa_{im}/stripe_{stripe_iml}/
+    <root>/site_{site}/{structure}/mdof/msa_{ss_id}/stripe_{stripe_iml}/
+
+where ``msa_{ss_id}`` is the MSA results folder of ONE site-specific record set (e.g.
+``msa_AvgSA_03__ks``; config.ss_msa_names). Each record set has its own folder, so the
+record set is always named explicitly - deleting from the wrong set's results is the one
+mistake this script must not make.
 
 i.e. the five per-record artefacts written by ``standes.analysis.msa.msa_one_record``
 (``_log.json``, ``_recorders.pickle``, ``_collapse_recorders.pickle``,
@@ -47,9 +52,9 @@ before, so running this script again on the same CSV would delete the fresh resu
 
 Usage
 -----
-    python -m phd_project.scripts.data_handling.delete_msa_record_results CSV --dry-run
-    python -m phd_project.scripts.data_handling.delete_msa_record_results CSV
-        [--root DIR] [--im AvgSA_03]
+    python -m phd_project.scripts.data_handling.delete_msa_record_results CSV --ss AvgSA_03__ks --dry-run
+    python -m phd_project.scripts.data_handling.delete_msa_record_results CSV --ss AvgSA_03__ks
+        [--root DIR]
 
 Always look at the ``--dry-run`` report first.
 """
@@ -105,14 +110,14 @@ def read_slots(csv_path: Path) -> pd.DataFrame:
     return df
 
 
-def plan_slot(row, root: Path, im: str) -> SlotPlan:
+def plan_slot(row, root: Path, results_folder: str) -> SlotPlan:
     """Locate one slot's result files and decide whether they may be deleted."""
     k = int(row["record_index"])
     record_tag = row.get("record_tag")
     record_tag = record_tag if isinstance(record_tag, str) and record_tag else None
 
     stripe_dir = (root / f"site_{row['site']}" / row["structure"] / "mdof"
-                  / f"msa_{im}" / f"stripe_{row['stripe_iml']}")
+                  / results_folder / f"stripe_{row['stripe_iml']}")
     plan = SlotPlan(site=row["site"], structure=row["structure"],
                     stripe_iml=row["stripe_iml"], record_index=k, record_tag=record_tag,
                     stripe_dir=stripe_dir, status=NOTHING)
@@ -184,8 +189,12 @@ def report(plans: list[SlotPlan], dry_run: bool) -> None:
         print(f"       {p.stripe_dir} record {p.record_index}: {p.note}")
 
 
-def run(csv_path: Path, root: Path, im: str = "AvgSA_03", dry_run: bool = False) -> list[SlotPlan]:
+def run(csv_path: Path, root: Path, results_folder: str, dry_run: bool = False
+        ) -> list[SlotPlan]:
     """Plan every slot, print the report and (unless ``dry_run``) delete the files.
+
+    ``results_folder`` is the MSA results folder name inside each structure's mdof/
+    folder, e.g. ``"msa_AvgSA_03__ks"`` - i.e. which record set's results are touched.
 
     Planning is done for ALL rows before anything is deleted, so the report a real run
     prints is the same one ``--dry-run`` shows.
@@ -195,7 +204,7 @@ def run(csv_path: Path, root: Path, im: str = "AvgSA_03", dry_run: bool = False)
         raise FileNotFoundError(f"results root {root} does not exist (drive not mounted?)")
 
     slots = read_slots(csv_path)
-    plans = [plan_slot(row, root, im) for _, row in slots.iterrows()]
+    plans = [plan_slot(row, root, results_folder) for _, row in slots.iterrows()]
     report(plans, dry_run)
 
     if not dry_run:
@@ -229,13 +238,15 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, default=None,
                         help="results root holding site_*/ folders (default: config "
                              "analysis_data.wp1_casestudy_sites)")
-    parser.add_argument("--im", default="AvgSA_03",
-                        help="intensity measure; selects the msa_{im} results folder "
-                             "(default: AvgSA_03)")
+    parser.add_argument("--ss", required=True,
+                        help="site-specific record-set id whose MSA results are deleted, "
+                             "e.g. AvgSA_03__ks (selects the msa_{ss} results folder)")
     args = parser.parse_args()
 
+    from phd_project.config import config as config_mod
+    folder = config_mod.ss_msa_names(config_mod.load_config(), args.ss)["results"]
     try:
         run(args.csv, args.root if args.root is not None else _default_root(),
-            im=args.im, dry_run=args.dry_run)
+            results_folder=folder, dry_run=args.dry_run)
     except (FileNotFoundError, ValueError) as err:
         sys.exit(f"error: {err}")

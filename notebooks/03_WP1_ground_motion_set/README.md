@@ -20,8 +20,43 @@ Prose in the older notebooks cross-references a legacy work-package code scheme
 (`wp1pt4pt1f`, `wp1pt4pt1g`, …). These map onto the numbers above; the numbers are
 authoritative.
 
-Two subfolders hold work that is not part of the main chain: `archived/`,
-`partly_completed_ideas/` and `checks_and_tests/`.
+Four subfolders hold work that is not part of the main chain: `archived/`,
+`partly_completed_ideas/`, `checks_and_tests/` and `side-quest_gm_selection_optimisation/`
+(the investigation of better-optimised record sets, nb `034`; see its README).
+
+## Record sets
+
+Every stage from record selection onwards keeps each record set's files in its own folder,
+so several sets can sit side by side without overwriting each other. The sets are registered
+in `config.yaml` under `record_sets`:
+
+| Kind | Id | Folder pattern |
+|---|---|---|
+| site-specific (SS), one per selection scheme | `AvgSA_03__ks` (original), `AvgSA_03__opt_ks`, `AvgSA_03__opt_mu_sigma`, `AvgSA_03__opt_ks_mu_sigma` (main line) | `<stage>/ss/{ss}/` |
+| fixed (FX), the same records at every site | `femap695` | `<stage>/fx/{fx}/` |
+| study: one SS set analysed against one FX set | `AvgSA_03__ks__vs__femap695`, `AvgSA_03__opt_ks_mu_sigma__vs__femap695` | `<stage>/studies/{study}/` |
+
+`record_sets.active_study` names the study the main-line notebooks work on; they read it
+through `config.study(cfg)` and never name a set themselves. Folder paths come from
+`config.ss_dir`, `config.fx_dir`, `config.study_dir` and `config.bootstrap_roots`, and the
+stripe grid from `config.stripe_grid_path` (the main line uses the live grid of nb `017`; the
+side-quest sets use a frozen copy in `06_gm_selection/ss/AvgSA_03__ks/`). Results that depend
+only on the FX set (e.g. the A2 fits, MSA-FX vs IDA-FX) are stored once, in the FX folder.
+
+Nothing in the code is specific to FEMA P695: a fixed set is a `record_sets.fx` entry
+(`records`, `records_analysis_machine`, `record_glob`, `label`), and its id is spliced into
+every FX file name through the arm tokens `msa_{fx}`, `ida_{fx}`, `ida_{fx}_ub`,
+`ida_{fx}_avg` (`mra.fx_arm_names`; the site-specific arm is always `site_msa`). For
+`femap695` these are the existing file names. Record tags are positions in the sorted
+`record_glob` listing (`config.fx_record_files`, `scripts/fixed_record_sets.py`). FX ids are
+letters and digits only. The fixed set's covariate components in nb 072's dataset are
+`fx_ln_{saratio,ds595}_{mean,sigma}`, and the FX notebooks are named generically
+(`052-setup_ida_fx_…`, `053-convert_group_ida_fx_…`, `054-setup_msa_fx_…`,
+`061-group_msa_fx_…`).
+
+On the analysis drive the run folders carry the set name too: `msa_{ss}/`, `{ss}_stripes/`,
+`config_msa_{ss}.py` per site, and `ida__{fx}/`, `msa_{im}__{fx}/` per design group
+(`config.ss_msa_names`, `config.fx_msa_names`, `config.fx_ida_names`).
 
 ## Pipelines
 
@@ -62,9 +97,9 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 | `040`–`042` | selection results | downloaded + converted records | `037` |
 | `050_setup_msa_runs…` | stripe IMLs, converted records, model folders | MSA files + `site_*_msa_*` launchers | `042`, `011`, `017` |
 | `051-group_sites_by_structural_design` | site designs (`011`) | `unique_structural_designs.{csv,json}` — the 51 unique designs behind the 120 (site, storey) pairs | `011` |
-| `052-setup_ida_femap695_by_design_group` | design groups (`051`), site designs (`011`), existing per-site `ida_femap695` results | per-group IDA folders under `wp1_fixed_record_sets`, migrated 3s results, `fixed_record_sets/{n}s/mdof/ida_femap695.py`, `results/06_group_ida_femap695/group_folder_map.csv` | `011`, `051` |
-| `053-convert_group_ida_femap695_fragilities_to_avgsa` | per-group IDA results (`052`), design groups (`051`), site designs (`011`) | per-group collapse fragilities in SA / AvgSA_03 / AvgSA_06 under `wp1_design_groups/`, fanned back out to the per-site `site_{ii}/{tag}_ida_femap695_collapsefragility_{im}.json` files `014` wrote (so `054` / `061` are unchanged), plus a snapshot of `014`'s files and the group/site summary CSVs | `052` |
-| `054-setup_msa_femap695_by_design_group` | group IDA fragilities (`053`), design groups (`051`), FEMA P695 records | MSA-FEMAP695 stripe selections, per-group MSA files, `fixed_record_sets/{n}s/mdof/msa_AvgSA03_femap695.py` | `051`, `053` |
+| `052-setup_ida_fx_by_design_group` | design groups (`051`), site designs (`011`), existing per-site `ida_femap695` results | per-group IDA folders (`ida__{fx}/`) under `wp1_fixed_record_sets`, migrated 3s results, `fixed_record_sets/{n}s/mdof/ida__{fx}.py`, `results/06_group_fx_analyses/{fx}/ida/group_folder_map.csv` | `011`, `051` |
+| `053-convert_group_ida_fx_fragilities_to_avgsa` | per-group IDA results (`052`), design groups (`051`), site designs (`011`) | per-group collapse fragilities in SA / AvgSA_03 / AvgSA_06 under `09_structure_fragility_curves/fx/{fx}/design_groups/`, fanned back out to per-site `fx/{fx}/sites/site_{ii}/{tag}_ida_femap695_collapsefragility_{im}.json` files, plus a snapshot of `014`'s files and the group/site summary CSVs | `052` |
+| `054-setup_msa_fx_by_design_group` | group IDA fragilities (`053`), design groups (`051`), FEMA P695 records | MSA-FX stripe selections (`results/04_record_selection/fx/{fx}/{im}/`), per-group MSA files (`msa_{im}__{fx}/`), `fixed_record_sets/{n}s/mdof/msa_{im}__{fx}.py` | `051`, `053` |
 
 > **Note — undownloadable records.** A record the selection picked can turn out to be
 > impossible to fetch from its source database. Do **not** delete it from

@@ -2,8 +2,9 @@
 
 For the site-specific Multiple-Stripe Analysis (MSA), ground motions were
 selected per conditioning IM -- ``AvgSA([0, 3])`` and ``AvgSA([0, 6])`` -- for
-60 sites x 6 stripes, giving 30 records per (site, IM, stripe). Those selections
-live in ``<gm_selection>/AvgSA_{03,06}_final_ensembles.pickle`` as a dict keyed
+60 sites x 6 stripes, giving 30 records per (site, IM, stripe). One record SET's
+selections live in its own folder,
+``data_processed/06_gm_selection/ss/{ss_id}/AvgSA_{03,06}_final_ensembles.pickle``, as a dict keyed
 by ``(site_index, stripe_iml)`` whose ``['recs']`` value is a DataFrame of the
 selected records (ESM and NGA-Sub mixed).
 
@@ -13,7 +14,7 @@ record counts as available if it is on the share (JSON conversion happens later)
     * NGA-Sub -> a folder ``NGASub_RSN_<rsn>`` exists under ``ngasub_folder``.
     * ESM     -> a file ``<event>__<station>__<loc>.h5`` exists under ``esm_folder``.
 
-This script writes three CSVs into the gm-selection folder:
+This script writes three CSVs into that record set's gm-selection folder:
     1. ``records_availability_summary.csv`` -- one row per (IM, site, stripe) with
        required/available/missing counts (split by database) and completeness
        flags (``stripe_complete`` and ``site_im_complete``).
@@ -24,10 +25,12 @@ This script writes three CSVs into the gm-selection folder:
        (site, IM) record sets as early as possible, in the same batched layout as
        ``ngasub_rsns_to_download_batched.csv``.
 
-Usage:
+Usage (the record set is always named explicitly - there is no default set):
     python -m phd_project.scripts.data_handling.summarise_record_availability
-        [--gm-selection-dir DIR] [--ngasub-folder DIR] [--esm-folder DIR]
-        [--site-model CSV] [--out-dir DIR]
+        --gm-selection-dir data_processed/06_gm_selection/ss/AvgSA_03__opt_ks_mu_sigma
+        [--ngasub-folder DIR] [--esm-folder DIR] [--site-model CSV] [--out-dir DIR]
+
+Notebooks call :func:`summarise_availability` directly with the set's folder (nb 040).
 """
 
 import argparse
@@ -289,7 +292,10 @@ def write_batched(path, ordered):
 # ---------------------------------------------------------------------------
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gm-selection-dir", type=Path, default=None)
+    # Required: which record set to audit is a choice, not a default. The other three
+    # inputs describe the shared record archive and site model, so they default to config.
+    parser.add_argument("--gm-selection-dir", type=Path, required=True,
+                        help="the record set's folder, 06_gm_selection/ss/{ss_id}")
     parser.add_argument("--ngasub-folder", type=Path, default=None)
     parser.add_argument("--esm-folder", type=Path, default=None)
     parser.add_argument("--site-model", type=Path, default=None)
@@ -298,7 +304,7 @@ def main(argv=None):
 
 
     cfg = load_config()
-    gm_selection_dir = args.gm_selection_dir or cfg["proc_data"]["gm_selection"]
+    gm_selection_dir = args.gm_selection_dir
     ngasub_folder = args.ngasub_folder or cfg["raw_data"]["ngasub_folder"]
     esm_folder = args.esm_folder or cfg["raw_data"]["esm_hdf5_folder"]
     site_model = args.site_model or cfg["hazard_models"]["eshm20_wp1_site_model"]

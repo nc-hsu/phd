@@ -44,6 +44,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from phd_project.config import config
 from phd_project.config.config import load_config
 from phd_project.scripts import gcim_saratio as gsr
 
@@ -485,7 +486,8 @@ PLOT_T_MIN, PLOT_T_MAX = 0.05, 3.0
 
 N_SITES, N_ROWS, N_DESIGNS = 60, 120, 51
 
-INT_PTH = (Path(cfg["proc_data"]["bootstrapping"]).parent
+# nb 072's hazard / GCIM-only intermediates, shared by every study
+INT_PTH = (Path(cfg["proc_data"]["fragility_statistical_analysis"])
            / "regression_coefficients")
 DISAGG_RTPS_FP = INT_PTH / "AvgSA_03_disagg_rtps_eps4.pickle"
 
@@ -496,7 +498,8 @@ PERIOD_RE = re.compile(r"period=([0-9.eE+-]+)")
 
 def modal_period(site: int, n_storeys: int) -> float:
     """First-mode period of the nonlinear model for one (site, structure) row."""
-    frag_dir = Path(cfg["proc_data"]["wp1_sites_fragility_curves"])
+    # the per-site IDA fragilities of the fixed record set
+    frag_dir = config.fx_dir(cfg, "proc_data", "structure_fragility_curves", "femap695") / "sites"
     fp = (frag_dir / f"site_{site}"
           / f"{n_storeys}s_cbf_dc2_site{site}_ida_femap695_collapsefragility_SA.json")
     with open(fp) as f:

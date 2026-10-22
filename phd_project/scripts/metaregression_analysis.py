@@ -1,4 +1,5 @@
 import json
+import re
 import warnings
 from pathlib import Path
 
@@ -6,33 +7,87 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
 from scipy.stats import chi2, kurtosis, skew
 
 from standes.fitting import lognorm_mle_fit, lognorm_moment_fit
 
-from phd_project.scripts.femap695_records import record_tag_to_column
+from phd_project.scripts.fixed_record_sets import record_tag_to_column
 
 # A resampled MSA fit is treated as degenerate once it exceeds this multiple of the
 # fit it was drawn from. The affected replicates sit many orders of magnitude away
 # (theta ~ 1e21), so anything from roughly 5 to 50 selects the same ones.
 _MAX_FIT_RATIO = 10.0
 
-# One colour per arm, fixed here so every figure in the chapter reads the same way. The
-# two FEMAP695 arms are warm, the site-specific arm cool, because the fixed-vs-site-
-# specific record set is the distinction the comparison is actually about.
-# The three ida_femap695* arms differ only in where inside the IDA's collapse bracket
-# each record's capacity is placed: the lower bound (the published fragility), the upper
-# bound, or the bracket's geometric mean. See nb 053 section 10.
-_ARM_COLORS = {"site_msa": "b", "msa_femap695": "tab:orange", "ida_femap695": "r",
-               "ida_femap695_ub": "tab:purple", "ida_femap695_avg": "tab:green"}
-_ARM_LABELS = {"site_msa": "MSA site-specific",
-               "msa_femap695": "MSA FEMA P695",
-               "ida_femap695": "IDA FEMA P695",
-               "ida_femap695_ub": "IDA FEMA P695 (upper bound)",
-               "ida_femap695_avg": "IDA FEMA P695 (geom. avg.)"}
+# -----------------------------------------------------------------------------
+# Arm names ("tokens"). Every saved bootstrap / estimate / bias file and every per-site
+# fragility JSON names the arm it belongs to. The site-specific arm is always
+# "site_msa"; the fixed-record-set (FX) arms carry the FX set's id, so a second fixed set
+# gets its own files instead of overwriting the first's:
+#
+#     msa_{fx}       MSA on the fixed set                      e.g. msa_femap695
+#     ida_{fx}       IDA, collapse-bracket lower bound          e.g. ida_femap695
+#     ida_{fx}_ub    IDA, collapse-bracket upper bound          e.g. ida_femap695_ub
+#     ida_{fx}_avg   IDA, collapse-bracket geometric mean       e.g. ida_femap695_avg
+#
+# The three ida_{fx}* arms differ only in where inside the IDA's collapse bracket each
+# record's capacity is placed: the lower bound (the published fragility), the upper bound,
+# or the bracket's geometric mean. See nb 053 section 10. FX ids are letters and digits
+# only (config.fx_info checks), which is what makes a token parse back unambiguously.
+# -----------------------------------------------------------------------------
+SS_ARM = "site_msa"
+FX_ARM_KINDS: tuple[str, ...] = ("msa", "ida", "ida_ub", "ida_avg")
+_ARM_RE = re.compile(r"^(msa|ida)_([A-Za-z0-9]+)(?:_(ub|avg))?$")
+
+# One colour per arm KIND, fixed here so every figure in the chapter reads the same way
+# whatever the fixed set. The fixed-set arms are warm, the site-specific arm cool,
+# because the fixed-vs-site-specific record set is the distinction the comparison is
+# actually about.
+_KIND_COLOURS = {"site_msa": "b", "msa": "tab:orange", "ida": "r",
+                 "ida_ub": "tab:purple", "ida_avg": "tab:green"}
+_KIND_LABELS = {"site_msa": "MSA site-specific",
+                "msa": "MSA {fx}",
+                "ida": "IDA {fx}",
+                "ida_ub": "IDA {fx} (upper bound)",
+                "ida_avg": "IDA {fx} (geom. avg.)"}
+
+
+def fx_arm_names(fx: str) -> dict[str, str]:
+    """The arm tokens of one FX set, keyed by kind:
+    ``{"msa": "msa_{fx}", "ida": "ida_{fx}", "ida_ub": "ida_{fx}_ub", "ida_avg": "ida_{fx}_avg"}``."""
+    if not fx.isalnum():
+        raise ValueError(f"FX id {fx!r} must be letters and digits only")
+    return {"msa": f"msa_{fx}", "ida": f"ida_{fx}",
+            "ida_ub": f"ida_{fx}_ub", "ida_avg": f"ida_{fx}_avg"}
+
+
+def parse_arm(arm: str) -> tuple[str, str | None]:
+    """``(kind, fx)`` of an arm token: ``"site_msa" -> ("site_msa", None)``,
+    ``"ida_femap695_ub" -> ("ida_ub", "femap695")``. Raises on anything else."""
+    if arm == SS_ARM:
+        return SS_ARM, None
+    m = _ARM_RE.match(arm)
+    if m is None:
+        raise ValueError(f"{arm!r} is not an arm token (site_msa, msa_{{fx}}, "
+                         f"ida_{{fx}}, ida_{{fx}}_ub, ida_{{fx}}_avg)")
+    return m[1] + (f"_{m[3]}" if m[3] else ""), m[2]
+
+
+def arm_colour(arm: str) -> str:
+    """The fixed colour of an arm token (by kind, so the same for every FX set)."""
+    return _KIND_COLOURS[parse_arm(arm)[0]]
+
+
+def arm_label(arm: str, fx_label: str | None = None) -> str:
+    """Figure label of an arm token, e.g. ``"IDA FEMA P695 (upper bound)"``.
+
+    ``fx_label`` is how the fixed set is named in figures (config.yaml
+    ``record_sets.fx.{fx}.label``); without it the FX id itself is used.
+    """
+    kind, fx = parse_arm(arm)
+    return _KIND_LABELS[kind].format(fx=fx_label or fx)
 
 # Efron & Tibshirani (1993) p.128: a bias below a quarter of the estimator's own standard
 # error costs less than 3.1% in RMSE and can be left uncorrected. The second threshold
@@ -54,15 +109,22 @@ def load_site_fragility_curves(
     frag_root: Path,
     sites: Sequence[int],
     n_storeys: Sequence[int],
+    fx: str,
 ) -> tuple[dict, dict]:
     """Load the MSA and IDA collapse fragilities for every site and storey count.
 
+    ``fx`` is the fixed record set whose IDA is paired with the site MSA (e.g.
+    "femap695"); its per-site files are ``{tag}_ida_{fx}_collapsefragility_AvgSA_03.json``.
+
     Returns ``(fragility_curves, fragility_curves_flat)``. The first is nested
-    ``[site][tag][arm]``, the second is flat ``[arm][tag]``. A structure is skipped
-    entirely unless *both* arms are present, so the two arms are always paired.
+    ``[site][tag][arm]``, the second is flat ``[arm][tag]``, with the arms keyed "msa" and
+    ``f"ida-{fx}"``. A structure is skipped entirely unless *both* arms are present, so the
+    two arms are always paired.
     """
+    ida_token = fx_arm_names(fx)["ida"]
+    ida_key = f"ida-{fx}"
     fragility_curves = {}
-    fragility_curves_flat = {"msa": {}, "ida-femap695": {}}
+    fragility_curves_flat = {"msa": {}, ida_key: {}}
 
     for site in sites:
         site_fcs = {}
@@ -70,7 +132,7 @@ def load_site_fragility_curves(
             tag = structure_tag(site, n)
             structure_fcs = {}
 
-            for arm, suffix in [("msa", "msa"), ("ida-femap695", "ida_femap695")]:
+            for arm, suffix in [("msa", "msa"), (ida_key, ida_token)]:
                 fc_path = (frag_root / f"site_{site}"
                            / f"{tag}_{suffix}_collapsefragility_AvgSA_03.json")
                 try:
@@ -97,13 +159,13 @@ def load_site_fragility_curves(
 # =============================================================================
 # Non-parametric bootstrap (fixed record set)
 # =============================================================================
-# The FEMA P695 far-field set is fixed, so both arms resample the *actual* per-record
+# A fixed (FX) record set (e.g. FEMA P695 far-field) never changes, so both arms resample the *actual* per-record
 # results - the IDA its collapse capacities (nb 053), the MSA its per-record collapse
 # flags (nb 061) - rather than drawing from a fitted lognormal. One record sample is
 # drawn once and reused by every structure in both arms, so replicate k means the same
-# 22 records everywhere: that is what "the same record set at every site" means, and it
+# records everywhere: that is what "the same record set at every site" means, and it
 # is what makes the two clouds comparable replicate-for-replicate. The record tags being
-# resampled are the ones defined in :mod:`phd_project.scripts.femap695_records`.
+# resampled are the ones defined in :mod:`phd_project.scripts.fixed_record_sets`.
 
 def draw_record_samples(
     record_tags: Sequence[str],
@@ -363,7 +425,7 @@ def expand_groups_to_sites(
 # =============================================================================
 # The site-specific MSA selects its records by GCIM, per site *and per stripe*, so this
 # arm has no fixed record set to resample and cannot reuse the shared sample the two
-# FEMAP695 arms share. Two consequences run through everything below. Each structure
+# fixed-set arms share. Two consequences run through everything below. Each structure
 # draws its own randomness, from its own seed. And because a stripe's records are its
 # own, the stripes are independent samples: resampling one stripe's n binary outcomes is
 # exactly a binomial draw at the observed collapse fraction, so the bootstrap needs only
@@ -516,7 +578,7 @@ def bootstrap_site_msa_fragilities(
 # -----------------------------------------------------------------------------
 # The count resample above needs only the collapse fractions, which is why it was written
 # first - nb 060 exported nothing else. It is now superseded by a record resample over the
-# per-record collapse flags, the same estimator the MSA-FEMAP695 arm uses.
+# per-record collapse flags, the same estimator the MSA-FX arm uses.
 #
 # What that does and does not change. Drawing 30 record indices with replacement from one
 # stripe's 30 flags and summing is *exactly* Binomial(30, z/30), so at an informative
@@ -524,7 +586,7 @@ def bootstrap_site_msa_fragilities(
 # is genuinely frozen, with no Jeffreys nudge to unfreeze it - and that the indices are
 # written to disk, so a replicate is auditable rather than reconstructed from a seed.
 #
-# The coherence that makes the MSA-FEMAP695 arm correlate across stripes is NOT available
+# The coherence that makes the MSA-FX arm correlate across stripes is NOT available
 # here: GCIM re-selects 30 different records at every site and IML, so there is no shared
 # record identity to propagate and each stripe is resampled on its own. Column k of the
 # flag table is a record *slot*, not a record - never join it across stripes.
@@ -664,7 +726,7 @@ def load_site_msa_index_samples(
 
     Guards against the file on disk having been drawn for a different replicate count or
     a different ensemble size - the mirror of the assertions nb 070 puts around the
-    FEMAP695 sample.
+    fixed-set sample.
     """
     columns = [str(i) for i in range(n_records)]
     df = pd.read_csv(path)
@@ -850,8 +912,33 @@ def print_stats(stat_dicts: list[dict[str, float]],
     print(value_string)
 
 
+# The bootstrap arm whose replicates depend on the SITE-SPECIFIC (SS) record set. Every
+# other arm (msa_{fx}, ida_{fx}*) depends on the FIXED (FX) record set only.
+SS_BOOTSTRAP_ARMS = frozenset({SS_ARM})
+
+
+def arm_root(root: Path | str | Mapping, arm: str) -> Path:
+    """The folder holding one arm's saved bootstrap / estimate / bias files.
+
+    ``root`` is one of two things:
+
+    * a mapping ``{"ss": ..., "fx": ...}`` - the record-set layout, built by
+      ``config.bootstrap_roots``. The SS arm's files sit in the SS set's folder
+      (10_.../ss/{ss_id}/bootstrapping) and the FX arms' files in the FX set's
+      (10_.../fx/{fx_id}/bootstrapping), because the two arms are resampled from
+      different record sets and one SS set can be paired with any FX set (and vice versa).
+    * a single folder holding every arm - what the unit tests build in a temporary
+      directory, where there is only ever one record set of each kind.
+
+    Every path builder below goes through here, so the choice is made in one place.
+    """
+    if isinstance(root, Mapping):
+        return Path(root["ss"] if arm in SS_BOOTSTRAP_ARMS else root["fx"])
+    return Path(root)
+
+
 def bootstrap_csv_path(
-    root: Path | str,
+    root: Path | str | Mapping,
     arm: str,
     quantity: str,
     im_tag: str,
@@ -859,7 +946,7 @@ def bootstrap_csv_path(
 ) -> Path:
     """Canonical filename for a saved bootstrap frame.
 
-    ``arm`` is e.g. ``"msa_femap695"``, ``quantity`` one of ``theta``/``beta``/
+    ``arm`` is an arm token, e.g. ``"msa_femap695"`` (see :func:`fx_arm_names`), ``quantity`` one of ``theta``/``beta``/
     ``theta_stats``/``beta_stats``/``fit_ok``, ``scope`` ``"by_group"`` or ``"by_site"``.
     Both the save and the reload go through here so the two cannot drift apart.
 
@@ -868,7 +955,7 @@ def bootstrap_csv_path(
     frames - the convention :func:`estimates_csv_path` already followed. Keeping the storey
     counts together is what lets a consumer ask for every structure at once.
     """
-    return Path(root) / f"{arm}_bootstrap_{quantity}_{im_tag}_{scope}.csv"
+    return arm_root(root, arm) / f"{arm}_bootstrap_{quantity}_{im_tag}_{scope}.csv"
 
 
 def select_storeys(
@@ -931,7 +1018,7 @@ def read_bootstrap_frame(path: Path | str, columns_name: str) -> pd.DataFrame:
 
 
 def load_saved_bootstrap(
-    root: Path | str,
+    root: Path | str | Mapping,
     arm: str,
     quantities: Sequence[str],
     n_storeys: int | Sequence[int] | None,
@@ -976,7 +1063,7 @@ def load_saved_bootstrap(
 
 # load the theta and beta bootstrap stats
 def load_saved_bootstrap_stats(
-    root: Path | str,
+    root: Path | str | Mapping,
     arm: str,
     quantities,
     n_storeys: int | Sequence[int] | None,
@@ -1222,13 +1309,13 @@ def stack_cloud_frames(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
     return out
 
 
-def estimates_csv_path(root: Path | str, arm: str, im_tag: str, scope: str) -> Path:
+def estimates_csv_path(root: Path | str | Mapping, arm: str, im_tag: str, scope: str) -> Path:
     """Canonical filename for a saved point-estimate frame.
 
     No storey count in the name: unlike the replicate clouds a single file carries every
     storey count, on the second level of its index.
     """
-    return Path(root) / f"{arm}_estimates_{im_tag}_{scope}.csv"
+    return arm_root(root, arm) / f"{arm}_estimates_{im_tag}_{scope}.csv"
 
 
 def _restore_unit_index(df: pd.DataFrame, index_name: str) -> pd.DataFrame:
@@ -1255,21 +1342,26 @@ def read_estimates_frame(path: Path | str,
 
 
 def load_estimates(
-    root: Path | str,
+    root: Path | str | Mapping,
     im_tag: str,
     scope: str = "by_site",
     arms: Sequence[str] | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Load several arms' saved point estimates at once, keyed by arm.
 
-    ``arms`` defaults to every arm the scope has: all three by site, the two FEMAP695 arms
-    by group. Unlike :func:`load_saved_bootstrap` a missing file raises rather than
+    ``arms`` defaults to every core arm the scope has: site_msa, msa_{fx} and ida_{fx} by
+    site, the two fixed-set arms by group. The default needs the FX id, so it is only
+    available when ``root`` is the ``config.bootstrap_roots`` mapping (which carries
+    ``fx_id``); with a plain folder pass ``arms``. Unlike :func:`load_saved_bootstrap` a missing file raises rather than
     returning ``None`` - these are an input to the models downstream, not a cache standing
     in for work that can simply be redone.
     """
     if arms is None:
-        arms = (["site_msa", "msa_femap695", "ida_femap695"] if scope == "by_site"
-                else ["msa_femap695", "ida_femap695"])
+        if not (isinstance(root, Mapping) and "fx_id" in root):
+            raise ValueError("pass `arms`, or root=config.bootstrap_roots(...) so the "
+                             "fixed set's arm names are known")
+        fx_arms = fx_arm_names(root["fx_id"])
+        arms = ([SS_ARM] if scope == "by_site" else []) + [fx_arms["msa"], fx_arms["ida"]]
 
     index_name = scope.removeprefix("by_")
     estimates = {}
@@ -1283,7 +1375,7 @@ def load_estimates(
     return estimates
 
 
-def bias_csv_path(root: Path | str, arm: str, quantity: str,
+def bias_csv_path(root: Path | str | Mapping, arm: str, quantity: str,
                   im_tag: str, scope: str) -> Path:
     """Canonical filename for a saved bias frame.
 
@@ -1302,7 +1394,7 @@ def read_bias_frame(path: Path | str, index_name: str = "site") -> pd.DataFrame:
     return _restore_unit_index(pd.read_csv(path, index_col=[0, 1]), index_name)
 
 
-def load_saved_bias(root: Path | str, arms: Sequence[str],
+def load_saved_bias(root: Path | str | Mapping, arms: Sequence[str],
                     quantities: Sequence[str],
                     n_storeys: int | Sequence[int] | None, im_tag: str,
                     scope: str) -> dict[str, dict[str, pd.DataFrame]] | None:
@@ -1406,8 +1498,12 @@ def storey_suptitle(fig, text: str, n_storeys: int | None) -> None:
 
 def _plot_arm_series(ax, series_by_arm: dict[str, pd.Series], ylabel: str,
                      means: bool = False, se_bands: bool = False,
-                     mcse_line: bool = False, legend: bool = True) -> None:
+                     mcse_line: bool = False, legend: bool = True,
+                     fx_label: str | None = None) -> None:
     """Scatter one diagnostic against the site number, one series per arm.
+
+    ``series_by_arm`` is keyed by arm token; colours and labels come from
+    :func:`arm_colour` / :func:`arm_label` (``fx_label`` names the fixed set).
 
     ``means`` adds each arm's across-site mean as a dashed line of its own colour;
     ``se_bands`` and ``mcse_line`` add the two materiality thresholds. ``legend=False``
@@ -1418,12 +1514,13 @@ def _plot_arm_series(ax, series_by_arm: dict[str, pd.Series], ylabel: str,
         ax.axhline(0, ls="-", color="k", lw=0.75)
 
     for arm, series in series_by_arm.items():
-        color = _ARM_COLORS[arm]
+        color = arm_colour(arm)
+        label = arm_label(arm, fx_label)
         ax.plot(series.index, series.to_numpy(), marker=".", mfc=color, mec=color,
-                ls="none", label=_ARM_LABELS[arm])
+                ls="none", label=label)
         if means:
             ax.axhline(series.mean(), ls="--", color=color,
-                       label=f"Avg. {_ARM_LABELS[arm]}")
+                       label=f"Avg. {label}")
 
     if se_bands:
         # the band is drawn to 0.4 unless something exceeds it, since a bias that large
@@ -1449,8 +1546,12 @@ def plot_bias_assessment(
     references: dict[str, pd.DataFrame] | None = None,
     contrasts: Sequence[tuple[str, str]] | None = None,
     n_storeys: int | None = None,
+    fx_label: str | None = None,
 ) -> tuple[plt.Figure, np.ndarray, plt.Figure, plt.Axes]:
     """Chart the per-site bias of every arm, before and after correction.
+
+    ``bias_data`` is keyed by arm token; ``fx_label`` is how the legends name the fixed
+    record set (config.yaml ``record_sets.fx.{fx}.label``, e.g. "FEMA P695").
 
     ``bias_data`` is keyed ``[arm]["theta"|"beta"]`` and every frame must already carry the
     ``bias_corrected`` columns :func:`add_bias_correction` adds. The 3x2 grid is arranged
@@ -1499,13 +1600,13 @@ def plot_bias_assessment(
     for j, (quantity, title, ylabel) in enumerate(columns):
         _plot_arm_series(axs1[0, j],
                          {a: bias_data[a][quantity]["bias"] for a in arms},
-                         ylabel, means=True, legend=False)
+                         ylabel, means=True, legend=False, fx_label=fx_label)
         _plot_arm_series(axs1[1, j],
                          {a: bias_data[a][quantity]["bias/se"] for a in arms},
-                         "Bias / S.E. [-]", se_bands=True, legend=False)
+                         "Bias / S.E. [-]", se_bands=True, legend=False, fx_label=fx_label)
         _plot_arm_series(axs1[2, j],
                          {a: bias_data[a][quantity]["bias/mcse"] for a in arms},
-                         "Bias / MCSE [-]", mcse_line=True, legend=False)
+                         "Bias / MCSE [-]", mcse_line=True, legend=False, fx_label=fx_label)
         axs1[0, j].set_title(title)
 
     # every panel draws the same arms, and the top-left one additionally carries the
@@ -1531,7 +1632,7 @@ def plot_bias_assessment(
         delta = bias_data[a]["beta"]["bias"] - bias_data[b]["beta"]["bias"]
         delta_corr = (bias_data[a]["beta"]["bias_corrected"]
                       - bias_data[b]["beta"]["bias_corrected"])
-        label = f"{_ARM_LABELS[a]} - {_ARM_LABELS[b]}"
+        label = f"{arm_label(a, fx_label)} - {arm_label(b, fx_label)}"
 
         axs2.plot(delta.index, delta.to_numpy(), ls="none", marker=marker, ms=5,
                   mfc="none", mec=color, alpha=0.6, label=f"{label} (uncorr.)")
@@ -2572,7 +2673,7 @@ def fit_reml(y: np.ndarray, X: np.ndarray, V_known: np.ndarray,
 
 
 # ---------------------------------------------------------------------------
-# Bivariate (joint theta / beta) REML -- the A8 models of analysis_models.md
+# Bivariate (joint theta / beta) REML -- the A8 models
 # ---------------------------------------------------------------------------
 #
 # THE MODEL

@@ -1,7 +1,7 @@
 """Shared pytest configuration: the ``slow`` marker and the ``--runslow`` switch.
 
 Some tests are Monte Carlo studies that take tens of minutes (the bootstrap
-coverage studies of ``dump/plan_hybrid_bootstrap.md``, H9). They are marked
+coverage studies of the hybrid bootstrap, H9). They are marked
 ``@pytest.mark.slow`` and SKIPPED by default, so the ordinary ``pytest`` run
 stays the same length it was. Run them on purpose with::
 

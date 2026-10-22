@@ -9,7 +9,7 @@ believe a hand-rolled estimator is to feed it data whose truth you already know
 and check that it hands the truth back.
 
 That is what this module does. It generates ``y`` from the generative story the
-roadmap writes down (``admin/analysis_models.md``, A1c), refits it with
+roadmap writes down for A1c, refits it with
 ``mra.fit_reml``, and reports how well the truth was recovered: bias against
 Monte-Carlo error, whether the model-based standard errors match the actual
 spread of the estimates, and whether nominal confidence intervals cover at their
@@ -619,7 +619,7 @@ def print_simulation_report(result: SimulationResult,
 # =============================================================================
 #
 # The same fake-data recovery check as above, for ``mra.fit_reml_mv``. The
-# generative story is the A8 model of analysis_models.md:
+# generative story is the A8 model:
 #
 #     (d_theta_j, d_beta_j) ~ N2(0, T_d)    one PAIR per design
 #     (s_theta_k, s_beta_k) ~ N2(0, T_s)    one pair per site
@@ -636,7 +636,7 @@ def print_simulation_report(result: SimulationResult,
 # V_known is the full 2n x 2n matrix. Its off-diagonal blocks V^theta-beta are
 # the point of the joint model: leaving them out of the FIT (``fit_V_known``)
 # while they are present in the DATA is how the "sampling correlation read as
-# true correlation" bias of analysis_models.md A8 is measured.
+# true correlation" bias of model A8 is measured.
 
 
 def _validate_components_mv(components: Mapping[str, tuple], n: int
@@ -913,8 +913,8 @@ def summarise_simulation_mv(result: MVSimulationResult) -> pd.DataFrame:
 # The hybrid bootstrap -- pseudo-data carrying ONE round of sampling noise
 # =============================================================================
 #
-# THE PROBLEM IT SOLVES (dump/report_joint_theta_beta_model.md section 4)
-# -----------------------------------------------------------------------
+# THE PROBLEM IT SOLVES
+# ---------------------
 # The record-only outer bootstrap refits each record-resampling replicate
 # y^(r) with V_known held fixed. Write a replicate as
 #

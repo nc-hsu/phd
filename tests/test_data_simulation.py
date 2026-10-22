@@ -394,7 +394,7 @@ def test_regression_recovers_every_coefficient(structure, V_bb):
 # The hybrid bootstrap: pseudo-data and the scheme-comparison study
 # =============================================================================
 #
-# dump/plan_hybrid_bootstrap.md. The record-only outer bootstrap refits each
+# The record-only outer bootstrap refits each
 # record-resampling replicate as it is; that replicate carries TWO rounds of
 # sampling noise while V_known describes one, so every replicate tau^2 is
 # inflated by about the mean sampling variance. The hybrid bootstrap refits

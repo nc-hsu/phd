@@ -1,4 +1,4 @@
-"""Tests for ``record_set_comparison`` (nb 034, plan ``dump/plan_record_set_rerun_decision.md``).
+"""Tests for ``record_set_comparison`` (nb 034).
 
 Two kinds, as in ``test_fragility_data_models.py``:
 
@@ -25,9 +25,11 @@ try:
     from phd_project.config import config
 
     _CFG = config.load_config()
-    _ORIG = Path(_CFG["results"]["AvgSA_03_record_selection"])
+    _ORIG = config.ss_dir(_CFG, "results", "record_selection", "AvgSA_03__ks")
     _GCIM = Path(_CFG["proc_data"]["gcim_dists"]) / "gcim_dist_AvgSA_03.pickle"
-    _BOOT = _CFG["proc_data"]["bootstrapping"]
+    # The tests check the data that exist: the original study (__ks sets vs FEMA P695),
+    # pinned rather than read from record_sets.active_study.
+    _BOOT = config.bootstrap_roots(_CFG, "AvgSA_03__ks__vs__femap695")
     _HAVE_SETS = _ORIG.is_dir() and _GCIM.is_file()
 except Exception:  # pragma: no cover - bare checkout
     _HAVE_SETS = False
@@ -238,7 +240,7 @@ def test_ecdf_xy_is_a_proper_step_cdf():
     assert np.allclose(y, [0.0, 1 / 3, 2 / 3, 1.0])
 
 
-_OPT = (Path(_CFG["results"]["AvgSA_03_record_selection_optimised"])
+_OPT = (config.ss_dir(_CFG, "results", "record_selection", "AvgSA_03__opt_ks")
         if _HAVE_SETS else None)
 
 
