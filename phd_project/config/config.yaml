@@ -147,6 +147,9 @@ proc_data:
   AvgSA_03_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_03_disagg_stats_wp1sites_eps4.pickle"
   AvgSA_06_disagg_data_gm_selection:  "data_processed/03_site_hazard/AvgSA_06_disagg_data_wp1sites_eps4.pickle"
   AvgSA_06_disagg_stats_gm_selection: "data_processed/03_site_hazard/AvgSA_06_disagg_stats_wp1sites_eps4.pickle"
+  # Disaggregation data for specific RTPs used in the regression analysis (nb 072 §8.10). 
+  # The pickles is a dict.
+  AvgSA_03_disagg_rtps: "data_processed/03_site_hazard/AvgSA_03_disagg_rtps_wp1sites_eps4.pickle"
   # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-033).
   # This is the LIVE stripe grid of the main line: nb 017 extends it with the remediation
   # IMLs that nb 060 asks for. The frozen grid the AvgSA_03__ks set (and nb 034) was built
