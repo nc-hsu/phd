@@ -1281,7 +1281,7 @@ def verify_against_reference(new_dstore, refs: dict, *, reader=None,
 
 
 def check_total_probability(dstore, parent_dstore, *, hcurves_004: dict | None = None,
-                            rtol_grid: float = 1e-6, rtol_004: float = 1e-6,
+                            rtol_grid: float = 1e-5, rtol_004: float = 1e-5,
                             disagg_type: str = DISAGG_TYPE,
                             report_fp: Path | None = None) -> pd.DataFrame:
     """The disaggregation adds up to the parent's hazard curve.
@@ -1305,6 +1305,23 @@ def check_total_probability(dstore, parent_dstore, *, hcurves_004: dict | None =
     With ``hcurves_004`` (the nb 004 pickle, ``[IML, MAFE]`` per site), the
     parent's mean curve is also compared with nb 004's: same model, so it must
     agree to summation noise.
+
+    Tolerances are set by float32, not float64:
+
+    - The engine stores its hazard rates (``map_array.rates_dt``) and its
+      curves (``hcurves-stats``) as float32 (~7 significant figures), while the
+      disaggregation is recomputed in float64. Differences of ~1e-6 relative
+      (about 10 float32 steps) are expected; ``rtol_grid = 1e-5`` (~80 steps)
+      sits above that and far below a real fault (a missing source or a wrong
+      site shows at the percent level).
+    - The nb 004 pickle holds MAFE computed by ``oqhelpers.get_hcurves_from_dstore``
+      as ``-log(1 - y) / T`` with ``y`` the float32 poe, so ``1 - y`` is rounded
+      to float32 steps of 1.2e-7: small MAFE values are quantised and those with
+      poe below ~6e-8 are exactly 0. A rate comparison would divide by those
+      zeros, so the comparison is made in **poe**: the pickle is converted back
+      with ``1 - exp(-T * MAFE)`` and allowed an absolute error of two float32
+      steps near 1 (``2 * spacing(float32(1))``, the most the rounding of
+      ``1 - y`` can cause) plus ``rtol_004`` relative.
     """
     oq = parent_dstore["oqparam"]
     imts = list(oq.imtls)
@@ -1357,15 +1374,20 @@ def check_total_probability(dstore, parent_dstore, *, hcurves_004: dict | None =
         if hcurves_004 is not None:
             for m, imt in enumerate(imts):
                 hc = np.asarray(hcurves_004[s][imt]["mean"])
-                mafe_parent = -np.log1p(-mean[s, m]) / oq.investigation_time
+                # back from the pickle's MAFE to poe (exact inverse of the
+                # -log(1 - y) / T it was made with, up to that step's rounding)
+                poe_004 = -np.expm1(-oq.investigation_time * hc[:, 1].astype(float))
+                poe_parent = mean[s, m].astype(float)
+                # absolute floor: the float32 rounding of 1 - y in nb 004
+                atol_004 = 2.0 * float(np.spacing(np.float32(1.0)))
                 ok = (np.allclose(hc[:, 0], grid[imt], rtol=1e-12, atol=0)
-                      and np.allclose(mafe_parent, hc[:, 1], rtol=rtol_004, atol=1e-300))
-                a, r = _rel_err(mafe_parent, hc[:, 1], 1e-300)
+                      and np.allclose(poe_parent, poe_004, rtol=rtol_004, atol=atol_004))
+                a, r = _rel_err(poe_parent, poe_004, atol_004)
                 rows.append({"site": s, "imt": imt, "p": -1, "level_g": np.nan,
                              "on_grid": True, "poe_disagg": np.nan, "poe_curve": np.nan,
                              "rel_or_dln": r, "tol": rtol_004,
                              "status": "PASS" if ok else "FAIL",
-                             "check": "parent mean curve == nb 004 pickle"})
+                             "check": "parent mean curve == nb 004 pickle (poe)"})
     return _report(rows, report_fp, "check_total_probability")
 
 

@@ -11,9 +11,12 @@ def get_hcurve_from_dstore(dstore, site_idx, imt , stat, investigation_time,
     hc_metadata = get_hc_metadata(dstore)
     imt_idx = hc_metadata["imt"].index(imt)
     stat_idx = hc_metadata["stat"].index(stat)
-    y_data = np.array(dstore["hcurves-stats"][site_idx, stat_idx, imt_idx, :])
+    # float32 in the datastore: cast before any arithmetic, and use log1p so
+    # small poes are not rounded away in 1 - y (see get_hcurves_from_dstore)
+    y_data = np.array(dstore["hcurves-stats"][site_idx, stat_idx, imt_idx, :],
+                      dtype=np.float64)
     if mafe:
-        y_data = -np.log(1-y_data) / investigation_time
+        y_data = -np.log1p(-y_data) / investigation_time
 
     x_data = np.array(get_imtls(dstore)[imt]).reshape(-1, 1)
     y_data = y_data.reshape(-1, 1)
@@ -45,10 +48,20 @@ def get_hcurves_from_dstore(dstore, mafe:bool=True):
             imtls = all_imtls[imt]
             stat_hcs = {}
             for stat_i, stat in enumerate(hc_metadata["stat"]):
-                # get the hc
-                y_data = s_data[stat_i, imt_i, :].reshape(-1, 1)
+                # get the hc. The engine stores hcurves-stats as float32; cast to
+                # float64 BEFORE any arithmetic.
+                y_data = s_data[stat_i, imt_i, :].astype(np.float64).reshape(-1, 1)
                 if mafe:
-                    y_data = -np.log(1-y_data) / investigation_time
+                    # MAFE = -ln(1 - poe) / T, evaluated as -log1p(-poe) / T.
+                    # The old form, -np.log(1 - y) on the float32 poe, formed
+                    # 1 - y in float32: it rounded 1 - y to steps of 6e-8, so
+                    # with T = 1 yr every MAFE carried an absolute error of up
+                    # to 3e-8 /yr (>10 % below ~3e-7 /yr) and any poe below
+                    # ~3e-8 came out as exactly 0 - a false "zero hazard"
+                    # ceiling. log1p is accurate for small poe, and the poe
+                    # itself keeps float32's ~7 significant figures at any
+                    # size, so the MAFE is now good to ~1e-7 relative.
+                    y_data = -np.log1p(-y_data) / investigation_time
                 
                 hc = np.hstack([np.array(imtls).reshape(-1, 1),
                                 y_data])
