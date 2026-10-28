@@ -192,3 +192,52 @@ def test_parent_config_is_psha_plus_max_sites(tmp_path):
     q_lines = [l for l in psha.read_text().splitlines() if not l.startswith(("#", "description"))]
     assert [l for l in p_lines if l] == [l for l in q_lines if l]
     assert "max_sites_disagg = 60" in fp.read_text()
+
+
+# --------------------------------------------------------------------------- #
+# hazard-curve readers by site (engine bug at disaggregation.py:205)          #
+# --------------------------------------------------------------------------- #
+
+class _FakeGetter:
+    """Stands in for an engine MapGetter: only ``.sids`` is used by the wrapper."""
+
+    def __init__(self, sids):
+        self.sids = np.asarray(sids, dtype=np.uint32)
+
+
+def _chunked(n_sites, n_chunks):
+    # the engine's own rule (map_getters / gen_chunks): site sid -> chunk sid % n
+    sids = np.arange(n_sites)
+    return [_FakeGetter(sids[sids % n_chunks == c]) for c in range(n_chunks)]
+
+
+def test_getters_by_sid_fewer_chunks_than_sites():
+    # 60 sites in 7 chunks: the plain list fails at sid 7 (the reported error),
+    # the wrapper returns the reader that holds each site
+    readers = _chunked(60, 7)
+    with pytest.raises(IndexError):
+        readers[7]
+    wrapped = mid._GettersBySid(readers)
+    wrapped.check_covers(range(60))
+    for sid in range(60):
+        assert sid in wrapped[sid].sids
+        assert wrapped[sid] is readers[sid % 7]
+    # list behaviour the engine might rely on is unchanged
+    assert len(wrapped) == 7 and list(wrapped) == readers
+
+
+def test_getters_by_sid_one_chunk_per_site_is_unchanged():
+    # the case the stock code was written for: reader k holds site k
+    readers = _chunked(5, 5)
+    wrapped = mid._GettersBySid(readers)
+    assert all(wrapped[k] is readers[k] for k in range(5))
+
+
+def test_getters_by_sid_refuses_missing_or_duplicate_sites():
+    with pytest.raises(ValueError):
+        mid._GettersBySid([_FakeGetter([0, 1]), _FakeGetter([1, 2])])
+    wrapped = mid._GettersBySid([_FakeGetter([0, 2])])
+    with pytest.raises(ValueError):
+        wrapped.check_covers([0, 1, 2])
+    with pytest.raises(IndexError):
+        wrapped[1]

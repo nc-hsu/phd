@@ -169,6 +169,60 @@ def engine_info() -> dict:
 _CALCULATOR_CLASS = None
 
 
+class _GettersBySid(list):
+    """The engine's list of hazard-curve readers, made indexable by site id.
+
+    Why this exists (engine bug, oq-engine-nc b8f3077961):
+    a classical job stores its hazard rates in ``n`` site *chunks*; site ``sid``
+    goes to chunk ``sid % n`` (``map_array.gen_chunks``). ``getters.map_getters``
+    returns one reader (``MapGetter``) per chunk, holding the sites of that chunk
+    in ``.sids``. ``n`` comes from ``getters.get_num_chunks``, read from the
+    *parent's* oqparam:
+
+    - if the job is itself a disaggregation, or N < concurrent_tasks // 2,
+      ``n = N`` -> one chunk per site, and reader k holds exactly site k;
+    - otherwise (our 60-site *classical* parent on the analysis machine)
+      ``n = concurrent_tasks // 2`` (or the memory-based tile count) < N.
+
+    ``DisaggregationCalculator.full_disaggregation`` then picks the reader for
+    each site as ``self.mgetters[sid]`` (``disaggregation.py:205``), which is only
+    right in the first case. In the second it reads the wrong chunk for sites
+    ``0..n-1`` and raises ``IndexError`` at ``sid = n``.
+
+    This list keeps the readers in their original order (so iteration, ``len``
+    and slicing behave as the engine expects) but answers an integer index with
+    the reader whose ``.sids`` actually contains that site. It is built from the
+    readers' own site lists rather than from ``sid % n``, so it does not depend
+    on the chunking rule, and it refuses a site that is missing or in two chunks.
+    """
+
+    def __init__(self, getters):
+        super().__init__(getters)
+        self._by_sid = {}
+        for getter in getters:
+            for sid in getter.sids:
+                sid = int(sid)
+                if sid in self._by_sid:
+                    raise ValueError(f"site {sid} is in more than one hazard chunk")
+                self._by_sid[sid] = getter
+
+    def __getitem__(self, key):
+        # integer index = site id (the only way disaggregation.py indexes it);
+        # slices fall through to ordinary list behaviour
+        if isinstance(key, (int, np.integer)):
+            try:
+                return self._by_sid[int(key)]
+            except KeyError:
+                raise IndexError(f"no hazard chunk holds site {int(key)}") from None
+        return super().__getitem__(key)
+
+    def check_covers(self, sids):
+        """Raise unless every site of the calculation has exactly one reader."""
+        missing = sorted(set(int(s) for s in sids) - set(self._by_sid))
+        if missing:
+            raise ValueError(f"sites {missing[:10]} are in no hazard chunk")
+
+
 def calculator_class():
     """Return :class:`MultiIMLDisaggCalculator`, defining it on first use.
 
@@ -197,6 +251,40 @@ def calculator_class():
 
         iml_levels: np.ndarray | None = None
         levels_sha256: str = "unknown"
+
+        def full_disaggregation(self):
+            """Stock ``full_disaggregation``, with the per-site reader lookup fixed.
+
+            The stock method builds ``self.mgetters`` from
+            ``getters.map_getters(...)`` and indexes it by site id, which fails
+            when the classical parent stored fewer chunks than sites (see
+            :class:`_GettersBySid`). The engine source is not edited. Instead
+            ``getters.map_getters`` is swapped, in this process, for a wrapper
+            that returns the same readers in a :class:`_GettersBySid`. The
+            wrapper is one-shot: on its first call it puts the original
+            function back, so only the single call at ``disaggregation.py:196``
+            is affected. The ``finally`` restores it even if the stock method
+            raises before reaching that call.
+
+            The readers, the hazard curves they return and the realisation
+            ranking are all stock; only which reader serves which site changes.
+            """
+            from openquake.calculators import getters as oq_getters
+
+            original = oq_getters.map_getters
+            sids = self.sitecol.sids
+
+            def map_getters_by_sid(*args, **kwargs):
+                oq_getters.map_getters = original      # one-shot: undo at once
+                wrapped = _GettersBySid(original(*args, **kwargs))
+                wrapped.check_covers(sids)
+                return wrapped
+
+            oq_getters.map_getters = map_getters_by_sid
+            try:
+                return super().full_disaggregation()
+            finally:
+                oq_getters.map_getters = original
 
         def compute(self):
             """Replace the placeholder ``hmap3`` with :attr:`iml_levels`, then
