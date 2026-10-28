@@ -68,7 +68,7 @@ def get_mask(keys: list, targets: list, df: pd.DataFrame):
 
 
 def group_disagg_data(groups: list[tuple], metadata, dstore,
-                      disagg_type, traditional, occurence=False):
+                      disagg_type, traditional):
     """
     Groups the dissagregation data stored in an openquake datastore according to
     groups and metadata.
@@ -77,7 +77,7 @@ def group_disagg_data(groups: list[tuple], metadata, dstore,
     disaggregation results.
     """
 
-    disagg_data = get_disagg_from_datastore(dstore, disagg_type, traditional, occurence)
+    disagg_data = get_disagg_from_datastore(dstore, disagg_type, traditional)
 
     grouped_data = {}
     for s, r in groups:

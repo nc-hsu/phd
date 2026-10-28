@@ -60,12 +60,16 @@ def get_hcurves_from_dstore(dstore, mafe:bool=True):
 
 
 def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps", 
-                              traditional=False, occurence=False):
+                              traditional=False):
     """
     Returns a dict. Each value corresponds to a site (key) and contains
     the dissaggreation results. 
     The return dict has the following structure:
     return_dict[site_id][imt][poe] = pd.DataFrame of disaggregation results
+
+    Exceedance only. The occurrence disaggregation P(m|X=x) needs a second
+    disaggregation at x + dx (Bradley 2010, Eq. 7) and now lives in
+    ``oq_multi_iml_disagg`` (``occurrence_disagg`` / ``collate_targets``).
     """
     investigation_time = dstore["oqparam"].investigation_time
     site_disaggs = {}
@@ -83,12 +87,7 @@ def get_disagg_from_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
                 disagg_slice = _build_slice(site_i, poe_i, imt_i, shape_descr)
                 df = _disagg_array_to_df(disagg_data[disagg_slice], 
                                          disagg_type, disagg_bins)
-                if occurence:
-                    imtl = get_imtl_from_hmap(dstore, site_i, imt_i, poe_i, 0)
-                    df =  _get_occurence_disagg(df, dstore, site_i, imt, imtl,
-                                                investigation_time)
-
-                if traditional and not occurence:
+                if traditional:
                     df = _get_traditional_disagg(df, investigation_time)
                 
                 poe_disagg[poe] = df
@@ -189,159 +188,22 @@ def _get_traditional_disagg(df, investigation_time):
     return df
 
 
-def _get_occurence_disagg(
-        df, dstore, site_idx, imt, imtl, investigation_time, delta=0.001):
-    # calculate the disaggregation results based on occurence, P(m|X=x)
-
-    # first do the traditional disaggregation
-    df = _get_traditional_disagg(df, investigation_time)
-    hc = get_hcurve_from_dstore(
-        dstore, site_idx, imt, "mean", investigation_time, mafe=True)
-    delta_imtl = delta * imtl
-    lambda_im1 = np.interp(imtl, hc[:,0], hc[:,1])              # lambda_im
-    lambda_im2 = np.interp(imtl+delta_imtl, hc[:,0], hc[:,1])   # lambda_(im + delta_im)
-    delta_lambda = lambda_im1 - lambda_im2
-    df["P(m|X=x)"] = (df["P(m|X>x)"] * lambda_im1 - df["P(m|X>x)"] * lambda_im2) / delta_lambda
-
-    return df
-
 def get_imtl_from_hmap(dstore, site_idx, imt_idx, poe_idx, stat_idx=0):
     # only works if the poe has a hmap. Interpolation not supported
     return dstore["hmaps-stats"][site_idx, stat_idx, imt_idx, poe_idx]
 
 
 # -----------------------------------------------------------------------------
-# IML-based disaggregation (iml_disagg runs)
+# IML-based disaggregation: stats helpers
 #
-# Notebook 020 disaggregates at a single target IML per calculation (OpenQuake's
-# ``iml_disagg``), so each datastore holds exactly one intensity level and no
-# ``poes_disagg`` / ``hmaps-stats``. The POE-based reader above therefore does
-# not apply; the helpers below read a single-IML datastore and collate a set of
-# them (one per target IML) into a flat, un-grouped dict keyed by site index.
+# The readers that collated one ``iml_disagg`` datastore per target IML
+# (get_iml_disagg_targets, get_disagg_from_iml_datastore, collate_disagg_by_iml)
+# and the occurrence functions (_get_occurence_disagg, _get_occurence_disagg_from_hc)
+# were removed: the occurrence functions used the SAME exceedance share in both
+# terms of Bradley's (2010) Eq. 7, so they returned P(m|X>x) labelled as P(m|X=x).
+# The replacement is phd_project/scripts/oq_multi_iml_disagg.py, which
+# disaggregates at x and x + dx in one child calculation.
 # -----------------------------------------------------------------------------
-
-def get_iml_disagg_targets(dstore):
-    """Return ``{imt: iml}``, the single target intensity level per IMT of an
-    ``iml_disagg`` run. Read from ``oqparam.imtls`` (which the engine populates
-    from ``iml_disagg``), falling back to ``oqparam.iml_disagg``.
-    """
-    oq = dstore["oqparam"]
-    imtls = getattr(oq, "imtls", None)
-    if imtls and all(len(np.atleast_1d(v)) >= 1 for v in imtls.values()):
-        return {imt: float(np.atleast_1d(levels)[0])
-                for imt, levels in imtls.items()}
-    iml_disagg = getattr(oq, "iml_disagg", None)
-    if iml_disagg:
-        return {imt: float(np.atleast_1d(v)[0]) for imt, v in iml_disagg.items()}
-    raise ValueError("could not determine the target IML(s) from the datastore")
-
-
-def _get_occurence_disagg_from_hc(df, hc, imtl, investigation_time, delta=0.001):
-    """Occurrence disaggregation ``P(m|X=x)`` using an externally supplied hazard
-    curve ``hc`` for the slope.
-
-    Mirrors :func:`_get_occurence_disagg` but takes ``hc`` (an ``(n_iml, 2)``
-    array of ``[IML, MAFE]``) directly instead of reading it from the datastore.
-    Needed for ``iml_disagg`` runs, whose own hazard curve has a single point and
-    so cannot supply the gradient ``d(lambda)/d(IML)``. ``hc`` must come from a
-    calculation with the *same* source model / logic tree as this disagg run
-    (see :func:`assert_shared_provenance`).
-    """
-    df = _get_traditional_disagg(df, investigation_time)
-    delta_imtl = delta * imtl
-    lambda_im1 = np.interp(imtl, hc[:, 0], hc[:, 1])              # lambda_im
-    lambda_im2 = np.interp(imtl + delta_imtl, hc[:, 0], hc[:, 1])  # lambda_(im+delta)
-    delta_lambda = lambda_im1 - lambda_im2
-    df["P(m|X=x)"] = (df["P(m|X>x)"] * lambda_im1
-                      - df["P(m|X>x)"] * lambda_im2) / delta_lambda
-    return df
-
-
-def get_disagg_from_iml_datastore(dstore, disagg_type="TRT_Mag_Dist_Eps",
-                                  traditional=True, occurence=False, hcurves=None):
-    """Read a single-IML (``iml_disagg``) disaggregation datastore.
-
-    Returns ``dict[site_id][imt] -> pd.DataFrame`` for the one target IML of the
-    run. Reuses the POE-based building blocks (:func:`get_bins`,
-    :func:`_build_slice`, :func:`_disagg_array_to_df`,
-    :func:`_get_traditional_disagg`) but takes the poe axis at index 0 (there is a
-    single level) and reads the target IML from :func:`get_iml_disagg_targets`
-    rather than from a hazard map.
-
-    For ``occurence=True`` pass ``hcurves`` = ``hcs[site_id][imt][stat] ->
-    (n_iml, 2)`` full-resolution hazard curves (``[IML, MAFE]``) matching this
-    run's source model; the ``"mean"`` stat is used for the slope.
-    """
-    investigation_time = dstore["oqparam"].investigation_time
-    targets = get_iml_disagg_targets(dstore)
-    disagg_data = dstore["disagg-stats"][disagg_type]
-    shape_descr = disagg_data.attrs["shape_descr"]
-    disagg_bins = get_bins(dstore, disagg_type)
-
-    n_poe = disagg_data.shape[len(disagg_data.shape) - 2]
-    if n_poe != 1:
-        raise ValueError(
-            f"expected a single intensity level for an iml_disagg run, "
-            f"found {n_poe} on the poe axis")
-
-    site_disaggs = {}
-    for site_i in range(disagg_data.shape[0]):
-        imt_disagg = {}
-        for imt_i, imt in enumerate(disagg_bins["imt"]):
-            imtl = targets[imt]
-            disagg_slice = _build_slice(site_i, 0, imt_i, shape_descr)
-            df = _disagg_array_to_df(disagg_data[disagg_slice],
-                                     disagg_type, disagg_bins)
-            if occurence:
-                if hcurves is None:
-                    raise ValueError(
-                        "occurence=True requires `hcurves` for the hazard-curve "
-                        "slope (the iml_disagg datastore has a single level)")
-                hc = np.asarray(hcurves[site_i][imt]["mean"])
-                df = _get_occurence_disagg_from_hc(
-                    df, hc, imtl, investigation_time)
-            elif traditional:
-                df = _get_traditional_disagg(df, investigation_time)
-            imt_disagg[imt] = df
-        site_disaggs[site_i] = imt_disagg
-
-    return site_disaggs
-
-
-def collate_disagg_by_iml(calc_ids, imls, disagg_type="TRT_Mag_Dist_Eps",
-                          traditional=True, occurence=True, hcurves=None,
-                          reader=None):
-    """Collate the single-IML disaggregations of one ``(IM, eps)`` pair into a
-    flat, un-grouped dict keyed by site index.
-
-    ``return[site_id][imt][iml] -> pd.DataFrame``, where ``iml`` is the target
-    level in g keyed as ``float`` at 6 significant figures (stable across the
-    full-precision floats OpenQuake round-trips).
-
-    Parameters
-    ----------
-    calc_ids, imls : parallel ordered sequences of OpenQuake calc ids and their
-        target IMLs (one per level) for a single ``(IM, eps)`` pair.
-    hcurves : ``hcs[site_id][imt][stat]`` hazard curves matching the pair, passed
-        through for the occurrence slope when ``occurence=True``.
-    reader : datastore opener; defaults to
-        ``openquake.commonlib.datastore.read``.
-    """
-    if reader is None:
-        from openquake.commonlib.datastore import read as reader
-
-    out = {}
-    for calc_id, iml in zip(calc_ids, imls):
-        iml_key = float(f"{float(iml):.6g}")
-        dstore = reader(calc_id)
-        site_disagg = get_disagg_from_iml_datastore(
-            dstore, disagg_type, traditional, occurence, hcurves)
-        for site_i, imt_dict in site_disagg.items():
-            out.setdefault(site_i, {})
-            for imt, df in imt_dict.items():
-                out[site_i].setdefault(imt, {})[iml_key] = df
-    return out
-
 
 def _disagg_summary_stats(df):
     """Per-DataFrame TRT proportions (``"<TRT> [%]"``) plus PoE-weighted
