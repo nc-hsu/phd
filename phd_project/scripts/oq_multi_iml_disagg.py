@@ -1149,6 +1149,17 @@ def _engine_version(dstore) -> str:
     return str(dstore.hdf5.attrs.get("engine_version", "unknown"))
 
 
+# Absolute noise floor for comparing two independent runs of the same model.
+# The engine forms each bin's probability through 1 - prod(1 - p) / 1 - exp(-rate)
+# steps, which leave an ABSOLUTE error of a few machine epsilons (2.2e-16) on the
+# scale of 1, whatever the size of the result. Observed: |diff| <= 4e-15 between
+# the 56-level child and the 1-level stock nb 020 jobs (same engine commit);
+# relative differences of ~2e-8 then appear only in bins of size ~1e-7. 1e-13 is
+# ~450 eps: far above that noise, and orders of magnitude below any error a real
+# fault would cause (a wrong site, chunk or level moves bins by 1e-3 or more).
+NOISE_ATOL = 1e-13
+
+
 def _rel_err(a: np.ndarray, b: np.ndarray, atol: float) -> tuple[float, float]:
     """(max |a-b|, max |a-b| / max(|b|, atol))."""
     d = np.abs(np.asarray(a, float) - np.asarray(b, float))
@@ -1159,7 +1170,7 @@ def _rel_err(a: np.ndarray, b: np.ndarray, atol: float) -> tuple[float, float]:
 
 def verify_against_reference(new_dstore, refs: dict, *, reader=None,
                              disagg_type: str = DISAGG_TYPE, rtol: float = 1e-9,
-                             atol: float = 1e-15, level_rtol: float = 0.0,
+                             atol: float = NOISE_ATOL, level_rtol: float = 0.0,
                              report_fp: Path | None = None) -> pd.DataFrame:
     """Compare a child with stock reference datastores, level by level.
 
@@ -1173,9 +1184,13 @@ def verify_against_reference(new_dstore, refs: dict, *, reader=None,
         for nb 020, whose reference IMLs come from the same 6-significant-figure
         text; small but non-zero for nb 072, whose reference levels came from a
         separate run of the same hazard model.
-    rtol, atol : for the disaggregation arrays. The child and the references are
+    rtol, atol : for the disaggregation arrays (all probabilities), passed as
+        ``|new - ref| <= atol + rtol * |ref|``. The child and the references are
         independent runs of the same model, so they agree to summation-order
-        noise (~1e-12), not bit for bit.
+        noise, not bit for bit. That noise is ABSOLUTE (a few machine epsilons,
+        observed <= 4e-15), so tiny bins show large relative differences; the
+        default ``atol = NOISE_ATOL`` (1e-13) sits above it. Do not set ``atol``
+        below ~1e-14 or the smallest bins fail on rounding alone.
 
     Compared per reference: the site collection, the bins
     (``disagg-bins/{Mag,Dist,Eps,TRT,Lon,Lat}``), the level (``hmap3``), the
@@ -1388,11 +1403,14 @@ def check_independence(base_dstore, perturbed_dstore, changed: list[tuple[int, i
 
 def compare_processed_shards(old_dir: Path, new_dir: Path, *, excluded: dict | None = None,
                              rtol: float = 1e-9, sum_tol: float = 1e-9,
+                             atol: float = NOISE_ATOL,
                              report_fp: Path | None = None) -> pd.DataFrame:
     """nb 021 check 4: the rebuilt shards against the pre-fix backup.
 
     Per (site, imt, iml): the exceedance columns ``P(X>x|T,m)``, ``nu_m`` and
-    ``P(m|X>x)`` must be unchanged (the levels and the model are the same);
+    ``P(m|X>x)`` must be unchanged (the levels and the model are the same) up
+    to rounding noise: ``atol`` on the bin probabilities, carried through to
+    ``nu_m`` and ``P(m|X>x)`` as explained in the loop below;
     ``P(m|X=x)`` must now sum to 1, be >= 0, and **differ** from
     ``P(m|X>x)`` - the old code wrote the exceedance share into the occurrence
     column, so equality there means the fix did not take effect. Zero-hazard
@@ -1418,9 +1436,31 @@ def compare_processed_shards(old_dir: Path, new_dir: Path, *, excluded: dict | N
                     if not np.array_equal(o[c].to_numpy(), n[c].to_numpy()):
                         rows.append({"site": s, "imt": imt, "iml": iml, "check": f"bins {c}",
                                      "value": np.nan, "status": "FAIL"})
-                for c in ("P(X>x|T,m)", "nu_m", "P(m|X>x)"):
-                    _, r = _rel_err(n[c].to_numpy(), o[c].to_numpy(), 1e-15)
-                    ok = np.allclose(n[c], o[c], rtol=rtol, atol=1e-15)
+                # The old shards come from the 1-level stock jobs and the new
+                # ones from the child: independent runs, so they agree to the
+                # absolute noise floor `atol` on the bin probabilities, not bit
+                # for bit. The floor is carried through to the derived columns
+                # (oqhelpers._get_traditional_disagg):
+                #   nu_m      = -ln(1 - p) / T      -> floor atol / T
+                #   P(m|X>x)  = nu_m / nu           -> floor (atol / T) / nu,
+                # and the share also inherits the relative noise of nu itself,
+                # (atol / T) / nu, which matters at low-hazard IMLs where nu is
+                # tiny. T (investigation time) and nu are recovered from the old
+                # frame itself, so no extra inputs are needed.
+                p_o = o["P(X>x|T,m)"].to_numpy(float)
+                nu_o = o["nu_m"].to_numpy(float)
+                pos = (p_o > 0) & (nu_o > 0)
+                T = float(np.median(-np.log1p(-p_o[pos]) / nu_o[pos])) if pos.any() else 1.0
+                share_sum = float(o["P(m|X>x)"].sum())
+                nu_tot = float(nu_o.sum()) / share_sum if share_sum > 0 else np.inf
+                floor_nu = atol / T
+                floor_share = floor_nu / nu_tot
+                tols = {"P(X>x|T,m)": (rtol, atol),
+                        "nu_m": (rtol, floor_nu),
+                        "P(m|X>x)": (rtol + floor_share, floor_share)}
+                for c, (rt, at) in tols.items():
+                    _, r = _rel_err(n[c].to_numpy(), o[c].to_numpy(), at)
+                    ok = np.allclose(n[c], o[c], rtol=rt, atol=at)
                     rows.append({"site": s, "imt": imt, "iml": iml, "check": c,
                                  "value": r, "status": "PASS" if ok else "FAIL"})
                 if float(iml) in excl.get(s, set()):
