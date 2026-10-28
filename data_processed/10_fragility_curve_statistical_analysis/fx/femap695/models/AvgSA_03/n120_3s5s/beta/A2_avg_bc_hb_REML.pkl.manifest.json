@@ -1,20 +1,24 @@
 {
   "inputs": {
     "spec": {
-      "hash": "611699dea7a2c353e7ab17298ae687f5614e296e43469736301a74e7ab43ac0f",
-      "summary": "ModelSpec {'model_id': 'A3ab', 'contrast': 'y0_avg', 'components': ('design', 'site'), 'covariates': ('d_ln_saratio_mean_unif', 'd_ln_ds595_mean_unif', 'd_ln_saratio_sigma_unif', 'd_ln_ds595_sigma_unif'), 'diagonal_V': False, 'corrected': False, 'bootstrap_scheme': 'record'}"
+      "hash": "eb9862b59ae0068f8ba3b77b086832969cfba45cdf05b7e9eeff613b9a3011e2",
+      "summary": "ModelSpec {'model_id': 'A2_avg_bc_hb', 'contrast': 'y2_avg', 'components': (), 'covariates': (), 'diagonal_V': False, 'corrected': True, 'bootstrap_scheme': 'hybrid'}"
     },
     "kw": {
       "hash": "559bededcb346584f1200f573f2076d34a011e43064063b0f635e49190772830",
       "summary": "kw {}"
+    },
+    "boot_seed": {
+      "hash": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "summary": "int=20261013"
     },
     "pickagm_version": {
       "hash": "0.1.0",
       "summary": "pickagm version"
     },
     "contrast": {
-      "hash": "4fdefd5443fad352f1f39ab315388977e144b1c97725655c8057063090993d2c",
-      "summary": "contrast y0_avg (theta, n=120, k=5000, corrected=False)"
+      "hash": "baa2378bd2ef4f47b4a105f695e1218613bfc798ea4f5af11a780ffcf2575913",
+      "summary": "contrast y2_avg (beta, n=51, k=5000, corrected=True)"
     },
     "code": {
       "hash": "9a21d883501e63d67ae975f182c046a2f61f01038005175e396a9df4c2125dfb",
@@ -22,15 +26,15 @@
     }
   },
   "_meta": {
-    "artifact": "A3ab_REML.pkl",
-    "git_commit": "f6488803",
-    "written_at": "2026-10-23T07:39:22.419345+00:00",
-    "model_id": "A3ab",
+    "artifact": "A2_avg_bc_hb_REML.pkl",
+    "git_commit": "4c58d807",
+    "written_at": "2026-10-27T15:54:40.199400+00:00",
+    "model_id": "A2_avg_bc_hb",
     "estimator": "REML",
     "im_tag": "AvgSA_03",
-    "quantity": "theta",
+    "quantity": "beta",
     "k": 5000,
-    "container_hash": "714bdf818de8085bbc8313bf20119a2dd8f11952fcf7f7a8618e7298363233ad",
+    "container_hash": "d4156d379e97fef0889e18685c889243bdac079d9bb00f6beda3eac5662b2b27",
     "versions": {
       "python": "3.12.10",
       "numpy": "2.2.6",
@@ -84,6 +88,6 @@
       "metaregression_analysis.summary_variance_re": "8b24a21cf0ad7c5a0f9fe2645233c12792d6a04708a061f022264c5b56fea46c",
       "metaregression_analysis.validate_studies": "21de8ee11c438d8a6425ddf7fc495b715591a66410f66578fb00b02227952f95"
     },
-    "n_boot_saved": 200
+    "n_boot_saved": 5000
   }
 }

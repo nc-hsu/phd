@@ -1,19 +1,23 @@
 {
   "inputs": {
     "spec": {
-      "hash": "049d3aee046d103363de8a81c636eab414c89a70c0ae74b9be8533f18b379edf",
-      "summary": "ModelSpec {'model_id': 'A3ae', 'contrast': 'y0_avg', 'components': ('design', 'site'), 'covariates': ('d_ln_saratio_mean_unif_corrected', 'd_ln_ds595_mean_unif_corrected', 'd_ln_saratio_sigma_unif_corrected', 'd_ln_ds595_sigma_unif_corrected'), 'diagonal_V': False, 'corrected': False, 'bootstrap_..."
+      "hash": "993ff0c62a156ef5ff1e30a909da6db13ab6a12843702b60a9d2bda891d96024",
+      "summary": "ModelSpec {'model_id': 'A0c_hb', 'contrast': 'y0_avg', 'components': ('design', 'site'), 'covariates': (), 'diagonal_V': False, 'corrected': False, 'bootstrap_scheme': 'hybrid'}"
     },
     "kw": {
       "hash": "559bededcb346584f1200f573f2076d34a011e43064063b0f635e49190772830",
       "summary": "kw {}"
+    },
+    "boot_seed": {
+      "hash": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "summary": "int=20261013"
     },
     "pickagm_version": {
       "hash": "0.1.0",
       "summary": "pickagm version"
     },
     "contrast": {
-      "hash": "4fdefd5443fad352f1f39ab315388977e144b1c97725655c8057063090993d2c",
+      "hash": "820094209c8ea7e8cd5feda7ae0d52a44ec4521ab0414a76266621d5ee9b429f",
       "summary": "contrast y0_avg (theta, n=120, k=5000, corrected=False)"
     },
     "code": {
@@ -22,15 +26,15 @@
     }
   },
   "_meta": {
-    "artifact": "A3ae_REML.pkl",
-    "git_commit": "f6488803",
-    "written_at": "2026-10-23T07:39:34.218512+00:00",
-    "model_id": "A3ae",
+    "artifact": "A0c_hb_REML.pkl",
+    "git_commit": "4c58d807",
+    "written_at": "2026-10-27T14:47:18.881756+00:00",
+    "model_id": "A0c_hb",
     "estimator": "REML",
     "im_tag": "AvgSA_03",
     "quantity": "theta",
     "k": 5000,
-    "container_hash": "714bdf818de8085bbc8313bf20119a2dd8f11952fcf7f7a8618e7298363233ad",
+    "container_hash": "e8be42650b4b3b0f96688954756f20b0f6be7d14aeb6215014e03d4e0c7d6b43",
     "versions": {
       "python": "3.12.10",
       "numpy": "2.2.6",
@@ -84,6 +88,6 @@
       "metaregression_analysis.summary_variance_re": "8b24a21cf0ad7c5a0f9fe2645233c12792d6a04708a061f022264c5b56fea46c",
       "metaregression_analysis.validate_studies": "21de8ee11c438d8a6425ddf7fc495b715591a66410f66578fb00b02227952f95"
     },
-    "n_boot_saved": 200
+    "n_boot_saved": 5000
   }
 }
