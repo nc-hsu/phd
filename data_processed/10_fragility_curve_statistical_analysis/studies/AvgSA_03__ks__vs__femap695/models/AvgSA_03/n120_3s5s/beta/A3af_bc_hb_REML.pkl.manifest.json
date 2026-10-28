@@ -1,0 +1,93 @@
+{
+  "inputs": {
+    "spec": {
+      "hash": "2604010b7f9aaca3e9a3045f498901713302af459d6a5df6e7f4e7074a40372a",
+      "summary": "ModelSpec {'model_id': 'A3af_bc_hb', 'contrast': 'y0_avg', 'components': ('design', 'site'), 'covariates': ('d_ln_saratio_mean_unif_recs', 'd_ln_ds595_mean_unif_recs', 'd_ln_saratio_sigma_unif_recs', 'd_ln_ds595_sigma_unif_recs'), 'diagonal_V': False, 'corrected': True, 'bootstrap_scheme': 'hybrid'}"
+    },
+    "kw": {
+      "hash": "559bededcb346584f1200f573f2076d34a011e43064063b0f635e49190772830",
+      "summary": "kw {}"
+    },
+    "boot_seed": {
+      "hash": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "summary": "int=20261013"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    },
+    "contrast": {
+      "hash": "65554602c79101713f830d4e91b7d129ada735de90ee20dfda7acb302459dd51",
+      "summary": "contrast y0_avg (beta, n=120, k=5000, corrected=True)"
+    },
+    "code": {
+      "hash": "9a21d883501e63d67ae975f182c046a2f61f01038005175e396a9df4c2125dfb",
+      "summary": "45 hashed functions/constants"
+    }
+  },
+  "_meta": {
+    "artifact": "A3af_bc_hb_REML.pkl",
+    "git_commit": "4c58d807",
+    "written_at": "2026-10-27T16:12:51.427475+00:00",
+    "model_id": "A3af_bc_hb",
+    "estimator": "REML",
+    "im_tag": "AvgSA_03",
+    "quantity": "beta",
+    "k": 5000,
+    "container_hash": "d4156d379e97fef0889e18685c889243bdac079d9bb00f6beda3eac5662b2b27",
+    "versions": {
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3"
+    },
+    "code_inventory": {
+      "data_simulation._hybrid_noise": "3ee6ebb7b0758a35f37d649d10e764fbcdcfc6e0ed176cbc95b8536837e3d9ee",
+      "data_simulation._validate_components": "dd57cbd8e2ebd2da274f05d401ab9c89b6ab84f25c21f037e6546e8b5feff800",
+      "data_simulation.build_component_gs": "8ef1d4fb9997b9cedbfea19148cbf433c8f347840d977694717a693783988db3",
+      "data_simulation.centre_replicates": "b389c5a523df1b4446891d70b4d567fb7e291084fbbdab69cb861b658172e851",
+      "data_simulation.draw_effects": "a9893c3cc5539f460c6722d9f5e6faba878c77fa324b3c7bdb0ac17004a0c930",
+      "data_simulation.hybrid_pseudo_data": "d6d7a1208d6868a63458f3a581e3c59bf6056fc010d83e981b65ac6d17ba879b",
+      "fragility_data_models.ARMS": "27f87628db29b61d353065ae62eda6593ea7e04798c7a2c97f78ccb097f4ef7a",
+      "fragility_data_models.BOOT_SEED": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "fragility_data_models.Contrast.diag_V": "116416e1c832ee976e90a5907ba15a9648ac8930437cea6c2717498cb488f596",
+      "fragility_data_models.Contrast.g": "355f21e5ad6635e96621b6dfe4a683829d0d91c6e99fc724b2ca9594e0b38fdb",
+      "fragility_data_models.Contrast.k": "5e5f62c754512be8dfc990c977811deecf11e20fd20bce6472d159cce7918fdb",
+      "fragility_data_models.Contrast.n": "140e5ef700c691be2c7a854e331fd59855a7daa0416ac313fe19cbd71e71d94f",
+      "fragility_data_models.Contrast.site_codes": "d3d981f1f1735db4ded4b283729c7c154f77a0bd003030e036e2e0b181001d6b",
+      "fragility_data_models.Contrast.v": "8e91177b349d94a70ce4b6a4bd8378b1eabe86092153e067c0a96208b34cea7b",
+      "fragility_data_models.ModelRegistry._fit_estimator": "e0d9be649d602f18fbda651b9b8f151c5077725e1d05d8c8436518e1751d6c08",
+      "fragility_data_models._hybrid_components": "4be2d85d05ce86b7ce2280b92306fa73ff08eb07a1caef0401980ed956fbab04",
+      "fragility_data_models.beta_column": "48afc8c4d3d14c62aa66fe33ac1952d8b3ca3124aba183cc81fe00529ebcbdb4",
+      "fragility_data_models.bootstrap_fits": "b101a2ff230e1cefd0f111e08b2fbba861299172d0dfa551625a40e30b706257",
+      "fragility_data_models.build_X": "dcf4d7f937b934cb3f3cc3ef7c343a1fb9391c89582aa7f911e1e8c46dca3241",
+      "fragility_data_models.build_components": "e6d49f310ad7aa259e072951b97db6308f0acb72f355435d29a71c3b579b5665",
+      "fragility_data_models.fit_dl": "b850040f4b6b570e0e75a1f3c1b671e30ce19b55ebee6fe9725c1d037fa19c73",
+      "fragility_data_models.fit_reml": "2b41e21b2392f219169cb1961bb6936b8eda7741017c16580711d8515ba49c72",
+      "metaregression_analysis._REML_ZERO_TOL": "9b1121f511b4c3712192d56200892fade81d8efc3d70705915d3baf1a2ea0ece",
+      "metaregression_analysis._align_studies": "2a811d120f0fd7131e7bbbf26ee8f0253f66e493152937732954789db6a9cf72",
+      "metaregression_analysis._build_sigma": "e386d164f5c10c6ca703262d1257b5e02a39e07042919d575a04ca4f261372d8",
+      "metaregression_analysis._label_list": "51c43398086d30274fd5b733ff5e033ac2458bbbb5c43466cdf806e40b37f3c0",
+      "metaregression_analysis.build_codes": "7f38190f10312ea4687b4956aa184d417b1b8823aa98bb57a3d4106247886275",
+      "metaregression_analysis.compute_C": "4f2e5e8943d51ef04df4c5e14b2423225aeea372c7a3db76a8cfef8a9d9a8da7",
+      "metaregression_analysis.compute_I_sq": "88724c6f2e14a64ed0a0ee43cd8a48ed4734193cf8e168930a30e480d905ac9e",
+      "metaregression_analysis.compute_I_sq_from_tau": "861686fd7016d53023c75627f9729a56d0b5896b0ce6b46b4f6fd32279118eee",
+      "metaregression_analysis.compute_Q": "c938a61789ed2ff96ecdbe95abc7540c1a772bcebcfdc507721c00d323d46127",
+      "metaregression_analysis.compute_Q_pvalue": "abeb2a6ee599d4faa6ae2e17579a15db6dc05d1258a72e8473913a8b57645c94",
+      "metaregression_analysis.compute_Tsquared": "bd811deee4cc3728dac28ab1af5b982f06cf56a3bb60c03efe69a6ba58faf40b",
+      "metaregression_analysis.compute_heterogeneity_stats": "ae3cd88914f9b6ba96ddbf139b9f60337bf5127e15ab6e9661280392946c0cdd",
+      "metaregression_analysis.compute_re_summary_effect": "951ef024e6eaa6d4403d4591deed9e3d0599936cc8b368039189889e7b846da8",
+      "metaregression_analysis.compute_typical_within_variance": "cfd69a596bd1cbda6ee920c63c042c5716544e958a57f633ad2e721853b67027",
+      "metaregression_analysis.fit_reml": "d540da4d9142cd340cbd2eaf61b482d879d5adaa5f2f471775e9a899230fac95",
+      "metaregression_analysis.get_fe_weights": "b7d5a1f9050f9e19e905f681513c8b7363c96de72ccc2844ae2ba06a2ce167fb",
+      "metaregression_analysis.get_re_weights": "a9032029c2747b9f5e76eba1475bc06aa48aa11b7cbad5db1b4d7368f2533c88",
+      "metaregression_analysis.make_indicator": "59d19a305b928de08927749169424bda7351e4bf0e4b2e89d60e123473998ff6",
+      "metaregression_analysis.reml_nll": "6d22385c8643163d7cde12fd108b33885e0171c4da0d516324f8ea6ebde98be5",
+      "metaregression_analysis.reml_nll_chol": "5ac14977c85b8af61d98d827d510d4d385e0ae8934ea83f7300d0b8170fb36f7",
+      "metaregression_analysis.summary_effect_re": "ffa65b7f99576fcb61ac2623f2f92c7672b55e27f2aa431f75ca9825bb1ddf7c",
+      "metaregression_analysis.summary_variance_re": "8b24a21cf0ad7c5a0f9fe2645233c12792d6a04708a061f022264c5b56fea46c",
+      "metaregression_analysis.validate_studies": "21de8ee11c438d8a6425ddf7fc495b715591a66410f66578fb00b02227952f95"
+    },
+    "n_boot_saved": 5000
+  }
+}

@@ -17,6 +17,10 @@ notebooks `032`, `033`, `040` and `042` one folder up.
 `034-comparison_original_and_optimised_gm_sets` compares all four sets (the three above and
 the main-line `AvgSA_03__opt_ks_mu_sigma`) and decides whether a re-run is justified.
 
+`073-statistical_models` is a legacy copy of main-line nb `073`, pinned to the study
+`AvgSA_03__ks__vs__femap695` and fitting every model it references. It records the results
+on the original sets that set the side quest off.
+
 ## Reproducibility
 
 - Each notebook here is **pinned to its own record set** (`SS = "..."` near the top). None of

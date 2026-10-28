@@ -1,0 +1,90 @@
+{
+  "inputs": {
+    "spec": {
+      "hash": "89189b4f2e017c47f92f1b207ff44237f91065cb4952b513a4296cb3e1c7248b",
+      "summary": "JointModelSpec {'model_id': 'A8b_bc_hb', 'contrast': 'y0_avg', 'components': ('design', 'site'), 'correlated': ('row',), 'covariates_theta': (), 'covariates_beta': (), 'estimators': ('REML',), 'corrected': True, 'bootstrap_scheme': 'hybrid'}"
+    },
+    "kw": {
+      "hash": "559bededcb346584f1200f573f2076d34a011e43064063b0f635e49190772830",
+      "summary": "kw {}"
+    },
+    "boot_seed": {
+      "hash": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "summary": "int=20261013"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    },
+    "contrast": {
+      "hash": "388311998398c6633416358055b469e07cc64438ba9b2b983f923e175f875bbd",
+      "summary": "joint contrast y0_avg (n=120, k=5000, beta corrected=True)"
+    },
+    "code": {
+      "hash": "f7385744466439ebbf58f3b8974fb2e7b62f1c3df2afa0a1885d0e727da44b53",
+      "summary": "42 hashed functions/constants"
+    }
+  },
+  "_meta": {
+    "artifact": "A8b_bc_hb.pkl",
+    "git_commit": "4c58d807",
+    "written_at": "2026-10-27T16:50:40.737774+00:00",
+    "model_id": "A8b_bc_hb",
+    "estimator": "REML",
+    "im_tag": "AvgSA_03",
+    "quantity": "theta+beta",
+    "k": 5000,
+    "container_hash": "f045cfcbb697020252fcc58d6dad548750af8f17ef4b2d07a41a289736d0f3cf",
+    "versions": {
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3"
+    },
+    "code_inventory": {
+      "data_simulation._PSD_TOL": "dfa601f6ddf08ada8c0cedaa42135288da214d622438d0a1f0844b817070d0b6",
+      "data_simulation._hybrid_noise": "3ee6ebb7b0758a35f37d649d10e764fbcdcfc6e0ed176cbc95b8536837e3d9ee",
+      "data_simulation._psd_root": "377724e76601348b28cb651867d5b1b2613b945594ce71f2ca42687042195ebb",
+      "data_simulation._validate_components": "dd57cbd8e2ebd2da274f05d401ab9c89b6ab84f25c21f037e6546e8b5feff800",
+      "data_simulation._validate_components_mv": "c52be91867ee0a44419dc669cfda01a6738e14d2524b1578c61181800e12e0b1",
+      "data_simulation.build_component_gs": "8ef1d4fb9997b9cedbfea19148cbf433c8f347840d977694717a693783988db3",
+      "data_simulation.centre_replicates": "b389c5a523df1b4446891d70b4d567fb7e291084fbbdab69cb861b658172e851",
+      "data_simulation.draw_effects_mv": "0130b6cf489476623177cd5fa11dac77577b31e3df5ebd919ffde9caead9ab74",
+      "data_simulation.hybrid_pseudo_data_mv": "b5c14fafd45ad68dfba8cd73a946b4ff0df42e4c9f7ea2fba9ceeba47546c3d4",
+      "fragility_data_models.ARMS": "27f87628db29b61d353065ae62eda6593ea7e04798c7a2c97f78ccb097f4ef7a",
+      "fragility_data_models.BOOT_SEED": "a716c3bc129fae430bf4134b4d3c4be928e874e56856e93037466272b8b992fd",
+      "fragility_data_models.Contrast.g": "355f21e5ad6635e96621b6dfe4a683829d0d91c6e99fc724b2ca9594e0b38fdb",
+      "fragility_data_models.Contrast.n": "140e5ef700c691be2c7a854e331fd59855a7daa0416ac313fe19cbd71e71d94f",
+      "fragility_data_models.Contrast.site_codes": "d3d981f1f1735db4ded4b283729c7c154f77a0bd003030e036e2e0b181001d6b",
+      "fragility_data_models.JointContrast.k": "5e5f62c754512be8dfc990c977811deecf11e20fd20bce6472d159cce7918fdb",
+      "fragility_data_models.JointContrast.n": "5b85933a803a5c8439a96b334ee6bf10f4f9577a3df970f9e480baaa6d8146be",
+      "fragility_data_models.JointModelRegistry._fit_joint": "93aab1ca2cfa015d3ee13623c88d09d96b0d14275febd63f89a41409607b2ec7",
+      "fragility_data_models.OUTCOMES": "119e4418932c1ebff8d75e33b3339ad98043e3760398397ad666d08fd8e09766",
+      "fragility_data_models._COMPONENT_NAMES": "f2f574d0747f0113941462216d088b09288aaedccd1806f699b85ec4fe7c8b1b",
+      "fragility_data_models._joint_column": "81f8b5e9667ba9ee92e78a7f7a0364bb103cc20384162fcd45420a9673b21f99",
+      "fragility_data_models.bootstrap_joint_fits": "12501cf3dc39621e797043f10029df07cd705e786a313c07fdcb299ebc11ae5f",
+      "fragility_data_models.build_X": "dcf4d7f937b934cb3f3cc3ef7c343a1fb9391c89582aa7f911e1e8c46dca3241",
+      "fragility_data_models.build_X_joint": "c5ea90fb01d88750146c8b2e957f355663c078641ae2085d975f3afccb3ba65b",
+      "fragility_data_models.build_components": "e6d49f310ad7aa259e072951b97db6308f0acb72f355435d29a71c3b579b5665",
+      "fragility_data_models.fit_reml_joint": "f5753d889270bff02c9286f4528615513f3bed419adcfe81542508e75b4fb01f",
+      "fragility_data_models.joint_level_factors": "95c812f5d40095570fa2c309917a9e3b7af01a762ff0756ff4d3b3d5eb669a5c",
+      "fragility_data_models.joint_level_gs": "e1db38eff4a00ce25c149e567ecbadf149ffe4838a11dd7afd750474a1106e96",
+      "metaregression_analysis._REML_ZERO_TOL": "9b1121f511b4c3712192d56200892fade81d8efc3d70705915d3baf1a2ea0ece",
+      "metaregression_analysis._build_sigma": "e386d164f5c10c6ca703262d1257b5e02a39e07042919d575a04ca4f261372d8",
+      "metaregression_analysis._build_sigma_mv": "78f67d0492b0e8f17dc681f0bda2153eb24948f71b0c208278691020c0dd7b17",
+      "metaregression_analysis._mv_outcome_columns": "130f0d94e56aa518a3b48b74e3bead262b8124cad92f8f505191ab4b4387aaf4",
+      "metaregression_analysis._pack_T": "c95ab7833ad9baa0b2362d024477cc550ff5c7700c4feb9ce13874775be3fdd3",
+      "metaregression_analysis._reml_mv_value_and_grad": "7b2760512c853eea5d95b81b5a4f1a49839369cf9dac191eeb95cf39347a1c1a",
+      "metaregression_analysis._unpack_T": "c4ff3379c0b9668278abcd99a29cb6a49a480e943728a0160d02c87e3ef0c74b",
+      "metaregression_analysis.build_codes": "7f38190f10312ea4687b4956aa184d417b1b8823aa98bb57a3d4106247886275",
+      "metaregression_analysis.fit_reml": "d540da4d9142cd340cbd2eaf61b482d879d5adaa5f2f471775e9a899230fac95",
+      "metaregression_analysis.fit_reml_mv": "94d8248127aaa742bb1a1d563c2d8c698e55823929235c2679ea972b20fa3b99",
+      "metaregression_analysis.make_indicator": "59d19a305b928de08927749169424bda7351e4bf0e4b2e89d60e123473998ff6",
+      "metaregression_analysis.reml_grad_mv": "49616427fbe7a3ee2f80743669f7f5e26030d110cdcd9000ac83515248edb563",
+      "metaregression_analysis.reml_nll": "6d22385c8643163d7cde12fd108b33885e0171c4da0d516324f8ea6ebde98be5",
+      "metaregression_analysis.reml_nll_chol": "5ac14977c85b8af61d98d827d510d4d385e0ae8934ea83f7300d0b8170fb36f7",
+      "metaregression_analysis.reml_nll_mv": "6bd838a8bac0f82fc454ef4708f912b123da0ee2589517c55b5e1cba619837b1"
+    },
+    "n_boot_saved": 5000
+  }
+}

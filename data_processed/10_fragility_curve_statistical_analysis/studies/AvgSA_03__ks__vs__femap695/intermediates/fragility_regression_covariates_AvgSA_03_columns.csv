@@ -51,6 +51,10 @@ dataset,d_ln_saratio_mean_unif_corrected,equal-weight mean over MSA-SS stripes o
 dataset,d_ln_saratio_sigma_unif_corrected,equal-weight mean over MSA-SS stripes of record-set SD ln SaRatio(T1) - SD of ln SaRatio(T1) over the fixed set's records (= drec_ln_saratio_sigma_unif + d_ln_saratio_sigma_unif),-
 dataset,d_ln_ds595_mean_unif_corrected,equal-weight mean over MSA-SS stripes of record-set mean ln Ds5-95 - mean of ln Ds5-95 over the fixed set's records (= drec_ln_ds595_mean_unif + d_ln_ds595_mean_unif),ln s
 dataset,d_ln_ds595_sigma_unif_corrected,equal-weight mean over MSA-SS stripes of record-set SD ln Ds5-95 - SD of ln Ds5-95 over the fixed set's records (= drec_ln_ds595_sigma_unif + d_ln_ds595_sigma_unif),ln s
+dataset,d_ln_saratio_mean_unif_recs,equal-weight mean over MSA-SS stripes of record-set mean ln SaRatio(T1) - mean of ln SaRatio(T1) over the fixed set's records (computed directly from the records; = d_ln_saratio_mean_unif_corrected),-
+dataset,d_ln_saratio_sigma_unif_recs,equal-weight mean over MSA-SS stripes of record-set SD ln SaRatio(T1) - SD of ln SaRatio(T1) over the fixed set's records (computed directly from the records; = d_ln_saratio_sigma_unif_corrected),-
+dataset,d_ln_ds595_mean_unif_recs,equal-weight mean over MSA-SS stripes of record-set mean ln Ds5-95 - mean of ln Ds5-95 over the fixed set's records (computed directly from the records; = d_ln_ds595_mean_unif_corrected),ln s
+dataset,d_ln_ds595_sigma_unif_recs,equal-weight mean over MSA-SS stripes of record-set SD ln Ds5-95 - SD of ln Ds5-95 over the fixed set's records (computed directly from the records; = d_ln_ds595_sigma_unif_corrected),ln s
 components,site,identifier / factor,-
 components,n_storeys,identifier / factor,-
 components,tag,identifier / factor,-

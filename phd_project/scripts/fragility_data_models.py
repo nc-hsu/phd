@@ -1564,8 +1564,8 @@ class ModelSpec:
 
 MODEL_SPECS: dict[str, ModelSpec] = {
     "A0a": ModelSpec(
-        "A0a", "y0", ("DL", "REML"), note="""
-        The headline: site-specific MSA against fixed-set IDA, intercept only.
+        "A0a", "y0", ("REML",), note="""
+        The basic result: site-specific MSA against fixed-set IDA, intercept only.
         exp(m0) is the correction factor an engineer would apply to a
         FEMA-P695-style IDA fragility to get the site-specific answer.
 
@@ -1575,6 +1575,14 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         confidence interval (Borenstein Ch. 17, not Ch. 14): the CI says where
         the MEAN correction lies, the PI says where the NEXT building lands,
         and it is the second one an engineer needs."""),
+
+    "A0a_hb": ModelSpec(
+        "A0a_hb", "y0", ("REML",), bootstrap_scheme="hybrid", 
+        note="""
+        The basic result: As for A0a - site-specific MSA against fixed-set IDA, 
+        intercept only. Uses the hybrid bootstrap scheme so teh bootstrap SEs 
+        represent the superpopulation.
+        """),
 
     "A0b": ModelSpec(
         "A0b", "y0_avg", ("REML",), note="""
@@ -1644,8 +1652,16 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         The random-effects includes the site * structure interaction + any 
         betwen row randomness."""),
 
+    "A0d_hb": ModelSpec(
+        "A0d_hb", "y0", ("REML",), components=("design", "site"), 
+        bootstrap_scheme="hybrid", note="""
+        A0a with the bewteen-study variance decomposed into random-effects,
+        building group, and site effects, based on the results of A1b and A1c.
+        The random-effects includes the site * structure interaction + any 
+        betwen row randomness."""),
+
     "A1a": ModelSpec(
-        "A1a", "y1", ("DL", "REML"), diagonal_V=True, note="""
+        "A1a", "y1", ("REML",), diagonal_V=True, note="""
         Site-specific MSA against fixed-set MSA: the pure record-set effect,
         with the analysis procedure held constant.
 
@@ -1874,7 +1890,56 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     The variance is divided out into the "design" and "site" components
     """
     ),
-    
+
+    "A3ab_bc": ModelSpec(
+        "A3ab_bc", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+        ), corrected=True, note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation. Bias corrected
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3ab_hb": ModelSpec(
+        "A3ab_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+        ), bootstrap_scheme="hybrid", note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered. Hybrid Bootstrap.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3ab_bc_hb": ModelSpec(
+        "A3ab_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+        ), corrected=True, bootstrap_scheme="hybrid", note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered. Bias corrected, Hybrid Bootstrap.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
     "A3ac": ModelSpec(
         "A3ac", "y0_avg", estimators=("REML",), components=("design", "site"), 
         covariates=(
@@ -2083,33 +2148,169 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         corrected=True, bootstrap_scheme="hybrid", note="""
         A3ae on bias-corrected estimates with the hybrid bootstrap scheme."""),
 
+    "A3af": ModelSpec(
+        "A3af", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif_recs", 
+            "d_ln_ds595_mean_unif_recs", 
+            "d_ln_saratio_sigma_unif_recs",
+            "d_ln_ds595_sigma_unif_recs",
+        ), note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only site-specific
+    covariates are considered: SARatio + its standard deviation and DS_595 + its
+    standard deviation. The values are based on the as-used record sets and not 
+    the target GCIM distributions
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3af_bc": ModelSpec(
+        "A3af_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_recs",
+            "d_ln_ds595_mean_unif_recs",
+            "d_ln_saratio_sigma_unif_recs",
+            "d_ln_ds595_sigma_unif_recs",
+        ),
+        corrected=True, note="""
+        A3ae on bias-corrected estimates. See A3af and A3a_bc."""),
+
+    "A3af_hb": ModelSpec(
+        "A3af_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_recs",
+            "d_ln_ds595_mean_unif_recs",
+            "d_ln_saratio_sigma_unif_recs",
+            "d_ln_ds595_sigma_unif_recs",
+        ),
+        bootstrap_scheme="hybrid", note="""
+        A3af with the hybrid bootstrap scheme"""),
+
+    "A3af_bc_hb": ModelSpec(
+        "A3af_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
+        covariates=(
+            "d_ln_saratio_mean_unif_recs",
+            "d_ln_ds595_mean_unif_recs",
+            "d_ln_saratio_sigma_unif_recs",
+            "d_ln_ds595_sigma_unif_recs",
+        ),
+        corrected=True, bootstrap_scheme="hybrid", note="""
+        A3af with bias correction and the hybrid bootstrap scheme"""),
+
     "A3b": ModelSpec(
-        # Was "A3a" (a copy-paste slip): the summary printed A3b's numbers under
-        # A3a's name. Fixed 2026-10-08; only the label changes, not the fit.
         "A3b", "y0_avg", estimators=("REML",), components=("design", "site"), 
         covariates=(
-            "ln_T1",), note="""
+            "ln_T1", "ln_overstrength", "ln_ductility",), note="""
     Regression analysis of the difference between site-specific MSA and IDA FX
     using the average collapse IML. In this regression only structure-specific
-    covariates are considered: SARatio + its standard deviation and DS_595 + its
-    standard deviation.
+    covariates are considered.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3b_bc": ModelSpec(
+        "A3b_bc", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=("ln_T1", "ln_overstrength", "ln_ductility",), corrected=True,
+        note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only structure-specific
+    covariates are considered. Bias corrected.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3b_hb": ModelSpec(
+        "A3b_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "ln_T1", "ln_overstrength", "ln_ductility",), 
+        bootstrap_scheme="hybrid", note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only structure-specific
+    covariates are considered. The hybrid bootstrap scheme is used.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3b_bc_hb": ModelSpec(
+        "A3b_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "ln_T1", "ln_overstrength", "ln_ductility",), 
+        bootstrap_scheme="hybrid", corrected=True, note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression only structure-specific
+    covariates are considered. The hybrid bootstrap scheme is used. Bias corrected
 
     The variance is divided out into the "design" and "site" components
     """
     ),
 
     "A3c": ModelSpec(
-        # Was "A3a"; see A3b.
         "A3c", "y0_avg", estimators=("REML",), components=("design", "site"), 
         covariates=(
-            "d_ln_saratio_mean_rtp5000", 
-            "d_ln_ds595_mean_rtp5000", 
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000",
-            "ln_T1"), note="""
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "ln_T1", "ln_overstrength", "ln_ductility",), note="""
     Regression analysis of the difference between site-specific MSA and IDA FX
     using the average collapse IML. In this regression all of the A3a and A3b 
     covariates are considered
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3c_bc": ModelSpec(
+        "A3c_bc", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "ln_T1", "ln_overstrength", "ln_ductility",), 
+        corrected=True, note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression all of the A3a and A3b 
+    covariates are considered. Bias corrected.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3c_hb": ModelSpec(
+        "A3c_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "ln_T1", "ln_overstrength", "ln_ductility",), 
+        bootstrap_scheme="hybrid", note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression all of the A3a and A3b 
+    covariates are considered. Hybrid bootstrap.
+
+    The variance is divided out into the "design" and "site" components
+    """
+    ),
+
+    "A3c_bc_hb": ModelSpec(
+        "A3c_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"), 
+        covariates=(
+            "d_ln_saratio_mean_unif", 
+            "d_ln_ds595_mean_unif", 
+            "d_ln_saratio_sigma_unif",
+            "d_ln_ds595_sigma_unif",
+            "ln_T1", "ln_overstrength", "ln_ductility",), 
+        corrected=True, bootstrap_scheme="hybrid", note="""
+    Regression analysis of the difference between site-specific MSA and IDA FX
+    using the average collapse IML. In this regression all of the A3a and A3b 
+    covariates are considered. Bias corrected. Hybrid bootstrap.
 
     The variance is divided out into the "design" and "site" components
     """
@@ -4635,8 +4836,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         Joint theta/beta version of A0b: one row-level 2x2 T_u, intercepts only.
         Gives rho_tot, the correlation between the TRUE theta and beta
         corrections with the sampling correlation (V_cross) taken out. Its
-        marginal tau^2's should be close to the A0c / A4c totals; with V_cross
-        set to zero they equal the univariate single-level fits exactly, and
+        marginal tau^2's should be close to the A0c totals for the univariate models; 
+        with V_cross set to zero they equal the univariate single-level fits exactly, and
         with it they move a little, because each outcome's GLS weights now
         borrow from the other's sampling errors."""),
     
@@ -4712,6 +4913,203 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         correlated=("design", "site", "row"), corrected=True,
         bootstrap_scheme="hybrid", note="""A8c on bias-corrected beta estimates 
         (theta is never corrected). Hybrid bootstrap. See A8c_bc and A8c_hb."""),
+
+    "A8d": JointModelSpec(
+        "A8d", "y0_avg", components=("design", "site"),
+        correlated=("site",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d are
+        rho_u are set to zero because their variance fraction is small and the rho
+        values are likely to be unreliable anyway."""),
+    
+    "A8d_bc": JointModelSpec(
+        "A8d_bc", "y0_avg", components=("design", "site"),
+        correlated=("site",), corrected=True,
+        note="""A8d on bias-corrected beta estimates. See A8d."""),
+
+    "A8d_hb": JointModelSpec(
+        "A8d_hb", "y0_avg", components=("design", "site"),
+        correlated=("site",), bootstrap_scheme="hybrid",
+        note="""A8d on hybrid bootstrap estimates. See A8d."""),
+
+    "A8d_bc_hb": JointModelSpec(
+        "A8d_bc_hb", "y0_avg", components=("design", "site"),
+        correlated=("site",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8d_bc and A8d_hb."""),
+
+    "A8e": JointModelSpec(
+        "A8e", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d are
+        rho_u are set to zero because their variance fraction is small and the rho
+        values are likely to be unreliable anyway."""),
+    
+    "A8e_bc": JointModelSpec(
+        "A8e_bc", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), corrected=True,
+        note="""A8d on bias-corrected beta estimates. See A8d."""),
+
+    "A8e_hb": JointModelSpec(
+        "A8e_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), bootstrap_scheme="hybrid",
+        note="""A8d on hybrid bootstrap estimates. See A8d."""),
+
+    "A8e_bc_hb": JointModelSpec(
+        "A8e_bc_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_saratio_mean_unif", 
+        "d_ln_ds595_mean_unif", 
+        "d_ln_saratio_sigma_unif",
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8d_bc and A8d_hb."""),
+
+####################################################################################
+##### Joint Models with reduced covariates
+
+    "A8f": JointModelSpec(
+        "A8f", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d are
+        rho_u are set to zero because their variance fraction is small and the rho
+        values are likely to be unreliable anyway. All structural parameters + 
+        the significant site parameters."""),
+    
+    "A8f_bc": JointModelSpec(
+        "A8f_bc", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), corrected=True,
+        note="""A8f on bias-corrected beta estimates. See A8f."""),
+
+    "A8f_hb": JointModelSpec(
+        "A8f_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), bootstrap_scheme="hybrid",
+        note="""A8f on hybrid bootstrap estimates. See A8f."""),
+
+    "A8f_bc_hb": JointModelSpec(
+        "A8f_bc_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb."""),
+
+    "A8g": JointModelSpec(
+        "A8g", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d are
+        rho_u are set to zero because their variance fraction is small and the rho
+        values are likely to be unreliable anyway. All structural parameters + 
+        the significant site parameters."""),
+    
+    "A8g_bc": JointModelSpec(
+        "A8g_bc", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), corrected=True,
+        note="""A8f on bias-corrected beta estimates. See A8f."""),
+
+    "A8g_hb": JointModelSpec(
+        "A8g_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), bootstrap_scheme="hybrid",
+        note="""A8f on hybrid bootstrap estimates. See A8f."""),
+
+    "A8g_bc_hb": JointModelSpec(
+        "A8g_bc_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_ductility",),
+        covariates_beta=(
+        "d_ln_ds595_sigma_unif",),
+        correlated=("site",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb."""),
 }
 
 
