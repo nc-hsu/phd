@@ -47,136 +47,55 @@ SELECTION_CONFIG = {
 }
 
 
-# Records that were SELECTED but cannot be used: either they cannot be obtained from
-# their source database (the download crashes / the waveform is missing upstream), or
-# the waveform that was obtained does not match the flatfile the selection was made
-# from (so scaling it by the flatfile-based factor would give the wrong intensity).
-# Each entry names one physical record by the identity its database uses in the
-# combined selection DB:
+# Records that were SELECTED but cannot be used, dropped from the database IN MEMORY
+# before selecting (gm_db_for_selection below).
+#
+# EMPTY since 2026-10-29. The records known to be unusable are now removed from the
+# database itself, when nb 030 builds it: they are listed, one RSN per row with the
+# reason, in data_processed/04_gm_database_for_selection/unavailable_records_ngasub.csv.
+# That is where a newly found bad record normally goes (add a row, re-run nb 030). It
+# changes the database file, which every stripe fingerprints, so every stripe of every
+# record set then reads as stale.
+#
+# This list remains for the case where that is too much: a record found to be bad
+# AFTER a selection, which should only reselect the stripes that contain it. Each
+# entry names one physical record by the identity its database uses in the combined
+# selection DB:
 #
 #   NGA-Sub : ("index" == NGAsubRSN) or ("event_id", "station_code") ==
-#             (NGAsubEQID, NGAsubSSN); the download unit is the whole
-#             NGASub_RSN_<rsn> folder, so BOTH component rows (H1, H2) must go.
-#   ESM     : ("event_id", "station_code", "location_code"); the download unit is
-#             the single {event}__{station}__{loc}.h5, so all component rows
-#             (U, V) must go.
+#             (NGAsubEQID, NGAsubSSN); both component rows (H1, H2) go.
+#   ESM     : ("event_id", "station_code", "location_code"); all component rows
+#             (U, V) go.
 #
-# An identity value may be a single value (equality) or a list (membership), which
-# is how a whole network is excluded: the ONA entry below predates the DB's
-# "network_code" column (added 2026-09-30), so that network is expressed as its list
-# of RSNs.
+# e.g. {"database": "NGASub", "label": "...", "identity": {"index": ["7004773"]},
+#       "reason": "...", "date": "YYYY-MM-DD", "added_in_version": 1,
+#       "affected_stripes": {...}}
 #
-# Both selections (original and optimised) drop every record listed here from the
-# database, in memory, before selecting (gm_db_for_selection below), and record the
-# list in every stripe manifest (the "db_exclusions" key of SELECTION_CONFIG /
-# SELECTION_CONFIG_OPTIMISED).
+# An identity value may be a single value (equality) or a list (membership). "label",
+# "reason", "date" and "affected_stripes" are documentation; only "database" +
+# "identity" are hashed into the stripe fingerprints ("db_exclusions").
 #
 # The list is VERSIONED (see the "Database exclusions" section of gm_selection.py):
+# "added_in_version" is the version of the list that first contained the entry, the
+# list "at version v" is every entry with added_in_version <= v, and version 0 is the
+# empty list. A stripe selected under an older version stays valid as long as it
+# contains none of the records added since. Versions run 1, 2, ..., N without gaps.
+# Because the database was rebuilt on 2026-10-29, the numbering starts again at 1
+# for any record added from now on.
 #
-#   "added_in_version"  the version of this list that first contained the entry.
-#                       The list "at version v" is every entry with
-#                       added_in_version <= v; version 0 is no list at all. A stripe
-#                       selected under an older version stays valid as long as it
-#                       contains none of the records added since, so adding an
-#                       entry reselects ONLY the stripes that contain it. Versions
-#                       must run 1, 2, ..., N without gaps: a new entry gets
-#                       N + 1 (or N, if it is added together with the newest one
-#                       before anything has been selected with N). NEVER renumber
-#                       or remove an existing entry -- every manifest written under
-#                       an older version would then match nothing, and its stripe
-#                       would be reselected.
-#
-#   Versions so far (and the stripes selected under each):
-#     0  no list               528 original stripes
-#     1  ONA                   original one-off reselection of (31, 1.15)
-#     2  + RSN 6003695/6003748/6003796
-#                              original one-offs (41, 0.65), (41, 0.95), (44, 1.15);
-#                              all 532 optimised stripes
-#     3  + RSN 7004773         everything selected from 2026-10-19 on
-#   (The four original one-offs predate the versioning, and their manifests still
-#   claim version 0; migrate_stripe_manifests --to recorded-exclusions re-stamps
-#   them with the version their pickle records.)
-#
-#   "affected_stripes"  documentation only: {selection: [(site, iml), ...]} of the
-#                       stripes that contained the record when it was added.
-#
-# "label" is a human tag for the console output; the row match is only ever on the
-# identity fields. Only "database" + "identity" are hashed, so every other field can
-# be edited without making any stripe stale.
-UNAVAILABLE_RECORDS = [
-    {
-        "database": "NGASub",
-        "label": "NGA-Sub network ONA (28 RSNs, 4040476-4040503)",
-        # The ONA "network" is a single downhole array -- one location
-        # (38.398757, 141.498107) with four sensors at 1.7 / 27.3 / 61.5 / 147.1 m
-        # depth (NGAsubSSN 4002280-4002283), recorded for seven 2011 Japan events.
-        # Its flatfile entries are visibly unfinished (Station_Name is the
-        # placeholder "Ground Observation Point", Shortest_Usable_Period and
-        # Epsilon_Phi_pt7 are -999, Vs30 is inferred with Vs30_Code "2J_3J"), and
-        # the PEER portal serves no waveform for any of them: 0 of 28 have ever
-        # downloaded, while K-NET / KiK-net (~40k records) download fine.
-        # RSN list derived from Network == "ONA" in NGASub_SA_flatfile_rotD50.csv on
-        # the HSU share. 24 of the 28 survive into the combined selection DB (48
-        # rows, H1 + H2), at index labels 68473-68496 and 112550-112573.
-        "identity": {"index": [
-            "4040476", "4040477", "4040478", "4040479", "4040480", "4040481",
-            "4040482", "4040483", "4040484", "4040485", "4040486", "4040487",
-            "4040488", "4040489", "4040490", "4040491", "4040492", "4040493",
-            "4040494", "4040495", "4040496", "4040497", "4040498", "4040499",
-            "4040500", "4040501", "4040502", "4040503",
-        ]},
-        "reason": "PEER NGA-Sub portal serves no waveform for any ONA record; the "
-                  "download crashes. Found via RSN 4040498, then confirmed across "
-                  "the whole network.",
-        "date": "2026-08-27",
-        "added_in_version": 1,
-        # Only one ONA record was ever selected: RSN 4040498 (Fukushimaoki 2011,
-        # Mw 6.34), in this stripe of the original selection. The optimised
-        # selection excluded ONA from the start.
-        "affected_stripes": {"original": [(31, 1.15)]},
-    },
-    {
-        "database": "NGASub",
-        "label": "NGA-Sub RSN 6003695, 6003748, 6003796 (waveform ~3-4.5e4 x flatfile SA)",
-        # Three distant records (Rjb ~1,570-1,970 km, Mw 6.4-6.7):
-        #   RSN 6003695  EQID 6000158  SSN 6000279  DB rows 72851 (H1) / 116928 (H2)
-        #   RSN 6003748  EQID 6000161  SSN 6000269  DB rows 72874 (H1) / 116951 (H2)
-        #   RSN 6003796  EQID 6000035  SSN 6000691  DB rows 72907 (H1) / 116984 (H2)
-        # The response spectra of their converted H1 JSONs are ~3-4.5e4 times the
-        # flatfile SA that the GCIM selection and the scale factors alpha were computed
-        # from (found 2026-09-29, record-spectra check / nb 043). The MSA applies alpha
-        # to the JSON, so these records ran at an intensity ~4 orders of magnitude too
-        # high. Whether the AT2 files or the flatfile are at fault is not established;
-        # either way the waveform cannot be used with the flatfile-based alpha. Both
-        # components are excluded, because the record (the RSN) is the unit.
-        "identity": {"index": ["6003695", "6003748", "6003796"]},
-        "reason": "converted H1 waveform spectra are ~3-4.5e4 x the flatfile SA the "
-                  "selection and alpha were computed from, so the MSA ran them at the "
-                  "wrong intensity",
-        "date": "2026-09-30",
-        "added_in_version": 2,
-        # Selected (H1 in every case) in these stripes of the original selection,
-        # slot in brackets (the optimised selection excluded them from the start):
-        #   (41, 0.65): 6003695 [29]   -- run in the MSA, site 41, 3s and 5s
-        #   (41, 0.95): 6003748 [26], 6003695 [29]   -- not in either structure's MSA
-        #   (44, 1.15): 6003796 [29]   -- not in either structure's MSA
-        "affected_stripes": {"original": [(41, 0.65), (41, 0.95), (44, 1.15)]},
-    },
-    {
-        "database": "NGASub",
-        "label": "NGA-Sub RSN 7004773 (waveform cannot be downloaded)",
-        # Selected (H1, once each) in two stripes of the optimised selection; never
-        # selected in the original selection. Found after the full optimised
-        # selection had been run with version 2 of this list, so version 3 makes
-        # only those two stripes stale. Both component rows go, because the RSN is
-        # the download unit.
-        "identity": {"index": ["7004773"]},
-        "reason": "the waveform cannot be downloaded from the NGA-Sub database",
-        "date": "2026-10-19",
-        "added_in_version": 3,
-        "affected_stripes": {"optimised": [(31, 0.65), (42, 0.5)]},
-    },
-]
+# History (before 2026-10-29, all NGA-Sub, all now in unavailable_records_ngasub.csv):
+#   v1  2026-08-27  network ONA (28 RSNs 4040476-4040503): the PEER portal serves no
+#                   waveform; 24 of the 28 were in the database. Selected once, in
+#                   (31, 1.15) of the original selection.
+#   v2  2026-09-30  RSN 6003695, 6003748, 6003796: converted H1 spectra ~3-4.5e4 x the
+#                   flatfile SA. Selected in (41, 0.65), (41, 0.95), (44, 1.15) of the
+#                   original selection.
+#   v3  2026-10-19  RSN 7004773: the waveform cannot be downloaded. Selected in
+#                   (31, 0.65), (42, 0.5) of the optimised selection.
+#   The record sets selected before 2026-10-29 (AvgSA_03__ks, __opt_ks,
+#   __opt_mu_sigma, and the first __opt_ks_mu_sigma run) were selected from the
+#   database before the removal, kept as ESM-NGAsub_combined_old.csv.
+UNAVAILABLE_RECORDS = []
 
 # Current version of the list. Validates the versions when this module is imported
 # (integers, running 1..N without gaps), so a malformed entry fails immediately
@@ -187,6 +106,7 @@ EXCLUSION_LIST_VERSION = check_exclusion_versions(UNAVAILABLE_RECORDS)
 # too. Its stripes selected before the list existed have no "db_exclusions" entry
 # in their manifests (version 0); they stay valid via the versioned stale check
 # (stripe_fingerprints below) as long as they contain none of the listed records.
+# (With the list empty, every scheme's "db_exclusions" is the empty tuple ().)
 SELECTION_CONFIG["db_exclusions"] = _exclusion_identities(UNAVAILABLE_RECORDS)
 
 
@@ -367,15 +287,20 @@ del _sc
 
 
 def gm_db_for_selection(gm_db: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
-    """THE place where the selection database is filtered (both selections).
+    """THE place where the selection database is filtered in memory (all selections).
 
     Returns a copy of ``gm_db`` without every record listed in
     ``UNAVAILABLE_RECORDS`` -- ALL versions of the list, always, so a stripe
-    (re)selected now can never pick any listed record. nb 032 and nb 032-optimised
-    call it once, straight after ``setup_AvgSA03_gcim_gm_selection``, and pass ONLY
-    the filtered frame to ``build_final_ensembles``.
+    (re)selected now can never pick any listed record. nb 032 (and its side-quest
+    copies) call it once, straight after ``setup_AvgSA03_gcim_gm_selection``, and
+    pass ONLY the filtered frame to ``build_final_ensembles``.
 
-    - The database file on disk is never edited; filtering is in memory with
+    Since 2026-10-29 the list is empty and this drops nothing: the records known
+    to be unusable are removed from the database file itself by nb 030
+    (``unavailable_records_ngasub.csv``). The filter stays for a record found bad
+    after a selection, where reselecting only the stripes that contain it is wanted.
+
+    - The database file on disk is not edited here; filtering is in memory with
       ``DataFrame.drop(index=...)``, so the surviving rows keep their original
       index labels and every selected record still points at the right row of the
       canonical CSV (nb 033's network-code lookup relies on that).

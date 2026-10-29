@@ -431,6 +431,9 @@ def plain_setup():
     return disagg_stats, ctx
 
 
+@pytest.mark.skip(reason="database rebuilt 2026-10-29 (nb 030 removes the unusable NGA-Sub "
+                         "records); the older sets were selected from "
+                         "ESM-NGAsub_combined_old.csv, so their stripes are stale by design")
 @needs_setup
 @pytest.mark.parametrize("config_name,ss_id", [
     ("SELECTION_CONFIG", "AvgSA_03__ks"),
@@ -462,3 +465,39 @@ def test_scheme_setup_for_existing_config_equals_plain(plain_setup):
     a = gms._selection_ctx_fingerprint_inputs(ctx)
     b = gms._selection_ctx_fingerprint_inputs(ctx2)
     assert a.keys() == b.keys() and all(np.array_equal(a[k], b[k]) for k in a)
+
+
+# -----------------------------------------------------------------------------
+# Empty exclusion list (since 2026-10-29 the known bad records are removed in nb 030)
+# -----------------------------------------------------------------------------
+
+def test_empty_exclusion_list_gives_a_real_current_fingerprint(monkeypatch):
+    """With no exclusion entries, the CURRENT fingerprint (the one new manifests record)
+    must hash the config's own db_exclusions -- the empty tuple -- and not the
+    matching-only placeholder whose hash is None. Nothing is superseded."""
+    seen = {}
+
+    def fake_fp(site, iml, source_fps, ctx, sc, disagg_stats):
+        # stands in for stripe_input_fingerprint: records what it was given
+        seen["sc"] = sc
+        return {"db_exclusions": {"hash": repr(sc["db_exclusions"])} if "db_exclusions" in sc
+                else {"hash": "missing"}}
+
+    monkeypatch.setattr(gms, "stripe_input_fingerprint", fake_fp)
+    monkeypatch.setattr(gms, "check_ctx_matches_config", lambda ctx, sc: None)
+    sc = {"db_exclusions": gms._exclusion_identities([])}
+    fp_fn, superseded = gms.stripe_fingerprints_by_exclusion_version(sc, [], {}, {}, None)
+    assert superseded == []
+    fp = fp_fn(1, 0.5)
+    assert fp["db_exclusions"]["hash"] == repr(())
+    assert seen["sc"]["db_exclusions"] == ()
+
+
+def test_unavailable_records_list_is_empty():
+    """The in-memory list is empty since nb 030 removes the records from the database."""
+    import phd_project.scripts.WP1_ground_motion_set.setup_AvgSA03_gm_selection as su
+    assert su.UNAVAILABLE_RECORDS == []
+    assert su.EXCLUSION_LIST_VERSION == 0
+    for name in ("SELECTION_CONFIG", "SELECTION_CONFIG_OPTIMISED",
+                 "SELECTION_CONFIG_MU_SIGMA", "SELECTION_CONFIG_KS_MU_SIGMA"):
+        assert getattr(su, name)["db_exclusions"] == ()

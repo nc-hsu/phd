@@ -101,18 +101,21 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 | `053-convert_group_ida_fx_fragilities_to_avgsa` | per-group IDA results (`052`), design groups (`051`), site designs (`011`) | per-group collapse fragilities in SA / AvgSA_03 / AvgSA_06 under `09_structure_fragility_curves/fx/{fx}/design_groups/`, fanned back out to per-site `fx/{fx}/sites/site_{ii}/{tag}_ida_femap695_collapsefragility_{im}.json` files, plus a snapshot of `014`'s files and the group/site summary CSVs | `052` |
 | `054-setup_msa_fx_by_design_group` | group IDA fragilities (`053`), design groups (`051`), FEMA P695 records | MSA-FX stripe selections (`results/04_record_selection/fx/{fx}/{im}/`), per-group MSA files (`msa_{im}__{fx}/`), `fixed_record_sets/{n}s/mdof/msa_{im}__{fx}.py` | `051`, `053` |
 
-> **Note — undownloadable records.** A record the selection picked can turn out to be
-> impossible to fetch from its source database. Do **not** delete it from
-> `data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv`: the per-stripe
-> fingerprint hashes that file's bytes (so every stripe goes stale), the stored ensembles
-> identify records by the database's positional index (so every row below the deleted one
-> shifts), and round 4's shuffle depends on the frame length (so already-analysed stripes
-> could change). Instead declare the record -- or the whole network, as its list of RSNs --
-> in `setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS` and use the one-off reselection cell
-> at the end of nb `032`, which reselects only the affected stripe against an
-> in-memory-filtered copy of the database and stamps the deviation into that stripe's
-> `db_exclusions` key. The cell prints the run order; note that stripe's manifest still
-> claims the full database.
+> **Note — unusable records (updated 2026-10-29).** A record the selection picked can turn
+> out to be unusable (it cannot be downloaded, or its waveform does not match the flatfile).
+> There are two ways to exclude it:
+>
+> - **In the database (the normal way).** Add its RSN to
+>   `data_processed/04_gm_database_for_selection/unavailable_records_ngasub.csv` and re-run
+>   nb `030`, which removes the listed NGA-Sub records before writing
+>   `ESM-NGAsub_combined.csv`. This changes the file, which every stripe fingerprints, and
+>   shifts the rows below a removed one (the stored ensembles identify records by row
+>   position), so **every stripe of every record set goes stale** and must be reselected.
+>   Done on 2026-10-29 for the 32 RSNs listed there. `ESM-NGAsub_combined_old.csv` is the
+>   database before that removal, the one the earlier record sets were selected from.
+> - **In memory (to keep the existing selection).** Declare the record in
+>   `setup_AvgSA03_gm_selection.UNAVAILABLE_RECORDS` (empty today) as a new version. nb
+>   `032` drops it in memory, and only the stripes that contain it are reselected.
 
 > **Note.** `050` still adds MSA files to a per-site `sdof_param/` folder and writes
 > `site_sdof_param_msa_*` launchers. Since `011` no longer builds SDOF folders, that half of

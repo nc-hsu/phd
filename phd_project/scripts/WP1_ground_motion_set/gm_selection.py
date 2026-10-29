@@ -952,8 +952,13 @@ def drop_unavailable_records(gm_db: pd.DataFrame, records: list[dict],
     Dropping is done with ``DataFrame.drop(index=...)`` so the surviving rows keep
     their original index labels. That is the whole point of filtering in memory:
     every selected record still points at the right row of the canonical CSV, and
-    the CSV is never edited (editing it would change its byte hash, which every
-    stripe fingerprints, and would shift every row below a deleted one).
+    the CSV is not edited (editing it changes its byte hash, which every stripe
+    fingerprints, and shifts every row below a deleted one).
+
+    For AvgSA_03 the records known to be unusable are removed from the CSV itself
+    when nb 030 builds it (2026-10-29, ``unavailable_records_ngasub.csv``), which
+    deliberately makes every stripe stale. The in-memory exclusion here is for a
+    record found bad later, when only the stripes containing it should be redone.
     """
     meta = gm_db["metadata"]
 
@@ -1109,6 +1114,18 @@ def stripe_fingerprints_by_exclusion_version(selection_config: dict,
         # True if the filter would drop any row of the stripe's own record set,
         # i.e. the stripe contains one of `records`. No database load needed.
         return lambda recs: len(drop_unavailable_records(recs, records, verbose=False)) < len(recs)
+
+    if current == 0:
+        # An EMPTY list (the case since nb 030 removes the known bad records from the
+        # database itself, 2026-10-29). fp_fn_for(0) would be the matching-only
+        # fingerprint above, whose db_exclusions hash is None -- right for recognising
+        # old manifests that lack the entry, wrong as the fingerprint newly written
+        # manifests record. So the current fingerprint is the plain one, with the
+        # config's own db_exclusions (the empty tuple) hashed like any other value.
+        # There is no older version to fall back on, so nothing is superseded.
+        return (lambda s, i: stripe_input_fingerprint(
+            s, i, source_fps_stripe, basic_selection_ctx, dict(selection_config),
+            disagg_stats)), []
 
     fp_fn = fp_fn_for(current)
     superseded = [(fp_fn_for(v), contains_any_of(exclusion_records_added_after(exclusion_records, v)))
