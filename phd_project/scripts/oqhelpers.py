@@ -231,6 +231,25 @@ def _disagg_summary_stats(df):
     return stats
 
 
+def _is_zero_hazard(df, mafe):
+    """True if an IML has no hazard, judged two ways.
+
+    - ``mafe <= 0``: the hazard curve gives zero rate at the IML.
+    - **no non-zero bin** in the disaggregation (every ``nu_m`` is 0): the
+      engine found no rupture that can exceed the IML.
+
+    The second test is needed because ``mafe`` is *linearly interpolated*
+    between the hazard-curve grid points, which are a factor ~1.44 apart at the
+    top of the WP1 grid. If the curve is positive at the grid point below the
+    IML and zero at the one above, the interpolated ``mafe`` is positive even
+    when the IML lies above the epsilon-truncated maximum ground motion
+    (e.g. site 28 at 1.8039 g, AvgSA_03 eps4: interpolated mafe > 0 but every
+    disaggregation bin is 0). Such an IML has P(m|X>x) = 0/0 = NaN in every bin,
+    so it has no meaningful summary statistics either.
+    """
+    return mafe <= 0 or not bool((df["nu_m"].to_numpy(float) > 0).any())
+
+
 def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
     """Flat disagg-stats DataFrame for one ``(IM, eps)`` pair, one row per
     ``(site, imt, imtl)``.
@@ -247,11 +266,12 @@ def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
     (hazrisk). ``t`` is the investigation time in years (default 1, i.e. annual
     PoE and ``rtp == 1/mafe``, matching the disagg runs' ``investigation_time``).
 
-    ``(site, imt, imtl)`` combinations with **zero hazard** (``mafe <= 0``) are
-    omitted: the IML is beyond the maximum ground motion permitted by the GMM's
-    epsilon truncation, so the return period is infinite and the disaggregation is
-    not a meaningful hazard scenario. Those IMLs stay in ``disagg_data`` and are
-    listed by :func:`get_excluded_imls`.
+    ``(site, imt, imtl)`` combinations with **zero hazard** are omitted: either
+    ``mafe <= 0`` or the disaggregation has no non-zero bin (see
+    :func:`_is_zero_hazard`). The IML is then beyond the maximum ground motion
+    permitted by the GMM's epsilon truncation, so the return period is infinite
+    and the disaggregation is not a meaningful hazard scenario. Those IMLs stay
+    in ``disagg_data`` and are listed by :func:`get_excluded_imls`.
     """
     all_stats = []
     for site_id, imt_dict in disagg_data.items():
@@ -259,7 +279,7 @@ def get_iml_disagg_stats(disagg_data, site_metadata, hcurves, t=1, geodf=False):
             hc = np.asarray(hcurves[site_id][imt]["mean"])
             for imtl, df in iml_dict.items():
                 mafe = float(np.interp(imtl, hc[:, 0], hc[:, 1]))
-                if mafe <= 0:
+                if _is_zero_hazard(df, mafe):
                     continue  # zero hazard (truncation); excluded from stats
                 poe = float(mafe_to_poe(mafe, t))
                 rtp = float(poe_to_rtp(poe, t))
@@ -288,18 +308,20 @@ def get_excluded_imls(disagg_data, hcurves):
     :func:`get_iml_disagg_stats`.
 
     Returns ``{site_id: [imls]}`` (imls sorted, in g) for every ``(site, imt,
-    iml)`` whose mean hazard curve gives ``mafe <= 0`` — i.e. an intensity level
-    beyond the epsilon-truncated maximum ground motion, with an infinite return
-    period. Sites with no excluded IMLs are omitted. These IMLs remain present in
-    ``disagg_data``; only the stats rows are dropped.
+    iml)`` with zero hazard: the mean hazard curve gives ``mafe <= 0``, or the
+    disaggregation has no non-zero bin (:func:`_is_zero_hazard`, the same test
+    the stats use). Either way the level is beyond the epsilon-truncated
+    maximum ground motion, with an infinite return period. Sites with no
+    excluded IMLs are omitted. These IMLs remain present in ``disagg_data``;
+    only the stats rows are dropped.
     """
     excluded = {}
     for site_id, imt_dict in disagg_data.items():
         for imt, iml_dict in imt_dict.items():
             hc = np.asarray(hcurves[site_id][imt]["mean"])
-            for imtl in iml_dict:
+            for imtl, df in iml_dict.items():
                 mafe = float(np.interp(imtl, hc[:, 0], hc[:, 1]))
-                if mafe <= 0:
+                if _is_zero_hazard(df, mafe):
                     excluded.setdefault(site_id, set()).add(imtl)
     return {s: sorted(imls) for s, imls in excluded.items()}
 

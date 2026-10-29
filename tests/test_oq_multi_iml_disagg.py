@@ -294,3 +294,101 @@ def test_getters_by_sid_refuses_missing_or_duplicate_sites():
         wrapped.check_covers([0, 1, 2])
     with pytest.raises(IndexError):
         wrapped[1]
+
+
+# --------------------------------------------------------------------------- #
+# zero-hazard and one-bin edge cases (nb 021 check 4, oqhelpers exclusions)   #
+# --------------------------------------------------------------------------- #
+
+def _shard_frame(nu, occ=None):
+    """A 3-bin disaggregation frame with the shard columns.
+
+    ``nu`` are the bin rates; the exceedance share is nu / sum(nu) (NaN when
+    all are 0, as 0/0 in the real reader); ``occ`` defaults to that share.
+    """
+    nu = np.asarray(nu, float)
+    with np.errstate(invalid="ignore"):
+        share = nu / nu.sum()
+    df = pd.DataFrame({"TRT": ["A", "A", "B"], "Mag": [5.0, 6.0, 7.0],
+                       "Dist": [10.0, 20.0, 30.0], "Eps": [1.0, 2.0, 3.0],
+                       "Z": [0, 0, 0]})
+    df["P(X>x|T,m)"] = -np.expm1(-nu)          # T = 1 yr
+    df["nu_m"] = nu
+    df["P(m|X>x)"] = share
+    df["P(m|X=x)"] = share if occ is None else np.asarray(occ, float)
+    return df
+
+
+def _patch_shards(monkeypatch, old, new):
+    from phd_project.scripts import disagg_shards
+    monkeypatch.setattr(disagg_shards, "load_shards",
+                        lambda d: old if str(d) == "old" else new)
+
+
+def test_compare_shards_zero_hazard_not_in_excluded_passes(monkeypatch):
+    # site 28 at the top IML: every bin 0, NaN shares on both sides, and the
+    # IML is NOT in `excluded` (interpolated mafe > 0). Must not fail.
+    df = _shard_frame([0.0, 0.0, 0.0], occ=[np.nan] * 3)
+    data = {28: {"AvgSA": {1.8039: df}}}
+    _patch_shards(monkeypatch, data, {28: {"AvgSA": {1.8039: df.copy()}}})
+    rep = mid.compare_processed_shards("old", "new", excluded={})
+    assert (rep["status"] == "PASS").all()
+    assert "occ sums to 1" not in set(rep["check"])
+
+
+def test_compare_shards_nan_on_one_side_fails(monkeypatch):
+    o = _shard_frame([1e-6, 2e-6, 3e-6])
+    n = _shard_frame([0.0, 0.0, 0.0], occ=[np.nan] * 3)
+    _patch_shards(monkeypatch, {0: {"AvgSA": {1.0: o}}}, {0: {"AvgSA": {1.0: n}}})
+    with pytest.raises(AssertionError):
+        mid.compare_processed_shards("old", "new")
+
+
+def test_compare_shards_one_bin_tie_is_info(monkeypatch):
+    # sites 2/3: one non-zero bin, occurrence == exceedance by arithmetic.
+    df = _shard_frame([0.0, 3.3e-11, 0.0])
+    _patch_shards(monkeypatch, {2: {"AvgSA": {1.8039: df}}},
+                  {2: {"AvgSA": {1.8039: df.copy()}}})
+    rep = mid.compare_processed_shards("old", "new")
+    row = rep[rep["check"] == "occ differs from exceedance"]
+    assert row["status"].tolist() == ["INFO"]
+
+
+def test_compare_shards_tie_with_several_bins_still_fails(monkeypatch):
+    # the old bug: occurrence column = exceedance share with hazard in 3 bins.
+    df = _shard_frame([1e-6, 2e-6, 3e-6])
+    _patch_shards(monkeypatch, {0: {"AvgSA": {0.1: df}}}, {0: {"AvgSA": {0.1: df.copy()}}})
+    with pytest.raises(AssertionError, match="occ differs"):
+        mid.compare_processed_shards("old", "new")
+
+
+def test_excluded_imls_include_all_zero_disagg():
+    # mafe interpolates to > 0 at 1.8 g, but the disaggregation is all zero.
+    hc = {0: {"AvgSA": {"mean": np.array([[1.45, 1e-9], [2.09, 0.0]])}}}
+    data = {0: {"AvgSA": {1.5: _shard_frame([1e-9, 0, 0]),
+                          1.8: _shard_frame([0, 0, 0], occ=[np.nan] * 3)}}}
+    assert oqhelpers.get_excluded_imls(data, hc) == {0: [1.8]}
+    meta = pd.DataFrame({"lat": [0.0], "lon": [0.0], "seismicity": ["x"],
+                         "region": ["r"]}, index=[0])
+    stats = oqhelpers.get_iml_disagg_stats(data, meta, hc)
+    assert stats["imtl"].tolist() == [1.5]
+
+
+def _stats(rows):
+    cols = ["site_id", "imt", "imtl", "poe", "mafe", "rtp", "A [%]", "Mag_mean", "Dist_mean"]
+    return pd.DataFrame(rows, columns=cols)
+
+
+def test_compare_disagg_stats_rules():
+    old = _stats([[0, "AvgSA", 0.1, 1e-3, 1e-3, 1e3, 60.0, 6.12, 30.0],
+                  [28, "AvgSA", 1.8, 1e-9, 1e-9, 1e9, 0.0, 0.0, 0.0]])
+    # hazard columns change by 10 % (new curve), Mag_mean tips one rounding unit,
+    # and site 28's row is gone because it is now excluded.
+    new = _stats([[0, "AvgSA", 0.1, 1.1e-3, 1.1e-3, 909.0, 60.0, 6.13, 30.0]])
+    rep = mid.compare_disagg_stats(old, new, excluded_new={28: [1.8]})
+    assert not (rep["status"] == "FAIL").any()
+    with pytest.raises(AssertionError, match="row only in old"):
+        mid.compare_disagg_stats(old, new, excluded_new={})
+    bad = new.assign(Mag_mean=6.5)
+    with pytest.raises(AssertionError, match="Mag_mean"):
+        mid.compare_disagg_stats(old, bad, excluded_new={28: [1.8]})

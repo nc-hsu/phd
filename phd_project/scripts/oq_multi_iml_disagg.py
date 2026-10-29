@@ -1490,8 +1490,20 @@ def compare_processed_shards(old_dir: Path, new_dir: Path, *, excluded: dict | N
     ``nu_m`` and ``P(m|X>x)`` as explained in the loop below;
     ``P(m|X=x)`` must now sum to 1, be >= 0, and **differ** from
     ``P(m|X>x)`` - the old code wrote the exceedance share into the occurrence
-    column, so equality there means the fix did not take effect. Zero-hazard
-    IMLs (``excluded``: ``{site: [imls]}``) are exempt from the occurrence tests.
+    column, so equality there means the fix did not take effect.
+
+    Two edge cases at the top of the IML range, both caused by the ε-truncated
+    maximum ground motion, are handled rather than failed:
+
+    - **Zero hazard.** IMLs in ``excluded`` (``{site: [imls]}``), and IMLs whose
+      new disaggregation has no non-zero bin, are exempt from the occurrence
+      tests: there is nothing to share out. Their exceedance shares are 0/0 =
+      NaN in both old and new, so the exceedance comparison counts NaN = NaN as
+      a match (a NaN on one side only still fails).
+    - **One non-zero bin.** If all the hazard sits in a single bin, both
+      ``P(m|X>x)`` and ``P(m|X=x)`` are 1 in that bin and 0 elsewhere, so they
+      are equal by arithmetic, not because of the old bug. The "occ differs"
+      row is then INFO, not FAIL.
     """
     from .disagg_shards import load_shards
 
@@ -1536,11 +1548,18 @@ def compare_processed_shards(old_dir: Path, new_dir: Path, *, excluded: dict | N
                         "nu_m": (rtol, floor_nu),
                         "P(m|X>x)": (rtol + floor_share, floor_share)}
                 for c, (rt, at) in tols.items():
-                    _, r = _rel_err(n[c].to_numpy(), o[c].to_numpy(), at)
-                    ok = np.allclose(n[c], o[c], rtol=rt, atol=at)
+                    a, b = n[c].to_numpy(float), o[c].to_numpy(float)
+                    # NaN only arises as 0/0 at zero hazard; NaN in the same
+                    # cells on both sides is a match, so compare the rest.
+                    fin = np.isfinite(a) & np.isfinite(b)
+                    _, r = _rel_err(a[fin], b[fin], at)
+                    ok = np.allclose(a, b, rtol=rt, atol=at, equal_nan=True)
                     rows.append({"site": s, "imt": imt, "iml": iml, "check": c,
                                  "value": r, "status": "PASS" if ok else "FAIL"})
-                if float(iml) in excl.get(s, set()):
+                # How many bins carry any hazard in the new disaggregation:
+                # 0 = zero hazard (exempt), 1 = occurrence equals exceedance.
+                n_nonzero = int((n["nu_m"].to_numpy(float) > 0).sum())
+                if float(iml) in excl.get(s, set()) or n_nonzero == 0:
                     continue
                 occ = n["P(m|X=x)"].to_numpy(float)
                 rows.append({"site": s, "imt": imt, "iml": iml, "check": "occ sums to 1",
@@ -1550,10 +1569,94 @@ def compare_processed_shards(old_dir: Path, new_dir: Path, *, excluded: dict | N
                              "value": float(np.nanmin(occ)),
                              "status": "PASS" if np.nanmin(occ) >= 0 else "FAIL"})
                 diff = float(np.nanmax(np.abs(occ - n["P(m|X>x)"].to_numpy(float))))
+                if diff > 1e-6:
+                    status = "PASS"
+                elif n_nonzero == 1:
+                    status = "INFO"   # one bin: equal by arithmetic (see docstring)
+                else:
+                    status = "FAIL"
                 rows.append({"site": s, "imt": imt, "iml": iml,
                              "check": "occ differs from exceedance", "value": diff,
-                             "status": "PASS" if diff > 1e-6 else "FAIL"})
+                             "status": status})
     return _report(rows, report_fp, "compare_processed_shards")
+
+
+# Columns of the nb 021 stats table that come from the hazard curve (nb 004),
+# not from the disaggregation.
+_STATS_HAZARD_COLS = ("poe", "mafe", "rtp")
+_STATS_KEY = ["site_id", "imt", "imtl"]
+
+
+def compare_disagg_stats(old: pd.DataFrame, new: pd.DataFrame, *,
+                         excluded_new: dict | None = None,
+                         report_fp: Path | None = None) -> pd.DataFrame:
+    """nb 021 check 4 (stats part): the rebuilt stats table against the backup.
+
+    The stats table mixes two kinds of column, and they are checked differently.
+
+    - **From the disaggregation** (``"<TRT> [%]"``, ``Mag_mean``, ``Dist_mean``):
+      built from ``P(m|X>x)``, which the occurrence fix does not touch, so they
+      must agree. They are rounded to 2 decimals in
+      ``oqhelpers._disagg_summary_stats``, so rounding noise in the last bits can
+      tip a value across a rounding boundary: the tolerance is one unit in that
+      last place (0.01), not zero.
+    - **From the hazard curve** (``poe``, ``mafe``, ``rtp``): interpolated from
+      the nb 004 pickle. Since nb 003's PSHA became the disaggregation parent
+      (``max_sites_disagg``), that curve is the few-sites one and differs from
+      the old one by up to ~12 % at some sites. These rows are INFO, with the
+      largest relative change, not a pass/fail.
+
+    Rows are matched on ``(site_id, imt, imtl)``. A row only in the old table
+    passes if its IML is now excluded as zero hazard (``excluded_new``,
+    ``{site: [imls]}``, from ``oqhelpers.get_excluded_imls``); otherwise it
+    fails. A row only in the new table is INFO (an IML the old curve called
+    zero hazard and the new one does not).
+    """
+    excl = {int(s): set(map(float, v)) for s, v in (excluded_new or {}).items()}
+    rows = []
+    o = old.drop(columns="geometry", errors="ignore").set_index(_STATS_KEY)
+    n = new.drop(columns="geometry", errors="ignore").set_index(_STATS_KEY)
+
+    # Rows present on one side only.
+    for key in o.index.difference(n.index):
+        site, imt, iml = key
+        dropped = float(iml) in excl.get(int(site), set())
+        rows.append({"site_id": site, "imt": imt, "imtl": iml,
+                     "check": "row only in old", "value": np.nan,
+                     "status": "PASS" if dropped else "FAIL"})
+    for key in n.index.difference(o.index):
+        site, imt, iml = key
+        rows.append({"site_id": site, "imt": imt, "imtl": iml,
+                     "check": "row only in new", "value": np.nan, "status": "INFO"})
+
+    # Columns: the same set on both sides (a TRT appearing or vanishing would
+    # mean the disaggregation itself changed).
+    if set(o.columns) != set(n.columns):
+        rows.append({"site_id": -1, "imt": "", "imtl": np.nan,
+                     "check": f"same columns (old-only {sorted(set(o.columns) - set(n.columns))}, "
+                              f"new-only {sorted(set(n.columns) - set(o.columns))})",
+                     "value": np.nan, "status": "FAIL"})
+
+    common = o.index.intersection(n.index)
+    oc, nc = o.loc[common], n.loc[common]
+    disagg_cols = [c for c in o.columns
+                   if c in n.columns and (c.endswith("[%]") or c in ("Mag_mean", "Dist_mean"))]
+    for c in disagg_cols:
+        d = np.abs(nc[c].to_numpy(float) - oc[c].to_numpy(float))
+        worst = float(np.nanmax(d)) if d.size else 0.0
+        ok = bool(np.allclose(nc[c], oc[c], rtol=0, atol=0.01 + 1e-9, equal_nan=True))
+        rows.append({"site_id": -1, "imt": "", "imtl": np.nan,
+                     "check": f"{c} unchanged (atol 0.01)", "value": worst,
+                     "status": "PASS" if ok else "FAIL"})
+    for c in _STATS_HAZARD_COLS:
+        if c in oc.columns and c in nc.columns and len(common):
+            a, b = nc[c].to_numpy(float), oc[c].to_numpy(float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rel = np.abs(a / b - 1)
+            rows.append({"site_id": -1, "imt": "", "imtl": np.nan,
+                         "check": f"{c}: max relative change (new hazard curve)",
+                         "value": float(np.nanmax(rel)), "status": "INFO"})
+    return _report(rows, report_fp, "compare_disagg_stats")
 
 
 # --------------------------------------------------------------------------- #
