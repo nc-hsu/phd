@@ -22,8 +22,14 @@ site and how strongly (distances, GMM mean and sigma). None of that depends on
 the intensity level we ask about. The level only enters at the very end, in
 ``P(IM > x | rup) = 1 - Φ((ln x - μ) / σ)``. So:
 
-1. A **parent** classical calculation runs once, with ``max_sites_disagg = 60``
-   so the engine stores those rupture "contexts" (``base.py:548-553``).
+1. A **parent** classical calculation runs once, with ``max_sites_disagg`` >= the
+   number of sites so the engine stores those rupture "contexts"
+   (``base.py:548-553``). The parent is nb 003's PSHA itself
+   (``AvgSA_03_psha_eps4`` in ``psha_manifest.json``): nb 003 writes that block
+   into every PSHA config (``oq_runner.disagg_parent_block``), so the base hazard
+   and the disaggregations come from one and the same calculation and no
+   notebook downstream runs a PSHA. :func:`require_parent` checks that a
+   datastore is fit to be one.
 2. A **child** disaggregation (``hazard_calculation_id = parent``) reads them
    back and evaluates any number of levels per site. The engine already loops
    over a per-site level array ``hmap3`` of shape (N sites, M IMTs, P levels)
@@ -43,7 +49,8 @@ written.
 Contents
 --------
 - calculator: :func:`calculator_class` / :func:`run_child_calculation`
-- configs:    :func:`write_parent_config`, :func:`write_child_config`
+- parent:     :func:`parent_name`, :func:`require_parent`
+- configs:    :func:`write_child_config`
 - levels:     :func:`build_levels_table`, :func:`levels_array`,
               :func:`levels_at_poes`, :func:`split_targets`,
               :func:`write_levels_files`, :func:`read_levels_table`
@@ -387,40 +394,61 @@ def run_child_calculation(ini_fp: Path, levels_npy: Path,
 # configs                                                                      #
 # --------------------------------------------------------------------------- #
 
-def parent_description(im: str = "03", eps: int = 4) -> str:
-    """Engine description of the classical parent. Front-loaded and unique, so
-    ``oq_runner._calc_id_from_listing`` can tell it apart from the PSHA runs."""
-    return f"[disagg-parent AvgSA{im} eps{eps} - ESHM20 all sites]"
+def parent_name(im: str = "03", eps: int = 4) -> str:
+    """Manifest name of the classical parent: nb 003's PSHA for that IM and
+    truncation level, e.g. ``AvgSA_03_psha_eps4`` (``psha_manifest.json``)."""
+    return oq_runner.analysis_name(im, eps)
 
 
-def write_parent_config(out_fp: Path, *, im: str = "03",
-                        truncation_level: int = 4,
-                        max_sites_disagg: int = 60) -> Path:
-    """Write the classical parent ini.
+def require_parent(manifest_fp: Path, name: str, n_sites: int, *,
+                   reader=None) -> int:
+    """Return the calc id of the classical parent ``name``, after checking it can
+    serve as one. Raises with what to do if it cannot.
 
-    It is nb 003's ``config_AvgSA_{im}_psha_eps{eps}.ini`` (same template, same
-    model, same 25-level IMTL grid) with two changes:
+    The parent is nb 003's PSHA, recorded in ``psha_manifest.json``. Children
+    read three things from it, so all three are checked here rather than left
+    to fail deep inside the engine:
 
-    - a new ``description`` (so the calc id can be recovered from the listing);
-    - ``max_sites_disagg = 60``, which makes the classical step store the
-      rupture contexts the children read back (``base.py:548-553``: contexts are
-      stored only when the number of sites is <= max_sites_disagg).
+    - it is a ``classical`` calculation of exactly ``n_sites`` sites;
+    - ``max_sites_disagg >= n_sites``. Below that the engine neither stores the
+      rupture contexts nor uses its few-sites treatment of point sources, so the
+      PSHA hazard would differ from the disaggregation's (up to 12 % at some WP1
+      sites: calc 113 vs calc 138);
+    - the stored contexts (``rup/``) are actually there.
+
+    A PSHA run before nb 003 wrote ``max_sites_disagg`` fails the second check:
+    re-run nb 003.
     """
-    extra = (
-        "\n[disaggregation]\n"
-        "# Store the rupture contexts (rup/) so that disaggregation children\n"
-        "# (phd_project/scripts/oq_multi_iml_disagg.py) can reuse them.\n"
-        f"max_sites_disagg = {int(max_sites_disagg)}\n"
-    )
-    return oq_runner.write_config(
-        out_fp,
-        description=parent_description(im, truncation_level),
-        gsim_logic_tree_file=oq_runner.GMPE_LOGIC_TREES[im],
-        truncation_level=truncation_level,
-        im_upper=oq_runner.im_upper(im),
-        generated_by="phd_project/scripts/oq_multi_iml_disagg.py (write_parent_config)",
-        extra=extra,
-    )
+    if reader is None:
+        from openquake.commonlib.datastore import read as reader
+    manifest_fp = Path(manifest_fp)
+    manifest = oq_runner.load_manifest(manifest_fp)
+    if name not in manifest:
+        raise KeyError(f"parent '{name}' is not in {manifest_fp.name}: run nb 003 first")
+    calc_id = int(manifest[name]["calc_id"])
+    if not oq_runner._calc_exists(calc_id):
+        raise FileNotFoundError(f"parent '{name}' calc_id={calc_id} is not in this "
+                                f"machine's datastore: re-run nb 003")
+    dstore = reader(calc_id)
+    try:
+        oq = dstore["oqparam"]
+        problems = []
+        if oq.calculation_mode != "classical":
+            problems.append(f"calculation_mode is {oq.calculation_mode!r}, not 'classical'")
+        n = len(dstore["sitecol"])
+        if n != int(n_sites):
+            problems.append(f"it has {n} sites, not {n_sites}")
+        if oq.max_sites_disagg < int(n_sites):
+            problems.append(f"max_sites_disagg = {oq.max_sites_disagg} < {n_sites} sites")
+        if "rup" not in dstore:
+            problems.append("no stored rupture contexts (rup/)")
+    finally:
+        dstore.close()
+    if problems:
+        raise ValueError(f"'{name}' (calc {calc_id}) cannot be a disaggregation parent: "
+                         + "; ".join(problems) + ". Re-run nb 003, which writes "
+                         "max_sites_disagg into every PSHA config.")
+    return calc_id
 
 
 # The ERF, site and logic-tree lines are copied verbatim from the parent
@@ -813,14 +841,22 @@ def _calc_id_from_child_output(text: str) -> int | None:
 
 def run_or_reuse_child(name: str, child_ini: Path, levels_table: pd.DataFrame,
                        n_sites: int, wp1_dir: Path, manifest_fp: Path, *,
-                       parent_name: str, force_rerun: bool = False,
+                       parent_name: str, parent_manifest_fp: Path | None = None,
+                       force_rerun: bool = False,
                        dry_run: bool = False, new_window: bool = False,
                        imts=("AvgSA",)) -> int | None:
     """Run a child disaggregation, or reuse the recorded one if nothing changed.
 
     Mirrors ``oq_runner.run_or_reuse``: changed inputs re-run (printing what
     changed), a vanished datastore re-runs, otherwise the recorded calc id is
-    returned. The parent must already be in the manifest under ``parent_name``.
+    returned.
+
+    The child is recorded in ``manifest_fp`` (the disaggregation manifest). The
+    parent is looked up under ``parent_name`` in ``parent_manifest_fp`` - for
+    WP1, nb 003's ``psha_manifest.json`` - which defaults to ``manifest_fp`` for
+    a parent recorded alongside its children (the smoke tests). The parent's
+    recorded inputs are part of the child's fingerprint, so re-running the PSHA
+    invalidates every child built on it.
 
     The calculation runs in a **subprocess** (``python -m
     phd_project.scripts.oq_multi_iml_disagg run ...``, cwd = ``wp1_dir``), like
@@ -831,11 +867,13 @@ def run_or_reuse_child(name: str, child_ini: Path, levels_table: pd.DataFrame,
     Returns the calc id (``None`` under ``dry_run``).
     """
     child_ini, wp1_dir, manifest_fp = Path(child_ini), Path(wp1_dir), Path(manifest_fp)
+    parent_manifest_fp = Path(parent_manifest_fp) if parent_manifest_fp else manifest_fp
     manifest = oq_runner.load_manifest(manifest_fp)
-    if parent_name not in manifest:
-        raise KeyError(f"parent '{parent_name}' is not in {manifest_fp.name}; "
+    parent_manifest = oq_runner.load_manifest(parent_manifest_fp)
+    if parent_name not in parent_manifest:
+        raise KeyError(f"parent '{parent_name}' is not in {parent_manifest_fp.name}; "
                        f"run it first")
-    parent_entry = manifest[parent_name]
+    parent_entry = parent_manifest[parent_name]
     parent_calc_id = int(parent_entry["calc_id"])
 
     csv_fp, npy_fp = write_levels_files(levels_table, n_sites, wp1_dir, name, imts)
@@ -891,6 +929,7 @@ def run_or_reuse_child(name: str, child_ini: Path, levels_table: pd.DataFrame,
         "config": child_ini.name,
         "description": oq_runner._read_key(child_ini, "description"),
         "parent": parent_name,
+        "parent_manifest": parent_manifest_fp.name,
         "parent_calc_id": parent_calc_id,
         "levels_csv": csv_fp.name,
         "levels_npy": npy_fp.name,
@@ -1159,6 +1198,11 @@ def _engine_version(dstore) -> str:
 # fault would cause (a wrong site, chunk or level moves bins by 1e-3 or more).
 NOISE_ATOL = 1e-13
 
+# nb 020 check 2 compares the child with the old per-IML stock jobs at the IMLs
+# both share. With fewer shared IMLs than this the check is refused rather than
+# passed on next to no evidence (verify_against_reference, min_refs).
+MIN_STOCK_REFS = 5
+
 
 def _rel_err(a: np.ndarray, b: np.ndarray, atol: float) -> tuple[float, float]:
     """(max |a-b|, max |a-b| / max(|b|, atol))."""
@@ -1171,6 +1215,7 @@ def _rel_err(a: np.ndarray, b: np.ndarray, atol: float) -> tuple[float, float]:
 def verify_against_reference(new_dstore, refs: dict, *, reader=None,
                              disagg_type: str = DISAGG_TYPE, rtol: float = 1e-9,
                              atol: float = NOISE_ATOL, level_rtol: float = 0.0,
+                             min_refs: int = 1,
                              report_fp: Path | None = None) -> pd.DataFrame:
     """Compare a child with stock reference datastores, level by level.
 
@@ -1199,12 +1244,22 @@ def verify_against_reference(new_dstore, refs: dict, *, reader=None,
     ``best_rlzs``: the z order depends on the engine's ranking against the
     mean curve, which differs between a 1-level stock job and a 25-level child.
 
+    min_refs : raise unless at least this many references are given. nb 020
+        matches its child to the old per-IML jobs by IML, so after a stripe
+        re-selection few IMLs may be shared; with too few the check would pass
+        while comparing (almost) nothing.
+
     If the reference was written by a different engine version, a mismatch is
     reported as ``REVIEW`` rather than ``FAIL``: a version change can move the
     numbers legitimately, and that is for the analyst to judge.
     """
     if reader is None:
         from openquake.commonlib.datastore import read as reader
+    if len(refs) < int(min_refs):
+        raise AssertionError(
+            f"verify_against_reference: only {len(refs)} reference level(s), need "
+            f">= {min_refs}. The child shares too few IMLs with the old stock jobs "
+            f"for this comparison to mean anything.")
     new_ver = _engine_version(new_dstore)
     new_sc = new_dstore["sitecol"]
     new_best = np.asarray(new_dstore["best_rlzs"][()])
@@ -1534,7 +1589,10 @@ def _cli_verify(args) -> int:
     wp1 = Path(cfg["hazard_models"]["eshm20_wp1"])
     manifest = oq_runner.load_manifest(cfg["hazard_models"]["eshm20_wp1_disagg_manifest"])
     logs_dir = wp1 / "logs"
-    parent = read(int(manifest["AvgSA_03_disagg_eps4_parent"]["calc_id"]))
+    # the parent is nb 003's PSHA (psha_manifest.json), checked fit to be one
+    n_sites = len(pd.read_csv(wp1 / oq_runner.SITE_MODEL_FILE))
+    parent = read(require_parent(cfg["hazard_models"]["eshm20_wp1_psha_manifest"],
+                                 parent_name("03", 4), n_sites))
 
     if args.which == "imlgrid":
         old_re = re.compile(r"^AvgSA_03_disagg_eps4_(\d+pt\d+)$")
@@ -1558,7 +1616,8 @@ def _cli_verify(args) -> int:
                 if tok in p_of_tok:
                     refs[int(e["calc_id"])] = (0, p_of_tok[tok])
             print(verify_against_reference(
-                child, refs, report_fp=logs_dir / f"verify_{cname}_vs_stock.csv"
+                child, refs, min_refs=MIN_STOCK_REFS,
+                report_fp=logs_dir / f"verify_{cname}_vs_stock.csv"
             ).groupby(["check", "status"]).size().to_string())
             print(check_total_probability(
                 child, parent, report_fp=logs_dir / f"verify_{cname}_total_probability.csv"

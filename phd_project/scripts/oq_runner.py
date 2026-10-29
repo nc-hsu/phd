@@ -130,6 +130,27 @@ def analysis_description(im: str, eps: int) -> str:
     return f"[ESHM20 AvgSA 0 to {im_upper(im)} - all sites - eps{eps}]"
 
 
+def disagg_parent_block(n_sites: int) -> str:
+    """The ``[disaggregation]`` block that makes a PSHA the disaggregation parent.
+
+    ``max_sites_disagg >= n_sites`` does two things in the engine:
+
+    - the classical step stores the rupture contexts (``rup/``,
+      ``base.py:548-553``), which the disaggregation children of
+      ``oq_multi_iml_disagg`` read back instead of recomputing the hazard;
+    - the engine uses its few-sites treatment of point sources
+      (``hazardlib/contexts.py:357-369``), the one every disaggregation uses,
+      so the PSHA curves and the disaggregations agree.
+
+    nb 003 appends it to every generated config (``write_config(..., extra=...)``);
+    the hand-written SA config carries the same lines.
+    """
+    return ("\n[disaggregation]\n"
+            "# Base hazard for the disaggregations: store the rupture contexts\n"
+            "# (rup/) so oq_multi_iml_disagg children can reuse this calculation.\n"
+            f"max_sites_disagg = {int(n_sites)}\n")
+
+
 def write_config(
     out_fp: Path,
     *,
@@ -148,9 +169,8 @@ def write_config(
     ``generated_by`` names the writer in the header comment and ``extra`` is
     appended verbatim at the end of the file. Both default to what nb 003 has
     always written, so its configs (and their fingerprints) are byte-identical.
-    The multi-IML disaggregation parent (``oq_multi_iml_disagg.write_parent_config``)
-    uses them to add ``max_sites_disagg``, which makes the classical step store
-    the rupture contexts its children read back.
+    nb 003 passes ``extra=disagg_parent_block(n_sites)``, so every PSHA can be
+    the parent of the multi-IML disaggregation children (``oq_multi_iml_disagg``).
     """
     out_fp = Path(out_fp)
     text = _CONFIG_TEMPLATE.substitute(

@@ -170,7 +170,7 @@ def test_merge_collations_rejects_duplicates():
 
 def test_child_config_text(tmp_path):
     fp = mid.write_child_config(tmp_path / "c.ini", parent_calc_id=200,
-                                parent_name="AvgSA_03_disagg_eps4_parent", n_levels=6,
+                                parent_name="AvgSA_03_psha_eps4", n_levels=6,
                                 description="[x]", levels_file="levels_x.npy")
     text = fp.read_text()
     assert "hazard_calculation_id = 200" in text
@@ -180,18 +180,71 @@ def test_child_config_text(tmp_path):
     assert "num_rlzs_disagg = 0" in text and "iml_disagg" not in text.split("[disaggregation]")[1]
 
 
-def test_parent_config_is_psha_plus_max_sites(tmp_path):
+def test_psha_config_with_parent_block(tmp_path):
+    # nb 003's PSHA config + disagg_parent_block = the old PSHA text plus exactly
+    # the [disaggregation] block, so the hazard model itself is untouched
     from phd_project.scripts import oq_runner
-    fp = mid.write_parent_config(tmp_path / "p.ini")
-    psha = oq_runner.write_config(
-        tmp_path / "q.ini", description="d", gsim_logic_tree_file=oq_runner.GMPE_LOGIC_TREES["03"],
-        truncation_level=4, im_upper=3)
-    p_lines = [l for l in fp.read_text().splitlines()
-               if not l.startswith(("#", "description")) and "max_sites_disagg" not in l
-               and l != "[disaggregation]"]
-    q_lines = [l for l in psha.read_text().splitlines() if not l.startswith(("#", "description"))]
-    assert [l for l in p_lines if l] == [l for l in q_lines if l]
-    assert "max_sites_disagg = 60" in fp.read_text()
+    kw = dict(description="d", gsim_logic_tree_file=oq_runner.GMPE_LOGIC_TREES["03"],
+              truncation_level=4, im_upper=3)
+    plain = oq_runner.write_config(tmp_path / "a.ini", **kw).read_text()
+    parent = oq_runner.write_config(tmp_path / "b.ini", extra=oq_runner.disagg_parent_block(60),
+                                    **kw).read_text()
+    assert parent == plain + oq_runner.disagg_parent_block(60)
+    assert "[disaggregation]" in parent and "max_sites_disagg = 60" in parent
+
+
+def test_parent_name_is_the_psha():
+    assert mid.parent_name("03", 4) == "AvgSA_03_psha_eps4"
+
+
+class _FakeDstore(dict):
+    """dict-backed stand-in for a datastore: ``in``, ``[]`` and ``close``."""
+
+    def close(self):
+        pass
+
+
+class _FakeOQ:
+    def __init__(self, mode="classical", msd=60):
+        self.calculation_mode, self.max_sites_disagg = mode, msd
+
+
+def _parent_setup(tmp_path, monkeypatch, *, mode="classical", msd=60, n=60, rup=True):
+    import json
+    from phd_project.scripts import oq_runner
+    man = tmp_path / "psha_manifest.json"
+    man.write_text(json.dumps({"AvgSA_03_psha_eps4": {"calc_id": 7}}))
+    monkeypatch.setattr(oq_runner, "_calc_exists", lambda cid: True)
+    ds = _FakeDstore(oqparam=_FakeOQ(mode, msd), sitecol=list(range(n)))
+    if rup:
+        ds["rup"] = object()
+    return man, (lambda cid: ds)
+
+
+def test_require_parent_accepts_a_good_psha(tmp_path, monkeypatch):
+    man, reader = _parent_setup(tmp_path, monkeypatch)
+    assert mid.require_parent(man, "AvgSA_03_psha_eps4", 60, reader=reader) == 7
+
+
+@pytest.mark.parametrize("bad", [dict(msd=10), dict(rup=False), dict(n=59),
+                                 dict(mode="disaggregation")])
+def test_require_parent_rejects(tmp_path, monkeypatch, bad):
+    # msd=10: a PSHA from before nb 003 wrote max_sites_disagg (e.g. calc 113)
+    man, reader = _parent_setup(tmp_path, monkeypatch, **bad)
+    with pytest.raises(ValueError, match="Re-run nb 003"):
+        mid.require_parent(man, "AvgSA_03_psha_eps4", 60, reader=reader)
+
+
+def test_require_parent_missing_entry(tmp_path, monkeypatch):
+    man, reader = _parent_setup(tmp_path, monkeypatch)
+    with pytest.raises(KeyError):
+        mid.require_parent(man, "AvgSA_06_psha_eps4", 60, reader=reader)
+
+
+def test_verify_refuses_too_few_references():
+    # raises before touching any datastore, so a dummy is enough
+    with pytest.raises(AssertionError, match="too few IMLs"):
+        mid.verify_against_reference(None, {1: (0, 0)}, min_refs=mid.MIN_STOCK_REFS)
 
 
 # --------------------------------------------------------------------------- #
