@@ -1,20 +1,20 @@
 {
   "inputs": {
     "gm_db_file": {
-      "hash": "7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d",
-      "summary": "file ESM-NGAsub_combined.csv (120401781 bytes)"
+      "hash": "272cc6e6d90de3cb2f4eec26dde11b6ca5122e478a8ef1407ad8297fef5e4bb8",
+      "summary": "file ESM-NGAsub_combined.csv (120350269 bytes)"
     },
     "gcim_file": {
-      "hash": "e5f9a5ab6e97dc3bb530a7d9b202b13bcb41c358fc4940168667990825c797b2",
-      "summary": "file gcim_dist_AvgSA_03.pickle (76799314 bytes)"
+      "hash": "31004baeca90840cc6850d9d505763a79e092fab0234e1052c7ea09138783ff4",
+      "summary": "file gcim_dist_AvgSA_03.pickle (81267616 bytes)"
     },
     "disagg_shards_digest": {
-      "hash": "813d6a537c3d605732db3e1097a5929a306aebced4609e608b24d23dd67922ce",
-      "summary": "str '473a55d41f0c1771ffc10a6ad73cce0e5af8261e851d3faaabe1917174cd3e35'"
+      "hash": "88b6f2c058954bbe5130480389e8b7f38dafac7a9af390bc8685d18fe28f4cd4",
+      "summary": "str '00e12dacf72b78b22ced0a84f1a537f55eb67be471241bc3cdaddc31f88d0ee8'"
     },
     "disagg_stats_file": {
-      "hash": "f727bddc9605ffdf8793d68a52c7822a539cb511990b2688886622040af74327",
-      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (209617 bytes)"
+      "hash": "9b70e11532af0bc720719f1a74faccede0c3717d0706f38032dd0ded36678cc0",
+      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (302373 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -25,15 +25,15 @@
       "summary": "int=1"
     },
     "db_exclusions": {
-      "hash": "502e39884698375344984f79d225ca24c48ee3a8183094f6f8367f994c9f15f4",
-      "summary": "str \"(('NGASub', (('index', ('4040476', '4040477', '4040478', '4040479', '4040480', '4040481', '4040482', '4040483', '4040484', '4040485', '4040486', '4040487', '4040488', '4040489', '4040490', '4040491', '4040492', '4040493', '4040494', '4040495', '4040496', '4040497', '4040498', '4040499', '4040500', '4040501', '4040502', '4040503')),)), ('NGASub', (('index', ('6003695', '6003748', '6003796')),)), ('NGASub', (('index', ('7004773',)),)))\""
+      "hash": "2e38e77b22c314a449e91fafed92a43826ac6aa403ae6a8acb6cf58239fbaf5d",
+      "summary": "str '()'"
     },
     "stage": {
       "hash": "32d7044ba5c2d7653c1d5260ca6e8512af2411738c653ee7589238149478e048",
       "summary": "str 'optimise_r1'"
     },
     "only": {
-      "hash": "9d27684bb3e27aaf1158132eb0cac97c401178fbae1ba9affbf02928de8f2a01",
+      "hash": "444ff25f4def864fb5ff4957faced299275b15f06704ce6ae5cf57c66cb0e147",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -95,7 +95,7 @@
   },
   "_meta": {
     "artifact": "AvgSA_03_rd1_optimisation.pickle",
-    "git_commit": "f9ff0f9d",
-    "written_at": "2026-10-19T10:26:14.424162+00:00"
+    "git_commit": "1cc8b954",
+    "written_at": "2026-10-30T11:32:44.036770+00:00"
   }
 }

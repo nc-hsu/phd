@@ -1,20 +1,20 @@
 {
   "inputs": {
     "gm_db_file": {
-      "hash": "7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d",
-      "summary": "file ESM-NGAsub_combined.csv (120401781 bytes)"
+      "hash": "272cc6e6d90de3cb2f4eec26dde11b6ca5122e478a8ef1407ad8297fef5e4bb8",
+      "summary": "file ESM-NGAsub_combined.csv (120350269 bytes)"
     },
     "gcim_file": {
-      "hash": "a5cb5e61732fcd3a0671ce3b5f99bfe754270c8c3e33e3205f072fc0b31fd753",
-      "summary": "file gcim_dist_AvgSA_03.pickle (73762146 bytes)"
+      "hash": "31004baeca90840cc6850d9d505763a79e092fab0234e1052c7ea09138783ff4",
+      "summary": "file gcim_dist_AvgSA_03.pickle (81267616 bytes)"
     },
     "disagg_shards_digest": {
-      "hash": "e3bf93201f9a12bc91ecd2e9596172f2e6da9b2df38b9ee8155dbefc34d4ed77",
-      "summary": "str '4c761476e76a861995b9f0021054144f0da5851dfed69dee41a75826c147ae70'"
+      "hash": "88b6f2c058954bbe5130480389e8b7f38dafac7a9af390bc8685d18fe28f4cd4",
+      "summary": "str '00e12dacf72b78b22ced0a84f1a537f55eb67be471241bc3cdaddc31f88d0ee8'"
     },
     "disagg_stats_file": {
-      "hash": "e6c19bb3ebaa4f61b0e7d5cfaf099a7f162cbddb7ec3c9a0f1a23a26175d4423",
-      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (174635 bytes)"
+      "hash": "9b70e11532af0bc720719f1a74faccede0c3717d0706f38032dd0ded36678cc0",
+      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (302373 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -24,12 +24,16 @@
       "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
       "summary": "int=1"
     },
+    "db_exclusions": {
+      "hash": "2e38e77b22c314a449e91fafed92a43826ac6aa403ae6a8acb6cf58239fbaf5d",
+      "summary": "str '()'"
+    },
     "stage": {
       "hash": "a8be4ccb633b2d7dc4c7eface90d57cb1ef10744d3ffdda16ad47ba527660003",
       "summary": "str 'optimise_r3'"
     },
     "only": {
-      "hash": "c76758ceba0951d22f1ab4e5a502c35d6b80f9bbe27878e72ccf381064970565",
+      "hash": "ca7f83746890911db2e1f662e0ed5fdceaf26e46eaccb5e85b16fc57d3c8ef45",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -91,9 +95,7 @@
   },
   "_meta": {
     "artifact": "AvgSA_03_rd3_optimisation.pickle",
-    "git_commit": "eefd21aa",
-    "written_at": "2026-08-26T11:39:11.504792+00:00",
-    "network_code_restamped_at": "2026-09-30T12:15:53.946618+00:00",
-    "network_code_restamped_from": "gm_db_file: database before the network_code column was added (sha256 4587597c391a88bd19c6193b0ae53613b0a7a3427ce7574375be5ae4e63fbc4e) -> with it (sha256 7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d); all other text in the file byte-identical"
+    "git_commit": "1cc8b954",
+    "written_at": "2026-10-29T19:18:02.804752+00:00"
   }
 }

@@ -1,20 +1,20 @@
 {
   "inputs": {
     "gm_db_file": {
-      "hash": "7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d",
-      "summary": "file ESM-NGAsub_combined.csv (120401781 bytes)"
+      "hash": "272cc6e6d90de3cb2f4eec26dde11b6ca5122e478a8ef1407ad8297fef5e4bb8",
+      "summary": "file ESM-NGAsub_combined.csv (120350269 bytes)"
     },
     "gcim_file": {
-      "hash": "e5f9a5ab6e97dc3bb530a7d9b202b13bcb41c358fc4940168667990825c797b2",
-      "summary": "file gcim_dist_AvgSA_03.pickle (76799314 bytes)"
+      "hash": "31004baeca90840cc6850d9d505763a79e092fab0234e1052c7ea09138783ff4",
+      "summary": "file gcim_dist_AvgSA_03.pickle (81267616 bytes)"
     },
     "disagg_shards_digest": {
-      "hash": "813d6a537c3d605732db3e1097a5929a306aebced4609e608b24d23dd67922ce",
-      "summary": "str '473a55d41f0c1771ffc10a6ad73cce0e5af8261e851d3faaabe1917174cd3e35'"
+      "hash": "88b6f2c058954bbe5130480389e8b7f38dafac7a9af390bc8685d18fe28f4cd4",
+      "summary": "str '00e12dacf72b78b22ced0a84f1a537f55eb67be471241bc3cdaddc31f88d0ee8'"
     },
     "disagg_stats_file": {
-      "hash": "f727bddc9605ffdf8793d68a52c7822a539cb511990b2688886622040af74327",
-      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (209617 bytes)"
+      "hash": "9b70e11532af0bc720719f1a74faccede0c3717d0706f38032dd0ded36678cc0",
+      "summary": "file AvgSA_03_disagg_stats_wp1sites_eps4.pickle (302373 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -24,12 +24,16 @@
       "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
       "summary": "int=1"
     },
+    "db_exclusions": {
+      "hash": "2e38e77b22c314a449e91fafed92a43826ac6aa403ae6a8acb6cf58239fbaf5d",
+      "summary": "str '()'"
+    },
     "stage": {
       "hash": "32d7044ba5c2d7653c1d5260ca6e8512af2411738c653ee7589238149478e048",
       "summary": "str 'optimise_r1'"
     },
     "only": {
-      "hash": "b6ab40055996c59e8e1eb4b980022f5a2c8cc5de8fffd88ce981906d3070dde8",
+      "hash": "6130e019f0c59444219c4be10f4e2973cfce42d88397272d223ec66b858611f3",
       "summary": "tuple"
     },
     "n_ensembles": {
@@ -91,7 +95,7 @@
   },
   "_meta": {
     "artifact": "AvgSA_03_rd1_optimisation.pickle",
-    "git_commit": "5710cffa",
-    "written_at": "2026-10-05T08:05:18.476206+00:00"
+    "git_commit": "1cc8b954",
+    "written_at": "2026-10-29T16:21:12.259611+00:00"
   }
 }

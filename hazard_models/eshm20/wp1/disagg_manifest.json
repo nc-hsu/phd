@@ -1363,5 +1363,238 @@
       "git_commit": "4c58d807",
       "written_at": "2026-10-26T11:25:16.618786+00:00"
     }
+  },
+  "AvgSA_03_disagg_eps4_parent": {
+    "calc_id": 138,
+    "config": "config_AvgSA_03_disagg_eps4_parent.ini",
+    "description": "[disagg-parent AvgSA03 eps4 - ESHM20 all sites]",
+    "inputs": {
+      "config": {
+        "hash": "28f6c54ef57d26e162bf6281156ceca2bc677dc9bb75118f7536920e0da2e481",
+        "summary": "file config_AvgSA_03_disagg_eps4_parent.ini (1785 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      }
+    },
+    "_meta": {
+      "git_commit": "78d445e1",
+      "written_at": "2026-10-28T10:18:21.109210+00:00"
+    }
+  },
+  "AvgSA_03_disagg_eps4_smoke": {
+    "calc_id": 149,
+    "kind": "multi_iml_child",
+    "config": "config_AvgSA_03_disagg_eps4_smoke.ini",
+    "description": "[AvgSA_03_disagg_eps4_smoke - multi-IML disagg child - ESHM20 all sites]",
+    "parent": "AvgSA_03_psha_eps4",
+    "parent_manifest": "psha_manifest.json",
+    "parent_calc_id": 143,
+    "levels_csv": "levels_AvgSA_03_disagg_eps4_smoke.csv",
+    "levels_npy": "levels_AvgSA_03_disagg_eps4_smoke.npy",
+    "n_levels": 4,
+    "inputs": {
+      "config": {
+        "hash": "90b067029ce369d03a8d91740158cfa78a492908b29dd4206fb2ae4a64647acc",
+        "summary": "file config_AvgSA_03_disagg_eps4_smoke.ini (2164 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      },
+      "levels": {
+        "hash": "a7e9430c0ec05a707306c601b716ddb584ea26cac7ea16dbccde028673d3ac7e",
+        "summary": "file levels_AvgSA_03_disagg_eps4_smoke.csv (10556 bytes)"
+      },
+      "parent_inputs": {
+        "hash": "582fe193d7e231a0c37b2e6cc1bcf9d840050895592458b65ea4d9edf493a2ff",
+        "summary": "str '{\"config\": {\"hash\": \"6e82d1e99ab40277762417471dfe3a869140a70f8bd2aab2c19c260578b8c5ca\", \"summary\": \"file config_AvgSA_03_psha_eps4.ini (1786 bytes)\"}, \"gmpe_lt\": {\"hash\": \"469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169\", \"summary\": \"file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)\"}, \"pickagm_version\": {\"hash\": \"0.1.0\", \"summary\": \"pickagm version\"}, \"site_model\": {\"hash\": \"e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100\", \"summary\": \"file site_model_casestudy_sites.csv (2641 bytes)\"}, \"source_models_digest\": {\"hash\": \"8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370\", \"summary\": \"str \\'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b\\'\"}, \"ssc_lt\": {\"hash\": \"6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9\", \"summary\": \"file source_model_logic_tree_eshm20.xml (17970 bytes)\"}}'"
+      },
+      "parent_calc_id": {
+        "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+        "summary": "int=143"
+      },
+      "engine_version": {
+        "hash": "62a04afd0071333f9f14d0dad001fe721a56fd004ec025b92fbe87f1dd382f2e",
+        "summary": "str '3.27.0'"
+      },
+      "engine_commit": {
+        "hash": "cdfae11876e44b35e8f171cbea8b7613e0a85ef21fb92edb8b3d8a73fd14f0a3",
+        "summary": "str 'b8f3077961a0bb482b73ffef3b39b45d4d1bf55c'"
+      }
+    },
+    "_meta": {
+      "git_commit": "d4cd1a8c",
+      "written_at": "2026-10-29T06:54:44.762212+00:00",
+      "engine_version": "3.27.0",
+      "dist_version": "3.25.0",
+      "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
+      "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
+    }
+  },
+  "AvgSA_03_disagg_eps4_imlgrid": {
+    "calc_id": 150,
+    "kind": "multi_iml_child",
+    "config": "config_AvgSA_03_disagg_eps4_imlgrid.ini",
+    "description": "[AvgSA_03_disagg_eps4_imlgrid - multi-IML disagg child - ESHM20 all sites]",
+    "parent": "AvgSA_03_psha_eps4",
+    "parent_manifest": "psha_manifest.json",
+    "parent_calc_id": 143,
+    "levels_csv": "levels_AvgSA_03_disagg_eps4_imlgrid.csv",
+    "levels_npy": "levels_AvgSA_03_disagg_eps4_imlgrid.npy",
+    "n_levels": 76,
+    "inputs": {
+      "config": {
+        "hash": "6630a95d04de192221fc48387c16f4ecef2122ffa1e5f899b126d01eb0cf8beb",
+        "summary": "file config_AvgSA_03_disagg_eps4_imlgrid.ini (2984 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      },
+      "levels": {
+        "hash": "4c0c8ba3d3ec1ca7e3cf826a000f4749bd87d904995abde67bc424d7b8b66b8c",
+        "summary": "file levels_AvgSA_03_disagg_eps4_imlgrid.csv (268856 bytes)"
+      },
+      "parent_inputs": {
+        "hash": "582fe193d7e231a0c37b2e6cc1bcf9d840050895592458b65ea4d9edf493a2ff",
+        "summary": "str '{\"config\": {\"hash\": \"6e82d1e99ab40277762417471dfe3a869140a70f8bd2aab2c19c260578b8c5ca\", \"summary\": \"file config_AvgSA_03_psha_eps4.ini (1786 bytes)\"}, \"gmpe_lt\": {\"hash\": \"469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169\", \"summary\": \"file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)\"}, \"pickagm_version\": {\"hash\": \"0.1.0\", \"summary\": \"pickagm version\"}, \"site_model\": {\"hash\": \"e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100\", \"summary\": \"file site_model_casestudy_sites.csv (2641 bytes)\"}, \"source_models_digest\": {\"hash\": \"8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370\", \"summary\": \"str \\'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b\\'\"}, \"ssc_lt\": {\"hash\": \"6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9\", \"summary\": \"file source_model_logic_tree_eshm20.xml (17970 bytes)\"}}'"
+      },
+      "parent_calc_id": {
+        "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+        "summary": "int=143"
+      },
+      "engine_version": {
+        "hash": "62a04afd0071333f9f14d0dad001fe721a56fd004ec025b92fbe87f1dd382f2e",
+        "summary": "str '3.27.0'"
+      },
+      "engine_commit": {
+        "hash": "cdfae11876e44b35e8f171cbea8b7613e0a85ef21fb92edb8b3d8a73fd14f0a3",
+        "summary": "str 'b8f3077961a0bb482b73ffef3b39b45d4d1bf55c'"
+      }
+    },
+    "_meta": {
+      "git_commit": "d4cd1a8c",
+      "written_at": "2026-10-29T07:00:09.157557+00:00",
+      "engine_version": "3.27.0",
+      "dist_version": "3.25.0",
+      "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
+      "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
+    }
+  },
+  "AvgSA_03_disagg_eps4_smoke_perturb": {
+    "calc_id": 151,
+    "kind": "multi_iml_child",
+    "config": "config_AvgSA_03_disagg_eps4_smoke_perturb.ini",
+    "description": "[AvgSA_03_disagg_eps4_smoke_perturb - multi-IML disagg child - ESHM20 all sites]",
+    "parent": "AvgSA_03_psha_eps4",
+    "parent_manifest": "psha_manifest.json",
+    "parent_calc_id": 143,
+    "levels_csv": "levels_AvgSA_03_disagg_eps4_smoke_perturb.csv",
+    "levels_npy": "levels_AvgSA_03_disagg_eps4_smoke_perturb.npy",
+    "n_levels": 4,
+    "inputs": {
+      "config": {
+        "hash": "d09ccb52cdce70d3bf0ec6c07097eee57264c2e6fe3193db0231ed1efe8e094c",
+        "summary": "file config_AvgSA_03_disagg_eps4_smoke_perturb.ini (2180 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      },
+      "levels": {
+        "hash": "3e67c2c891f1ea342fbc404dd62a3ed8eb283d1bbee7ced3eb623d9acb8922ab",
+        "summary": "file levels_AvgSA_03_disagg_eps4_smoke_perturb.csv (10544 bytes)"
+      },
+      "parent_inputs": {
+        "hash": "582fe193d7e231a0c37b2e6cc1bcf9d840050895592458b65ea4d9edf493a2ff",
+        "summary": "str '{\"config\": {\"hash\": \"6e82d1e99ab40277762417471dfe3a869140a70f8bd2aab2c19c260578b8c5ca\", \"summary\": \"file config_AvgSA_03_psha_eps4.ini (1786 bytes)\"}, \"gmpe_lt\": {\"hash\": \"469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169\", \"summary\": \"file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)\"}, \"pickagm_version\": {\"hash\": \"0.1.0\", \"summary\": \"pickagm version\"}, \"site_model\": {\"hash\": \"e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100\", \"summary\": \"file site_model_casestudy_sites.csv (2641 bytes)\"}, \"source_models_digest\": {\"hash\": \"8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370\", \"summary\": \"str \\'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b\\'\"}, \"ssc_lt\": {\"hash\": \"6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9\", \"summary\": \"file source_model_logic_tree_eshm20.xml (17970 bytes)\"}}'"
+      },
+      "parent_calc_id": {
+        "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+        "summary": "int=143"
+      },
+      "engine_version": {
+        "hash": "62a04afd0071333f9f14d0dad001fe721a56fd004ec025b92fbe87f1dd382f2e",
+        "summary": "str '3.27.0'"
+      },
+      "engine_commit": {
+        "hash": "cdfae11876e44b35e8f171cbea8b7613e0a85ef21fb92edb8b3d8a73fd14f0a3",
+        "summary": "str 'b8f3077961a0bb482b73ffef3b39b45d4d1bf55c'"
+      }
+    },
+    "_meta": {
+      "git_commit": "d4cd1a8c",
+      "written_at": "2026-10-29T07:06:27.052614+00:00",
+      "engine_version": "3.27.0",
+      "dist_version": "3.25.0",
+      "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
+      "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
+    }
   }
 }
