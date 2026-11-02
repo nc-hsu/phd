@@ -1,16 +1,16 @@
 {
   "inputs": {
     "disagg_stripe_data": {
-      "hash": "a9daeee01c1773930997285842ea4599e468a447749468c70e2486169679f5f5",
-      "summary": "str '84f73858520fb5436ab2afd0b07523e5fd3a4846724685c605097519e1903ffb'"
+      "hash": "3ff180cfc709148a1e976c80482275436d0545d9ec14048ad00410f8ee15b94c",
+      "summary": "str 'ab42f57882cbbaa1d8547ed86f7525f6d73f0e4df55836131f82757fa8268434'"
     },
     "disagg_stats_row": {
-      "hash": "196dfe8d78af1b9610825aa38bbff9b4498ed04431209b0757732d0277cd84e5",
+      "hash": "f2a7cf9dddeee9d5ae2f7a70e5fc2a99034a6339231d959716882d686e2f210b",
       "summary": "pandas shape=(1, 18)"
     },
     "gm_db_file": {
-      "hash": "7c5f3cdd260983b12889d2813e7f3511dae884e3d769385851c15fec1884d20d",
-      "summary": "file ESM-NGAsub_combined.csv (120401781 bytes)"
+      "hash": "272cc6e6d90de3cb2f4eec26dde11b6ca5122e478a8ef1407ad8297fef5e4bb8",
+      "summary": "file ESM-NGAsub_combined.csv (120350269 bytes)"
     },
     "site_model_file": {
       "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
@@ -89,8 +89,8 @@
       "summary": "str \"(('acceptance', 'ks'), ('lambda_ks', 0.3333333333333333), ('lambda_mu', 0.3333333333333333), ('lambda_sigma', 0.3333333333333333), ('objective', 'ks_mu_sigma'), ('sd_error', 'log'))\""
     },
     "db_exclusions": {
-      "hash": "502e39884698375344984f79d225ca24c48ee3a8183094f6f8367f994c9f15f4",
-      "summary": "str \"(('NGASub', (('index', ('4040476', '4040477', '4040478', '4040479', '4040480', '4040481', '4040482', '4040483', '4040484', '4040485', '4040486', '4040487', '4040488', '4040489', '4040490', '4040491', '4040492', '4040493', '4040494', '4040495', '4040496', '4040497', '4040498', '4040499', '4040500', '4040501', '4040502', '4040503')),)), ('NGASub', (('index', ('6003695', '6003748', '6003796')),)), ('NGASub', (('index', ('7004773',)),)))\""
+      "hash": "2e38e77b22c314a449e91fafed92a43826ac6aa403ae6a8acb6cf58239fbaf5d",
+      "summary": "str '()'"
     },
     "pickagm_version": {
       "hash": "0.1.0",
@@ -99,7 +99,7 @@
   },
   "_meta": {
     "artifact": "site_53__stripe_iml_00pt890__gm_selection.pickle",
-    "git_commit": "a5be94d3",
-    "written_at": "2026-10-20T09:15:18.960236+00:00"
+    "git_commit": "1cc8b954",
+    "written_at": "2026-11-02T10:37:24.168053+00:00"
   }
 }
