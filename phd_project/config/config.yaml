@@ -27,7 +27,7 @@ project_root: "../../"
 record_sets:
   # The study the main-line notebooks work on. Side-quest notebooks never read this: they
   # name their record sets explicitly, so changing it cannot change their results.
-  active_study: "AvgSA_03__opt_ks_mu_sigma__vs__femap695"
+  active_study: "AvgSA_03__ks__vs__femap695"
 
   # Site-specific sets: GCIM-based selection per (site, stripe IML).
   #   scheme       the selection-config constant in
@@ -153,6 +153,17 @@ proc_data:
   # Disaggregation data for specific RTPs used in the regression analysis (nb 072 §8.10). 
   # The pickles is a dict.
   AvgSA_03_disagg_rtps: "data_processed/03_site_hazard/AvgSA_03_disagg_rtps_wp1sites_eps4.pickle"
+  # RSD595-given-AvgSA curves (nb 081). A separate disaggregation on one common IML grid
+  # (child AvgSA_03_disagg_eps4_rsdcurve), kept apart from the record-selection files above
+  # so nothing nbs 021/031-033 read is touched. All written by nb 081.
+  #   _imls:            the common IML grid in g (one column, as nb 017's IML file)
+  #   _disagg_shards:   per-site shards (+ _index.json), slim format: eps bins summed, zero rows dropped
+  #   _disagg_stats:    flat disagg-stats DataFrame, one row per (site, imt, imtl)
+  #   _excluded_imls:   {site_id: [imls]} with zero hazard (beyond the site's maximum ground motion)
+  AvgSA_03_rsdcurve_imls:          "data_processed/03_site_hazard/AvgSA_03_imls_for_rsdcurve.csv"
+  AvgSA_03_rsdcurve_disagg_shards: "data_processed/03_site_hazard/AvgSA_03_rsdcurve_disagg_data_wp1sites_eps4"
+  AvgSA_03_rsdcurve_disagg_stats:  "data_processed/03_site_hazard/AvgSA_03_rsdcurve_disagg_stats_wp1sites_eps4.pickle"
+  AvgSA_03_rsdcurve_excluded_imls: "data_processed/03_site_hazard/AvgSA_03_rsdcurve_excluded_imls_wp1sites_eps4.json"
   # Per-site IML subset for which GCIM distributions / record ensembles are built (nb 031-033).
   # This is the LIVE stripe grid of the main line: nb 017 extends it with the remediation
   # IMLs that nb 060 asks for. Since 2026-10-29 every SS set is selected on it. The frozen
@@ -167,6 +178,14 @@ proc_data:
   gm_databases_for_selection: "data_processed/04_gm_database_for_selection"
   gm_database: "data_processed/04_gm_database_for_selection/ESM-NGAsub_combined.csv"
   gcim_dists: "data_processed/05_gcim_distributions"
+  # nb 081: RSD595-only GCIM at every (site, grid IML) of the rsdcurve disaggregation, and the
+  # two curve tables read by rsd595_curves.read_curves (index site_id 0-59, columns = grid
+  # IMLs in g, NaN above a site's ceiling). In a sub-folder so nothing that scans
+  # gcim_dists for nb 031's files sees them.
+  rsd595_given_avgsa:            "data_processed/05_gcim_distributions/rsd595_given_avgsa"
+  gcim_rsd595_curve_AvgSA_03:    "data_processed/05_gcim_distributions/rsd595_given_avgsa/gcim_rsd595_curve_AvgSA_03.pickle"
+  mu_lnRSD595_given_AvgSA_03:    "data_processed/05_gcim_distributions/rsd595_given_avgsa/mu_lnRSD595_given_AvgSA_03.csv"
+  sigma_lnRSD595_given_AvgSA_03: "data_processed/05_gcim_distributions/rsd595_given_avgsa/sigma_lnRSD595_given_AvgSA_03.csv"
   # Record selection, one folder per SS set: 06_gm_selection/ss/{ss_id}/ holds that set's
   # stage-1 rounds, final ensembles and download / conversion lists (nb 032/033/040/042).
   # Use config.ss_dir(cfg, "proc_data", "gm_selection", ss_id).
@@ -246,6 +265,8 @@ results:
   psha: "results/03_psha"
   hazard_curve_plots: "results/03_psha/hc_plots"
   disaggregation_plots: "results/03_psha/disagg_plots"
+  # nb 081: per-site and all-site curves of mu / sigma of ln RSD595 given AvgSA_03
+  rsd595_given_avgsa_plots: "results/03_psha/rsd595_given_avgsa"
   # Stripe selection pickles:
   #   ss/{ss_id}/site_{i}__stripe_iml_{iml}__gm_selection.pickle   (nb 032/033)
   #   fx/{fx_id}/{IM}/group_{n}s_{gg}__stripe_iml_{iml}__gm_selection.pickle  (MSA-FX, nb 054:
