@@ -44,6 +44,7 @@ import pandas as pd
 OCC = "P(m|X=x)"          # occurrence share, P(m | AvgSA = x)
 EXC = "P(m|X>x)"          # exceedance share, P(m | AvgSA > x)
 NU = "nu_m"               # annual rate at which the bin exceeds x
+EPS = "Eps"               # epsilon-bin column; pickagm selects it by name
 
 # The GCIM row that holds the duration moments.
 RSD595_ROW = "RSD595"
@@ -165,7 +166,12 @@ def slim_disagg_frame(df: pd.DataFrame) -> pd.DataFrame:
     pickagm's GCIM begins with ``groupby(["TRT", "Mag", "Dist"]).sum()`` and then
     drops rows with zero occurrence weight (``_conditional_im_distributions``).
     It never uses the epsilon bins: it recomputes the epsilon of ``x`` from the
-    GMM at each (TRT, M, R) bin centre. The disaggregation stats
+    GMM at each (TRT, M, R) bin centre. It does still *select* an ``Eps``
+    column (``contexts.get_rup_ctxs`` reads ``TRT, Mag, Dist, Eps`` for the
+    ``TRT_Mag_Dist_Eps`` type), and the context builder copies it into the
+    rupture record, where no GMM reads it. So ``Eps`` is kept here, summed the
+    same way pickagm's own groupby would sum it, and the frame pickagm builds
+    from a slim frame is the one it builds from the full frame. The disaggregation stats
     (``oqhelpers.get_iml_disagg_stats``) use only TRT, Mag, Dist, ``nu_m`` and
     ``P(m|X>x)``, and the zero-hazard test only asks whether any ``nu_m`` is
     positive. Doing the epsilon sum here, in the same row order pandas would
@@ -175,7 +181,9 @@ def slim_disagg_frame(df: pd.DataFrame) -> pd.DataFrame:
     What is kept
     ------------
     ``TRT, Mag, Dist, Z`` and the three additive columns ``nu_m``, ``P(m|X>x)``,
-    ``P(m|X=x)``, each summed over ``Eps``. ``P(X>x|T,m)`` is dropped: it is a
+    ``P(m|X=x)``, each summed over the epsilon bins, plus ``Eps`` itself summed
+    over its bins (a placeholder with no physical meaning, present only because
+    pickagm selects the column; see above). ``P(X>x|T,m)`` is dropped: it is a
     conditional probability per epsilon bin and cannot be summed.
 
     Rows whose ``nu_m`` is 0 are dropped. Such a bin cannot exceed ``x``, so its
@@ -189,7 +197,9 @@ def slim_disagg_frame(df: pd.DataFrame) -> pd.DataFrame:
     NaN for :func:`occurrence_sum_error` to catch.
     """
     keys = ["TRT", "Mag", "Dist", "Z"]
-    cols = [NU, EXC, OCC]
+    # Eps is summed like the additive columns so that pickagm's later
+    # groupby(...).sum() yields the same Eps value as it would from the full frame.
+    cols = [EPS, NU, EXC, OCC]
     out = (df.groupby(keys, sort=False)[cols].sum(min_count=1)
              .reset_index())
     out = out[out[NU].to_numpy(float) > 0].reset_index(drop=True)

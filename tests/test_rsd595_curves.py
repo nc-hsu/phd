@@ -88,10 +88,11 @@ def _full_frame(seed=0, zero_bins=True):
 
 
 def _pickagm_weights(df):
-    """What pickagm's _conditional_im_distributions does to the frame first."""
+    """What pickagm's _conditional_im_distributions does to the frame first,
+    restricted to the columns it goes on to read (Eps via get_rup_ctxs)."""
     d = df.groupby(["TRT", "Mag", "Dist"]).sum().reset_index()
     d = d.loc[d["P(m|X=x)"] != 0, :]
-    return d[["TRT", "Mag", "Dist", "P(m|X=x)"]].reset_index(drop=True)
+    return d[["TRT", "Mag", "Dist", "Eps", "P(m|X=x)"]].reset_index(drop=True)
 
 
 def test_slim_gives_pickagm_identical_occurrence_weights():
@@ -101,10 +102,23 @@ def test_slim_gives_pickagm_identical_occurrence_weights():
     pd.testing.assert_frame_equal(a, b, check_exact=True)
 
 
+def test_slim_frame_feeds_pickagm_rupture_contexts():
+    """pickagm reads TRT, Mag, Dist and Eps by name to build the rupture
+    contexts; a slim frame must carry all four, with the same values the full
+    frame would give after pickagm's epsilon groupby."""
+    from pickagm.contexts import get_rup_ctxs
+    full = _full_frame()
+    slim = rc.slim_disagg_frame(full)
+    a = get_rup_ctxs("TRT_Mag_Dist_Eps", _pickagm_weights(full))
+    b = get_rup_ctxs("TRT_Mag_Dist_Eps", _pickagm_weights(slim))
+    assert a == b and len(a) > 0
+
+
 def test_slim_keeps_columns_and_totals():
     full = _full_frame()
     slim = rc.slim_disagg_frame(full)
-    assert list(slim.columns) == ["TRT", "Mag", "Dist", "Z", "nu_m", "P(m|X>x)", "P(m|X=x)"]
+    assert list(slim.columns) == ["TRT", "Mag", "Dist", "Z", "Eps",
+                                  "nu_m", "P(m|X>x)", "P(m|X=x)"]
     assert (slim["nu_m"] > 0).all()
     assert len(slim) < len(full) / 5
     for c in ["nu_m", "P(m|X>x)", "P(m|X=x)"]:
