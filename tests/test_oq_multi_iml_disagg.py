@@ -155,6 +155,152 @@ def test_split_targets_keeps_pairs_and_sites():
         assert c.groupby("site")["key"].apply(tuple).nunique() == 1
 
 
+# --------------------------------------------------------------------------- #
+# assigning target keys to children                                            #
+# --------------------------------------------------------------------------- #
+
+BASE = "AvgSA_03_disagg_eps4_imlgrid"
+
+
+def _record_child(manifest, wp1_dir, name, keys, n_sites=2, delta=mid.DELTA_DEFAULT):
+    """Write a child's levels files as nb 020 does and add a manifest entry for it,
+    so assign_keys_to_children sees it exactly as it would see a run child."""
+    t = pd.DataFrame([(s, k, k) for s in range(n_sites) for k in keys],
+                     columns=["site", "key", "x"])
+    table = mid.build_levels_table(t, delta)
+    csv_fp, _ = mid.write_levels_files(table, n_sites, wp1_dir, name)
+    manifest[name] = {"kind": "multi_iml_child", "levels_csv": csv_fp.name}
+    return table
+
+
+def test_assign_first_run_all_in_base(tmp_path):
+    a, orphans = mid.assign_keys_to_children([0.4, 0.2, 0.3], {}, BASE, tmp_path)
+    assert a == {BASE: [0.2, 0.3, 0.4]} and orphans == []
+
+
+def test_assign_first_run_split_names_c00(tmp_path):
+    a, _ = mid.assign_keys_to_children([0.2, 0.3, 0.4], {}, BASE, tmp_path, max_levels=4)
+    assert a == {f"{BASE}_c00": [0.2, 0.3], f"{BASE}_c01": [0.4]}
+
+
+def test_assign_existing_child_keeps_its_keys(tmp_path):
+    # the point of the function: adding an IML must not touch the existing child
+    man = {}
+    _record_child(man, tmp_path, BASE, [0.2, 0.4])
+    a, orphans = mid.assign_keys_to_children([0.2, 0.3, 0.4, 0.5], man, BASE, tmp_path)
+    assert a == {BASE: [0.2, 0.4], f"{BASE}_c01": [0.3, 0.5]}
+    assert orphans == []
+
+
+def test_assign_rebuilds_existing_levels_file_identically(tmp_path):
+    # the existing child's levels CSV must come out byte-identical, or its
+    # fingerprint changes and it re-runs
+    man = {}
+    _record_child(man, tmp_path, BASE, [0.1645, 0.27, 1.8039])
+    before = (tmp_path / f"levels_{BASE}.csv").read_bytes()
+    a, _ = mid.assign_keys_to_children([0.1645, 0.27, 1.8039, 0.5], man, BASE, tmp_path)
+    _record_child({}, tmp_path, BASE, a[BASE])
+    assert (tmp_path / f"levels_{BASE}.csv").read_bytes() == before
+
+
+def test_assign_numbers_on_from_highest_index(tmp_path):
+    man = {}
+    _record_child(man, tmp_path, f"{BASE}_c00", [0.2])
+    _record_child(man, tmp_path, f"{BASE}_c01", [0.3])
+    a, _ = mid.assign_keys_to_children([0.2, 0.3, 0.4, 0.5, 0.6], man, BASE, tmp_path,
+                                       max_levels=4)
+    assert a[f"{BASE}_c02"] == [0.4, 0.5] and a[f"{BASE}_c03"] == [0.6]
+    assert a[f"{BASE}_c00"] == [0.2] and a[f"{BASE}_c01"] == [0.3]
+
+
+def test_assign_nothing_new_returns_existing_only(tmp_path):
+    man = {}
+    _record_child(man, tmp_path, BASE, [0.2, 0.3])
+    a, orphans = mid.assign_keys_to_children([0.3, 0.2], man, BASE, tmp_path)
+    assert a == {BASE: [0.2, 0.3]} and orphans == []
+
+
+def test_assign_reports_orphans_and_keeps_them(tmp_path):
+    man = {}
+    _record_child(man, tmp_path, BASE, [0.2, 0.3])
+    a, orphans = mid.assign_keys_to_children([0.2], man, BASE, tmp_path)
+    assert a == {BASE: [0.2, 0.3]} and orphans == [0.3]
+
+
+def test_assign_ignores_other_children(tmp_path):
+    # smoke children and nb 081's rsdcurve child share the prefix but not the name
+    man = {}
+    _record_child(man, tmp_path, "AvgSA_03_disagg_eps4_smoke", [0.2])
+    _record_child(man, tmp_path, "AvgSA_03_disagg_eps4_rsdcurve", [0.2])
+    man["AvgSA_03_disagg_eps4_0pt270"] = {"calc_id": 89}          # old stock job
+    a, _ = mid.assign_keys_to_children([0.2], man, BASE, tmp_path)
+    assert a == {BASE: [0.2]}
+
+
+def test_assign_refuses_missing_levels_file(tmp_path):
+    man = {BASE: {"kind": "multi_iml_child", "levels_csv": "levels_gone.csv"}}
+    with pytest.raises(FileNotFoundError, match="levels file"):
+        mid.assign_keys_to_children([0.2], man, BASE, tmp_path)
+
+
+def test_assign_refuses_key_in_two_children(tmp_path):
+    man = {}
+    _record_child(man, tmp_path, BASE, [0.2])
+    _record_child(man, tmp_path, f"{BASE}_c01", [0.2])
+    with pytest.raises(ValueError, match="carried by both"):
+        mid.assign_keys_to_children([0.2], man, BASE, tmp_path)
+
+
+def test_assign_refuses_duplicate_keys(tmp_path):
+    with pytest.raises(ValueError, match="duplicate"):
+        mid.assign_keys_to_children([0.2, 0.2], {}, BASE, tmp_path)
+
+
+class _Arr:
+    """Stand-in for an h5py dataset: ``ds[()]`` returns the array."""
+
+    def __init__(self, a):
+        self.a = a
+
+    def __getitem__(self, item):
+        return self.a
+
+
+class _FakeOQImtls:
+    imtls = {"AvgSA": None}
+
+
+def _collate_setup(monkeypatch):
+    """A 2-site, 1-target child: a fake datastore whose hmap3 matches the levels
+    table, and read_levels patched to return frames whose rates fall from x to
+    x+dx (so the occurrence column is well defined)."""
+    t = pd.DataFrame([(s, 0.4, 0.4) for s in range(2)], columns=["site", "key", "x"])
+    table = mid.build_levels_table(t)
+    ds = _FakeDstore(hmap3=_Arr(mid.levels_array(table, 2)), oqparam=_FakeOQImtls())
+
+    def fake_read_levels(dstore, disagg_type, *, sites, levels):
+        site = sites[0]
+        return {site: {"AvgSA": {0: _frame([4e-4, 2e-4, 0.0]),
+                                 1: _frame([3e-4, 1.5e-4, 0.0])}}}
+
+    monkeypatch.setattr(mid, "read_levels", fake_read_levels)
+    return ds, table
+
+
+def test_collate_frame_fn_none_is_unchanged_and_fn_is_applied(monkeypatch):
+    ds, table = _collate_setup(monkeypatch)
+    plain = mid.collate_targets(ds, table)
+    assert "P(m|X=x)" in plain[0]["AvgSA"][0.4].columns
+    seen = []
+    tagged = mid.collate_targets(
+        ds, table, frame_fn=lambda df: seen.append(len(df)) or df.assign(tag=1))
+    assert len(seen) == 2                                   # once per (site, key)
+    for s in (0, 1):
+        a, b = plain[s]["AvgSA"][0.4], tagged[s]["AvgSA"][0.4]
+        pd.testing.assert_frame_equal(a, b.drop(columns="tag"))
+        assert (b["tag"] == 1).all()
+
+
 def test_merge_collations_rejects_duplicates():
     a = {0: {"AvgSA": {0.4: "a"}}}
     b = {0: {"AvgSA": {0.4: "b"}}}

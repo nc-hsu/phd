@@ -53,6 +53,7 @@ Contents
 - configs:    :func:`write_child_config`
 - levels:     :func:`build_levels_table`, :func:`levels_array`,
               :func:`levels_at_poes`, :func:`split_targets`,
+              :func:`assign_keys_to_children`, :func:`child_keys`,
               :func:`write_levels_files`, :func:`read_levels_table`
 - running:    :func:`run_or_reuse_child` (+ the ``run`` CLI subcommand)
 - reading:    :func:`read_levels`, :func:`occurrence_disagg`,
@@ -730,6 +731,115 @@ def split_targets(targets: pd.DataFrame, max_levels: int | None) -> list[pd.Data
             for i in range(0, len(keys), per)]
 
 
+def _chunk_keys(keys: list, max_levels: int | None) -> list[list]:
+    """Split a sorted key list into runs of at most ``max_levels // 2`` keys
+    (each key costs two levels, x and x+dx). ``None`` keeps them together."""
+    if not keys:
+        return []
+    if max_levels is None:
+        return [list(keys)]
+    per = max(int(max_levels) // 2, 1)
+    return [list(keys[i:i + per]) for i in range(0, len(keys), per)]
+
+
+def child_keys(levels_csv: Path) -> list:
+    """The target keys a child was run with, read from its levels CSV."""
+    table = read_levels_table(levels_csv)
+    return sorted(set(table.loc[table["role"] == ROLE_X, "key"]))
+
+
+def assign_keys_to_children(keys, manifest: dict, child_name: str, wp1_dir: Path, *,
+                            max_levels: int | None = None) -> tuple[dict[str, list], list]:
+    """Decide which child disaggregation carries each target key.
+
+    Why this exists
+    ---------------
+    The record-selection cache (nbs 031-033) marks a stripe stale when the
+    content hash of that stripe's own disaggregation DataFrame changes. The
+    hash is exact, and two runs of the same child are not bit-identical: the
+    engine adds task results in completion order, so the last bits differ
+    (see :func:`check_independence`). If a new IML were added to an existing
+    child, that child would re-run, every one of its IMLs would come back with
+    different last bits, and every already-selected stripe would read as
+    stale although nothing meaningful changed.
+
+    So a child, once recorded in the manifest, keeps exactly the keys it was
+    run with. Its levels table is then rebuilt identically, its fingerprint
+    matches, :func:`run_or_reuse_child` reuses its datastore, and nb 021
+    re-reads the same numbers for its stripes. Keys that no existing child
+    carries go into **new** children.
+
+    Rules
+    -----
+    - No child named ``child_name`` or ``child_name_cNN`` in the manifest
+      (first run): all keys, split by ``max_levels`` if given. One chunk is
+      named ``child_name``; several are ``child_name_c00``, ``_c01``, ...
+    - Otherwise each existing child keeps the keys in its levels CSV, and the
+      keys none of them carries are split by ``max_levels`` into new children
+      ``child_name_cNN``, numbered on from the highest existing index (the
+      unsuffixed child counts as index 0).
+    - ``max_levels`` therefore applies to a first run and to new keys only; an
+      existing child is never re-split.
+
+    Parameters
+    ----------
+    keys : the target keys wanted now (e.g. nb 017's IMLs at 6 s.f.).
+    manifest : the disaggregation manifest (``oq_runner.load_manifest``).
+    child_name : the base child name, e.g. ``AvgSA_03_disagg_eps4_imlgrid``.
+    wp1_dir : folder holding each child's levels CSV (``entry["levels_csv"]``).
+    max_levels : most levels per new child (two per key), or ``None``.
+
+    Returns
+    -------
+    ``(assignment, orphans)``. ``assignment`` maps child name -> sorted keys,
+    existing children first (by name), then new ones. ``orphans`` lists keys
+    an existing child carries that are no longer in ``keys``: they stay in
+    their child (removing them would re-run it), and the caller should report
+    them, since nb 021 refuses IMLs that are not in its target list.
+    """
+    wp1_dir = Path(wp1_dir)
+    wanted = sorted(set(keys))
+    if len(wanted) != len(list(keys)):
+        raise ValueError("duplicate target keys")
+
+    pattern = re.escape(child_name) + r"(_c(\d+))?"
+    existing = child_entries(manifest, pattern)
+
+    if not existing:
+        chunks = _chunk_keys(wanted, max_levels)
+        if len(chunks) == 1:
+            return {child_name: chunks[0]}, []
+        return {f"{child_name}_c{i:02d}": c for i, c in enumerate(chunks)}, []
+
+    # Keys carried by each existing child, from its own levels CSV. Without the
+    # file there is no way to know which keys the child holds, and guessing
+    # risks running a key twice, so refuse.
+    assignment, owner = {}, {}
+    for name, entry in existing.items():
+        csv_fp = wp1_dir / entry["levels_csv"]
+        if not csv_fp.is_file():
+            raise FileNotFoundError(
+                f"{name}: levels file {csv_fp.name} not in {wp1_dir}; it is needed "
+                f"to know which IMLs the child already carries")
+        ks = child_keys(csv_fp)
+        for k in ks:
+            if k in owner:
+                raise ValueError(f"key {k!r} is carried by both {owner[k]} and {name}")
+            owner[k] = name
+        assignment[name] = ks
+
+    orphans = sorted(set(owner) - set(wanted))
+    new_keys = [k for k in wanted if k not in owner]
+
+    # Number new children on from the highest index in use.
+    indices = [int(m.group(2)) if m.group(2) else 0
+               for m in (re.fullmatch(pattern, n) for n in existing)]
+    nxt = max(indices) + 1
+    for i, chunk in enumerate(_chunk_keys(new_keys, max_levels)):
+        assignment[f"{child_name}_c{nxt + i:02d}"] = chunk
+    return assignment, orphans
+
+
 def levels_file_stem(name: str) -> str:
     """``levels_<name>``: the stem of the CSV / NPY written next to the ini."""
     return f"levels_{name}"
@@ -1037,7 +1147,7 @@ def occurrence_disagg(df_x: pd.DataFrame, df_xdx: pd.DataFrame, *,
 
 
 def collate_targets(dstore, levels_table: pd.DataFrame,
-                    disagg_type: str = DISAGG_TYPE) -> dict:
+                    disagg_type: str = DISAGG_TYPE, *, frame_fn=None) -> dict:
     """Occurrence-and-exceedance frames per (site, imt, key) from one child.
 
     Returns ``out[site][imt][key] -> DataFrame`` with the nb 021 columns
@@ -1049,6 +1159,11 @@ def collate_targets(dstore, levels_table: pd.DataFrame,
     asserted equal (exactly) to ``levels_table`` before anything is read, so a
     levels CSV that does not belong to this datastore fails here rather than
     mislabelling results.
+
+    ``frame_fn``, if given, is applied to each frame as soon as its occurrence
+    column exists, and its result is stored instead. nb 081 passes
+    ``rsd595_curves.slim_disagg_frame`` so that only one site's full-size
+    frames are in memory at a time. ``None`` stores the frames unchanged.
     """
     hmap3 = np.asarray(dstore["hmap3"][()])
     imts = list(dstore["oqparam"].imtls)
@@ -1065,6 +1180,8 @@ def collate_targets(dstore, levels_table: pd.DataFrame,
         out[int(site)] = {}
         for row in grp.itertuples(index=False):
             df = occurrence_disagg(frames[row.imt][row.p_x], frames[row.imt][row.p_xdx])
+            if frame_fn is not None:
+                df = frame_fn(df)
             out[int(site)].setdefault(row.imt, {})[row.key] = df
     return out
 
