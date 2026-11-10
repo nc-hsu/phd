@@ -42,11 +42,11 @@ FX_ARM_KINDS: tuple[str, ...] = ("msa", "ida", "ida_ub", "ida_avg")
 _ARM_RE = re.compile(r"^(msa|ida)_([A-Za-z0-9]+)(?:_(ub|avg))?$")
 
 # One colour per arm KIND, fixed here so every figure in the chapter reads the same way
-# whatever the fixed set. The fixed-set arms are warm, the site-specific arm cool,
-# because the fixed-vs-site-specific record set is the distinction the comparison is
-# actually about.
-_KIND_COLOURS = {"site_msa": "b", "msa": "tab:orange", "ida": "r",
-                 "ida_ub": "tab:purple", "ida_avg": "tab:green"}
+# whatever the fixed set. The three core arms take green / blue / orange, a trio that stays
+# distinguishable where their curves and confidence bands overlap; the two IDA bracket
+# variants take purple and brown so that no arm shares a hue family with another.
+_KIND_COLOURS = {"site_msa": "tab:green", "msa": "tab:blue", "ida": "tab:orange",
+                 "ida_ub": "tab:brown", "ida_avg": "tab:purple"}
 _KIND_LABELS = {"site_msa": "MSA site-specific",
                 "msa": "MSA {fx}",
                 "ida": "IDA {fx}",
@@ -947,7 +947,10 @@ def bootstrap_csv_path(
     """Canonical filename for a saved bootstrap frame.
 
     ``arm`` is an arm token, e.g. ``"msa_femap695"`` (see :func:`fx_arm_names`), ``quantity`` one of ``theta``/``beta``/
-    ``theta_stats``/``beta_stats``/``fit_ok``, ``scope`` ``"by_group"`` or ``"by_site"``.
+    ``theta_stats``/``beta_stats``/``theta_beta_cov``/``fit_ok``, ``scope`` ``"by_group"`` or ``"by_site"``.
+    ``theta_beta_cov`` is the per-unit 2x2 sampling covariance of (theta, beta) written by
+    :func:`bootstrap_theta_beta_cov_frame`; it belongs to both quantities at once, which is
+    why it carries one token rather than a ``theta_`` or ``beta_`` prefix.
     Both the save and the reload go through here so the two cannot drift apart.
 
     No storey count in the name: one file carries every storey count, on the second level
@@ -1110,6 +1113,37 @@ def read_bootstrap_stats_frame(path: Path | str, columns_name: str,
     return df
 
 
+def load_saved_theta_beta_cov(
+    root: Path | str | Mapping,
+    arm: str,
+    n_storeys: int | Sequence[int] | None,
+    im_tag: str,
+    scope: str,
+) -> pd.DataFrame | None:
+    """Reload one arm's saved (theta, beta) sampling-covariance frame, or ``None`` if missing.
+
+    The file is the one nb 070 writes from :func:`bootstrap_theta_beta_cov_frame`, under
+    the ``theta_beta_cov`` token of :func:`bootstrap_csv_path`. It is a per-unit frame with
+    the same ``(unit, n_storeys)`` row index as the ``*_stats_*`` files, so it is read back
+    through :func:`read_bootstrap_stats_frame` and selected with :func:`select_storeys`
+    exactly as they are: an ``int`` gives the flat frame indexed by unit alone, ``None``
+    every storey count at once.
+
+    ``None`` rather than an exception on a missing file, matching
+    :func:`load_saved_bootstrap_stats`, so the caller decides whether a missing file is
+    an error (nb 072 treats it as one) or simply something still to compute.
+    """
+    path = bootstrap_csv_path(root, arm, "theta_beta_cov", im_tag, scope)
+    if not path.is_file():
+        return None
+
+    df = read_bootstrap_stats_frame(path, "statistic", scope.removeprefix("by_"))
+    try:
+        return select_storeys(df, n_storeys)
+    except KeyError:
+        return None
+
+
 def reformat_bootstrap_df(df: pd.DataFrame, n_storeys: int | None = None):
     """Reformat the bootstrap theta and beta dataframes to have multi-index rows.
 
@@ -1149,6 +1183,129 @@ def bootstrap_stats_frame(df: pd.DataFrame) -> pd.DataFrame:
     stats = pd.DataFrame({col: column_stats(df[col].dropna()) for col in df}).T
     stats.index.name = df.columns.name
     return stats
+
+
+# The columns of a (theta, beta) sampling-covariance frame, in the order they are written.
+# Two blocks of four, one per scale, laid out so that each block reads as the 2x2
+#
+#     S = [[var_theta,      cov_theta_beta],
+#          [cov_theta_beta, var_beta      ]]
+#
+# plus the correlation it implies. The log block is the one the meta-regression uses
+# (a_i, b_j, c_j are log-medians); the raw block is there for anything that works on the
+# fitted parameters themselves.
+THETA_BETA_COV_COLUMNS: tuple[str, ...] = (
+    "N_obs",
+    "var_theta", "var_beta", "cov_theta_beta", "corr_theta_beta",
+    "var_log_theta", "var_log_beta", "cov_log_theta_log_beta", "corr_log_theta_log_beta",
+)
+
+
+def _pair_cov(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
+    """``(var_x, var_y, cov_xy, corr_xy)`` of two paired samples, divisor k - 1.
+
+    ``np.cov`` with its default ``ddof=1`` is the same estimator :func:`bootstrap_cov` uses
+    for ``V_known``, so a 2x2 built here is on the same footing as the blocks of the full
+    sampling covariance the models are fitted with.
+    """
+    S = np.cov(x, y, ddof=1)
+    var_x, var_y, cov_xy = S[0, 0], S[1, 1], S[0, 1]
+    # A unit whose cloud does not move in one parameter has no defined correlation;
+    # report NaN rather than dividing by zero.
+    denom = np.sqrt(var_x * var_y)
+    corr = cov_xy / denom if denom > 0 else np.nan
+    return float(var_x), float(var_y), float(cov_xy), float(corr)
+
+
+def bootstrap_theta_beta_cov_frame(theta_cloud: pd.DataFrame,
+                                   beta_cloud: pd.DataFrame) -> pd.DataFrame:
+    """Per-unit 2x2 sampling covariance of (theta, beta) from a pair of replicate clouds.
+
+    Each bootstrap replicate refits ONE fragility curve and so produces a theta and a beta
+    together. The two are therefore not independent draws: a resample that happens to
+    pick strong records tends to raise the median and change the spread in a related
+    way. The variances of the two clouds, saved separately as ``theta_stats`` and
+    ``beta_stats``, describe each parameter alone; this function adds the term that ties
+    them together, so that for every site or design group the full sampling covariance
+
+        S_i = Cov_r( [x_theta_i, x_beta_i] )
+            = 1/(k-1) sum_r (x_r - xbar)(x_r - xbar)'
+
+    is available, on the raw scale (x = theta, beta) and on the log scale
+    (x = ln theta, ln beta).
+
+    Parameters
+    ----------
+    theta_cloud, beta_cloud : DataFrame
+        ``k`` x unit replicate clouds of ONE arm, as nb 070 builds and saves them:
+        rows are replicates, columns are sites or design groups. Both must carry the same
+        replicate labels and the same unit labels in the same order, because row r of
+        one and row r of the other must be the SAME resample - otherwise the covariance
+        would pair unrelated fits and come out near zero whatever the truth.
+
+    Returns
+    -------
+    DataFrame
+        One row per unit (the clouds' column labels, index named as their columns are),
+        columns :data:`THETA_BETA_COV_COLUMNS`.
+
+    Notes
+    -----
+    * Divisor k - 1 throughout, matching ``np.cov`` / :func:`bootstrap_cov` and the
+      ``ddof=1`` variances nb 072 puts in the dataset. The ``*_stats_*`` files report
+      ``variance`` through ``np.var`` (divisor k); this frame's variances equal those
+      after a ``N_obs / (N_obs - 1)`` rescale.
+    * Replicates screened out of the fit are ``NaN`` (see
+      :func:`bootstrap_msa_group_fragilities`) and are dropped PAIRWISE: a replicate is
+      used only if both its theta and its beta are finite and positive. Because both come
+      from the same fit they are screened together, so this is the same set of replicates
+      the separate variances use. ``N_obs`` reports how many remain.
+    * Bias correction does not enter. nb 070 corrects ln(beta) by a constant per unit, and
+      shifting every replicate of a unit by the same constant leaves its covariance
+      unchanged, so the uncorrected clouds give the covariance of the corrected
+      estimates too.
+    * A unit with fewer than two usable replicates comes back as ``N_obs`` and ``NaN``
+      statistics rather than raising, the convention :func:`bootstrap_stats_frame` and
+      :func:`bootstrap_bias_frame` follow, so one unusable unit does not take the whole
+      frame down.
+    """
+    # Pairing is the whole point of this function, so check it rather than trust it.
+    # pandas would otherwise align on labels and could silently pair the wrong columns,
+    # or fill NaN where the two clouds disagree.
+    if not theta_cloud.columns.equals(beta_cloud.columns):
+        raise ValueError("theta and beta clouds have different unit columns (labels or "
+                         "order) - they are not the same set of fits")
+    if not theta_cloud.index.equals(beta_cloud.index):
+        raise ValueError("theta and beta clouds have different replicate labels - row r "
+                         "of one would not be the same resample as row r of the other")
+
+    rows = {}
+    for unit in theta_cloud.columns:
+        t = theta_cloud[unit].to_numpy(dtype=float)
+        b = beta_cloud[unit].to_numpy(dtype=float)
+
+        # Pairwise usable replicates: finite on both, and positive so the logs exist.
+        ok = np.isfinite(t) & np.isfinite(b) & (t > 0) & (b > 0)
+        t, b = t[ok], b[ok]
+        n_obs = int(ok.sum())
+
+        if n_obs < 2:
+            # Not enough replicates to estimate a covariance at all.
+            rows[unit] = dict.fromkeys(THETA_BETA_COV_COLUMNS, np.nan) | {"N_obs": n_obs}
+            continue
+
+        raw = _pair_cov(t, b)                    # covariance of the fitted parameters
+        log = _pair_cov(np.log(t), np.log(b))    # covariance of the log parameters
+        rows[unit] = dict(zip(THETA_BETA_COV_COLUMNS, (n_obs, *raw, *log)))
+
+    out = pd.DataFrame.from_dict(rows, orient="index")[list(THETA_BETA_COV_COLUMNS)]
+    # Keep the clouds' own column labels as the row index - including a (unit, n_storeys)
+    # MultiIndex if the clouds already carry one - so the frame stacks and aligns exactly
+    # as the stats and bias frames do.
+    out.index = theta_cloud.columns.copy()
+    out.columns.name = "statistic"
+    out["N_obs"] = out["N_obs"].astype(int)
+    return out
 
 
 # =============================================================================
@@ -2052,8 +2209,8 @@ def compute_heterogeneity_stats(
 # fixed intercept; one site per row makes S S' = I, aliased with tau_u^2 I).
 #
 #     A1a   Gs = [I]                  V_known = diag(v1)
-#     A1b   Gs = [ZZt, I]             V_known = diag(v_a) + Z V_bb Z'
-#     A1c   Gs = [ZZt, SSt, I]        V_known = diag(v_a) + Z V_bb Z'
+#     A1b   Gs = [ZZt, I]             V_known = np.cov()
+#     A1c   Gs = [ZZt, SSt, I]        V_known = np.cov()
 #
 # where
 #     v1[i]      = Var_r(a_i^(r) - b_{g[i]}^(r))   combined, per ROW

@@ -17,7 +17,7 @@
       "summary": "pickagm version"
     },
     "contrast": {
-      "hash": "388311998398c6633416358055b469e07cc64438ba9b2b983f923e175f875bbd",
+      "hash": "fc2142511696699e1290a05586c567093d932b7b2ae42e46ca93026863c9d9a6",
       "summary": "joint contrast y0_avg (n=120, k=5000, beta corrected=True)"
     },
     "code": {
@@ -27,14 +27,14 @@
   },
   "_meta": {
     "artifact": "A8d_bc_hb.pkl",
-    "git_commit": "4c58d807",
-    "written_at": "2026-10-27T17:24:45.014806+00:00",
+    "git_commit": "1cc8b954",
+    "written_at": "2026-10-30T10:58:18.322430+00:00",
     "model_id": "A8d_bc_hb",
     "estimator": "REML",
     "im_tag": "AvgSA_03",
     "quantity": "theta+beta",
     "k": 5000,
-    "container_hash": "f045cfcbb697020252fcc58d6dad548750af8f17ef4b2d07a41a289736d0f3cf",
+    "container_hash": "93f915d0f83415d81ac05b574202388271d34947584c7fd4c8b918ec3d32f2c2",
     "versions": {
       "python": "3.12.10",
       "numpy": "2.2.6",
@@ -85,6 +85,6 @@
       "metaregression_analysis.reml_nll_chol": "5ac14977c85b8af61d98d827d510d4d385e0ae8934ea83f7300d0b8170fb36f7",
       "metaregression_analysis.reml_nll_mv": "6bd838a8bac0f82fc454ef4708f912b123da0ee2589517c55b5e1cba619837b1"
     },
-    "n_boot_saved": 5000
+    "n_boot_saved": 200
   }
 }

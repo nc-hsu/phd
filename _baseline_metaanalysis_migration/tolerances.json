@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "_doc": "Pass if |actual - expected| <= atol + rtol*|expected| (numpy assert_allclose). atol_scale 'mean_diag_V' means atol = value x mean(diag V) of the case. Per-case overrides go in expected/<case_id>.json under 'tolerance_override', with the measured noise floor beside them.",
+  "rules": {
+    "loglik": {
+      "rtol": 1e-08,
+      "atol": 0.0
+    },
+    "beta": {
+      "rtol": 1e-06,
+      "atol": 1e-10
+    },
+    "se_beta": {
+      "rtol": 1e-06,
+      "atol": 1e-10
+    },
+    "tau2": {
+      "rtol": 0.0001,
+      "atol": 1e-08,
+      "atol_scale": "mean_diag_V"
+    },
+    "T": {
+      "rtol": 0.0001,
+      "atol": 1e-08,
+      "atol_scale": "mean_diag_V"
+    },
+    "at_zero_boundary": {
+      "exact": true
+    },
+    "bootstrap": {
+      "rtol": 0.0001,
+      "atol": 1e-08,
+      "atol_scale": "mean_diag_V"
+    }
+  },
+  "near_threshold_warning": {
+    "zero_tol": 1e-08,
+    "band": [
+      1e-10,
+      1e-06
+    ]
+  },
+  "calibration": {
+    "permutations": 1,
+    "min_margin": 10
+  }
+}

@@ -8,6 +8,8 @@ Two kinds of section live in config.yaml:
 * ``record_sets``: plain names, NOT paths. It lists the site-specific (SS) and fixed (FX)
   record sets and the studies that pair them, plus ``active_study``. It is returned as
   loaded, and should be read through the helpers below rather than by hand.
+* ``study_outputs``: plain names, NOT paths. Named sub-folders of a study folder (e.g.
+  ``model_plots``), resolved for one study by :func:`study_output_dir`.
 
 Record-set folder layout (see the comment block in config.yaml): at each stage that
 depends on record sets, the stage folder has an ``ss/``, ``fx/`` and/or ``studies/`` level:
@@ -27,7 +29,7 @@ import yaml
 from pathlib import Path
 
 # Sections whose values are names, not paths: left exactly as loaded.
-NON_PATH_SECTIONS = frozenset({"record_sets"})
+NON_PATH_SECTIONS = frozenset({"record_sets", "study_outputs"})
 
 
 def load_config(path=None, cfg_file: str | None = None):
@@ -134,6 +136,26 @@ def study_dir(cfg: dict, section: str, key: str, study_name: str) -> Path:
     """``cfg[section][key] / "studies" / study_name`` for a registered study."""
     study(cfg, study_name)
     return Path(cfg[section][key]) / "studies" / study_name
+
+
+def study_output_dir(cfg: dict, name: str, study_name: str | None = None) -> Path:
+    """Folder of the per-study output ``name`` registered under ``study_outputs``.
+
+    Resolves to ``study_dir(cfg, section, key, study) / subdir`` for ``study_name``
+    (default: ``active_study``), e.g. "model_plots" ->
+        <root>/data_processed/10_fragility_curve_statistical_analysis/studies/
+        AvgSA_03__ks__vs__femap695/model_plots
+    Both the output name and the study are checked against their registries, so a typo
+    raises instead of building a path to a folder nobody reads. The folder is not created
+    here: the caller decides when to mkdir.
+    """
+    try:
+        outputs = cfg["study_outputs"]
+    except KeyError:
+        raise KeyError("config.yaml has no 'study_outputs' section") from None
+    entry = outputs[_check("study output", name, outputs)]
+    st = study(cfg, study_name)
+    return study_dir(cfg, entry["section"], entry["key"], st["name"]) / entry["subdir"]
 
 
 def bootstrap_roots(cfg: dict, study_name: str | None = None) -> dict:

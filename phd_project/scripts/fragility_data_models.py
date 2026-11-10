@@ -250,6 +250,14 @@ DATASET_ARM_COLUMNS: tuple[str, ...] = (
     "{arm}_{q}", "{arm}_log_{q}", "{arm}_{q}_bc", "{arm}_log_{q}_bc",
     "{arm}_var_{q}", "{arm}_var_log_{q}", "{arm}_log_{q}_bias",
 )
+# The per-arm columns that belong to BOTH quantities at once: the sampling covariance
+# of theta and beta from the same bootstrap fits, on the raw and on the log scale. They
+# are kept apart from DATASET_ARM_COLUMNS because that tuple is per quantity and is what
+# load_fragility_data drops for the off quantity; a cross term is neither theta's nor
+# beta's, so it must survive in both containers, as `{arm}_n_obs` does.
+DATASET_ARM_CROSS_COLUMNS: tuple[str, ...] = (
+    "{arm}_cov_theta_beta", "{arm}_cov_log_theta_log_beta",
+)
 DATASET_FACTORS: tuple[str, ...] = (
     "site", "n_storeys", "structure_id", "tag", "design_group_id",
     "n_sites_in_group", "is_representative",
@@ -528,8 +536,7 @@ class FragilityData:
         number being reported. On A2 (beta) its midpoint lands 0.008 off the
         corrected estimate, about half a bootstrap SE.
 
-        The shift that fixes it, per unit (task D3, option (ii), chosen
-        2026-10-07)::
+        The shift that fixes it, per unit (task D3, option (ii))::
 
             x*_shifted = x* - (2 b + s)
 
@@ -972,7 +979,8 @@ def load_fragility_data(
     # that is not an arm column -- which is what keeps the future A0b/A3
     # covariates safe, as those are row properties rather than per-arm results.
     # `{arm}_n_obs` also stays: the usable-replicate count is a property of the
-    # fit, shared by both quantities.
+    # fit, shared by both quantities. So do the DATASET_ARM_CROSS_COLUMNS, the
+    # theta-beta sampling covariances, which belong to both quantities equally.
     other_q = "beta" if quantity == "theta" else "theta"
     drop = [tmpl.format(arm=arm, q=other_q)
             for arm in ARMS for tmpl in DATASET_ARM_COLUMNS]
@@ -1800,80 +1808,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         A2_avg on bias-corrected estimates with the hybrid bootstrap scheme. 
         See A2_avg and A2_bc_hb."""),
 
-    # ---- Regressions -------------------------------------------------------
-    "A3a": ModelSpec(
-        "A3a", "y0_avg", estimators=("REML",), components=("design", "site"), 
-        covariates=(
-            "d_ln_saratio_mean_rtp5000", 
-            "d_ln_ds595_mean_rtp5000", 
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000"), note="""
-    Regression analysis of the difference between site-specific MSA and IDA FX
-    using the average collapse IML. In this regression only site-specific
-    covariates are considered: SARatio + its standard deviation and DS_595 + its
-    standard deviation.
-
-    The variance is divided out into the "design" and "site" components
-    """
-    ),
-
-    "A3a_bc": ModelSpec(
-        "A3a_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_rtp5000",
-            "d_ln_ds595_mean_rtp5000",
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000"),
-        corrected=True, note="""
-        A3a on bias-corrected estimates. See A3a. The slopes move too, because
-        the bias differs from row to row; their bootstrap CIs are centred by the
-        same per-row shift.
-        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
-        arm's ln(beta) has its own bootstrap bias removed, and the replicates
-        are shifted by -(2b + s) so the CI is the percentile interval of the
-        corrected estimator. Corrected because the MSA binomial MLE and the IDA
-        moment fit are biased differently, so the bias does not cancel in the
-        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
-        Meant for beta. theta is never corrected, so on a theta container this
-        is the uncorrected fit, and fitting it warns."""),
-
-    "A3a_hb": ModelSpec(
-        "A3a_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_rtp5000",
-            "d_ln_ds595_mean_rtp5000",
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000"),
-        bootstrap_scheme="hybrid", note="""
-        A3a with hybrid bootstrap scheme."""),
-
-    "A3a_bc_hb": ModelSpec(
-        "A3a_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_rtp5000",
-            "d_ln_ds595_mean_rtp5000",
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000"),
-        corrected=True, bootstrap_scheme="hybrid", note="""
-        A3a with bias correction and the hybrid bootstrap scheme."""),
-
-    "A3aa": ModelSpec(
-        "A3aa", "y0_avg", estimators=("REML",), components=("design", "site"), 
-        covariates=(
-            "d_ln_saratio_mean_rtp5000", 
-            "d_ln_ds595_mean_rtp5000", 
-            "d_ln_saratio_sigma_rtp5000",
-            "d_ln_ds595_sigma_rtp5000",
-            "ks_unif"), note="""
-    Regression analysis of the difference between site-specific MSA and IDA FX
-    using the average collapse IML. In this regression only site-specific
-    covariates are considered: SARatio + its standard deviation and DS_595 + its
-    standard deviation.
-
-    The variance is divided out into the "design" and "site" components
-    """
-    ),
-    
+    # ---- Regressions -------------------------------------------------------   
     "A3ab": ModelSpec(
         "A3ab", "y0_avg", estimators=("REML",), components=("design", "site"), 
         covariates=(
@@ -1888,6 +1823,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     standard deviation.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -1905,6 +1841,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     standard deviation. Bias corrected
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -1921,6 +1858,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered. Hybrid Bootstrap.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -1937,216 +1875,9 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered. Bias corrected, Hybrid Bootstrap.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
-
-    "A3ac": ModelSpec(
-        "A3ac", "y0_avg", estimators=("REML",), components=("design", "site"), 
-        covariates=(
-            "d_ln_saratio_mean_unif", 
-            "d_ln_ds595_mean_unif", 
-            "d_ln_saratio_sigma_unif",
-            "d_ln_ds595_sigma_unif",
-            "drec_ln_saratio_mean_unif",
-            "drec_ln_ds595_mean_unif",
-            "drec_ln_saratio_sigma_unif",
-            "drec_ln_ds595_sigma_unif",
-        ), note="""
-    Regression analysis of the difference between site-specific MSA and IDA FX
-    using the average collapse IML. In this regression only site-specific
-    covariates are considered: SARatio + its standard deviation and DS_595 + its
-    standard deviation.
-
-    The variance is divided out into the "design" and "site" components
-    """
-    ),
-
-    "A3ac_bc": ModelSpec(
-        "A3ac_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif",
-            "d_ln_ds595_mean_unif",
-            "d_ln_saratio_sigma_unif",
-            "d_ln_ds595_sigma_unif",
-            "drec_ln_saratio_mean_unif",
-            "drec_ln_ds595_mean_unif",
-            "drec_ln_saratio_sigma_unif",
-            "drec_ln_ds595_sigma_unif",
-        ),
-        corrected=True, note="""
-        A3ac on bias-corrected estimates. See A3ac and A3a_bc.
-        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
-        arm's ln(beta) has its own bootstrap bias removed, and the replicates
-        are shifted by -(2b + s) so the CI is the percentile interval of the
-        corrected estimator. Corrected because the MSA binomial MLE and the IDA
-        moment fit are biased differently, so the bias does not cancel in the
-        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
-        Meant for beta. theta is never corrected, so on a theta container this
-        is the uncorrected fit, and fitting it warns."""),
-
-    "A3ac_hb": ModelSpec(
-        "A3ac_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif",
-            "d_ln_ds595_mean_unif",
-            "d_ln_saratio_sigma_unif",
-            "d_ln_ds595_sigma_unif",
-            "drec_ln_saratio_mean_unif",
-            "drec_ln_ds595_mean_unif",
-            "drec_ln_saratio_sigma_unif",
-            "drec_ln_ds595_sigma_unif",
-        ),
-        bootstrap_scheme="hybrid", note="""
-        A3ac with the hybrid bootstrap scheme"""),
-
-    "A3ac_bc_hb": ModelSpec(
-        "A3ac_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif",
-            "d_ln_ds595_mean_unif",
-            "d_ln_saratio_sigma_unif",
-            "d_ln_ds595_sigma_unif",
-            "drec_ln_saratio_mean_unif",
-            "drec_ln_ds595_mean_unif",
-            "drec_ln_saratio_sigma_unif",
-            "drec_ln_ds595_sigma_unif",
-        ),
-        corrected=True, bootstrap_scheme="hybrid", note="""
-        A3ac with the hybrid bootstrap scheme"""),
-
-    "A3ad": ModelSpec(
-            "A3ad", "y0_avg", estimators=("REML",), components=("design", "site"), 
-            covariates=(
-                "d_ln_saratio_mean_fisher", 
-                "d_ln_ds595_mean_fisher", 
-                "d_ln_saratio_sigma_fisher",
-                "d_ln_ds595_sigma_fisher",
-                "drec_ln_saratio_mean_fisher",
-                "drec_ln_ds595_mean_fisher",
-                "drec_ln_saratio_sigma_fisher",
-                "drec_ln_ds595_sigma_fisher",
-            ), note="""
-        Regression analysis of the difference between site-specific MSA and IDA FX
-        using the average collapse IML. In this regression only site-specific
-        covariates are considered: SARatio + its standard deviation and DS_595 + its
-        standard deviation.
-    
-        The variance is divided out into the "design" and "site" components
-        """
-        ),
-
-    "A3ad_bc": ModelSpec(
-        "A3ad_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_fisher",
-            "d_ln_ds595_mean_fisher",
-            "d_ln_saratio_sigma_fisher",
-            "d_ln_ds595_sigma_fisher",
-            "drec_ln_saratio_mean_fisher",
-            "drec_ln_ds595_mean_fisher",
-            "drec_ln_saratio_sigma_fisher",
-            "drec_ln_ds595_sigma_fisher",
-        ),
-        corrected=True, note="""
-        A3ad on bias-corrected estimates. See A3ad and A3a_bc.
-        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
-        arm's ln(beta) has its own bootstrap bias removed, and the replicates
-        are shifted by -(2b + s) so the CI is the percentile interval of the
-        corrected estimator. Corrected because the MSA binomial MLE and the IDA
-        moment fit are biased differently, so the bias does not cancel in the
-        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
-        Meant for beta. theta is never corrected, so on a theta container this
-        is the uncorrected fit, and fitting it warns."""),
-
-    "A3ad_hb": ModelSpec(
-        "A3ad_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_fisher",
-            "d_ln_ds595_mean_fisher",
-            "d_ln_saratio_sigma_fisher",
-            "d_ln_ds595_sigma_fisher",
-            "drec_ln_saratio_mean_fisher",
-            "drec_ln_ds595_mean_fisher",
-            "drec_ln_saratio_sigma_fisher",
-            "drec_ln_ds595_sigma_fisher",
-        ),
-        bootstrap_scheme="hybrid", note="""
-        A3ad with the hybrid bootstrap scheme."""),
-
-    "A3ad_bc_hb": ModelSpec(
-        "A3ad_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_fisher",
-            "d_ln_ds595_mean_fisher",
-            "d_ln_saratio_sigma_fisher",
-            "d_ln_ds595_sigma_fisher",
-            "drec_ln_saratio_mean_fisher",
-            "drec_ln_ds595_mean_fisher",
-            "drec_ln_saratio_sigma_fisher",
-            "drec_ln_ds595_sigma_fisher",
-        ),
-        corrected=True, bootstrap_scheme="hybrid", note="""
-        A3ad on bias-corrected estimates with the hybrid bootstrap scheme."""),
-
-    "A3ae": ModelSpec(
-        "A3ae", "y0_avg", estimators=("REML",), components=("design", "site"), 
-        covariates=(
-            "d_ln_saratio_mean_unif_corrected", 
-            "d_ln_ds595_mean_unif_corrected", 
-            "d_ln_saratio_sigma_unif_corrected",
-            "d_ln_ds595_sigma_unif_corrected",
-        ), note="""
-    Regression analysis of the difference between site-specific MSA and IDA FX
-    using the average collapse IML. In this regression only site-specific
-    covariates are considered: SARatio + its standard deviation and DS_595 + its
-    standard deviation.
-
-    The variance is divided out into the "design" and "site" components
-    """
-    ),
-
-    "A3ae_bc": ModelSpec(
-        "A3ae_bc", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif_corrected",
-            "d_ln_ds595_mean_unif_corrected",
-            "d_ln_saratio_sigma_unif_corrected",
-            "d_ln_ds595_sigma_unif_corrected",
-        ),
-        corrected=True, note="""
-        A3ae on bias-corrected estimates. See A3ae and A3a_bc. (The
-        "_corrected" in the covariate names is unrelated: it refers to the
-        covariates, not to the bias correction of the estimates.)
-        Fitted on the BIAS-CORRECTED point estimates (nb 070 section 2.4): each
-        arm's ln(beta) has its own bootstrap bias removed, and the replicates
-        are shifted by -(2b + s) so the CI is the percentile interval of the
-        corrected estimator. Corrected because the MSA binomial MLE and the IDA
-        moment fit are biased differently, so the bias does not cancel in the
-        contrast (Efron & Tibshirani Ch. 10, ~p. 128: |bias|/se above 0.25).
-        Meant for beta. theta is never corrected, so on a theta container this
-        is the uncorrected fit, and fitting it warns."""),
-
-    "A3ae_hb": ModelSpec(
-        "A3ae_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif_corrected",
-            "d_ln_ds595_mean_unif_corrected",
-            "d_ln_saratio_sigma_unif_corrected",
-            "d_ln_ds595_sigma_unif_corrected",
-        ),
-        bootstrap_scheme="hybrid", note="""
-        A3ae with the hybrid bootstrap scheme"""),
-
-    "A3ae_bc_hb": ModelSpec(
-        "A3ae_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
-        covariates=(
-            "d_ln_saratio_mean_unif_corrected",
-            "d_ln_ds595_mean_unif_corrected",
-            "d_ln_saratio_sigma_unif_corrected",
-            "d_ln_ds595_sigma_unif_corrected",
-        ),
-        corrected=True, bootstrap_scheme="hybrid", note="""
-        A3ae on bias-corrected estimates with the hybrid bootstrap scheme."""),
 
     "A3af": ModelSpec(
         "A3af", "y0_avg", estimators=("REML",), components=("design", "site"), 
@@ -2163,6 +1894,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     the target GCIM distributions
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -2175,7 +1907,8 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "d_ln_ds595_sigma_unif_recs",
         ),
         corrected=True, note="""
-        A3ae on bias-corrected estimates. See A3af and A3a_bc."""),
+        A3ae on bias-corrected estimates. See A3af and A3a_bc.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A3af_hb": ModelSpec(
         "A3af_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
@@ -2186,7 +1919,8 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "d_ln_ds595_sigma_unif_recs",
         ),
         bootstrap_scheme="hybrid", note="""
-        A3af with the hybrid bootstrap scheme"""),
+        A3af with the hybrid bootstrap scheme
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A3af_bc_hb": ModelSpec(
         "A3af_bc_hb", "y0_avg", estimators=("REML",), components=("design", "site"),
@@ -2197,7 +1931,8 @@ MODEL_SPECS: dict[str, ModelSpec] = {
             "d_ln_ds595_sigma_unif_recs",
         ),
         corrected=True, bootstrap_scheme="hybrid", note="""
-        A3af with bias correction and the hybrid bootstrap scheme"""),
+        A3af with bias correction and the hybrid bootstrap scheme
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A3b": ModelSpec(
         "A3b", "y0_avg", estimators=("REML",), components=("design", "site"), 
@@ -2213,8 +1948,9 @@ MODEL_SPECS: dict[str, ModelSpec] = {
 
     "A3b_bc": ModelSpec(
         "A3b_bc", "y0_avg", estimators=("REML",), components=("design", "site"), 
-        covariates=("ln_T1", "ln_overstrength", "ln_ductility",), corrected=True,
-        note="""
+        covariates=(
+            "ln_T1", "ln_overstrength", "ln_ductility",),
+            corrected=True, note="""
     Regression analysis of the difference between site-specific MSA and IDA FX
     using the average collapse IML. In this regression only structure-specific
     covariates are considered. Bias corrected.
@@ -2262,6 +1998,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -2279,6 +2016,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered. Bias corrected.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -2296,6 +2034,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered. Hybrid bootstrap.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 
@@ -2313,6 +2052,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     covariates are considered. Bias corrected. Hybrid bootstrap.
 
     The variance is divided out into the "design" and "site" components
+    SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA).
     """
     ),
 }
@@ -2343,8 +2083,7 @@ def _check_model_specs(specs: dict[str, ModelSpec]) -> None:
 
     1. The dict key equals ``spec.model_id``. The key is what ``fit`` and the
        registry use; the id is what every printout uses. If they differ, the
-       numbers get printed under another model's name, which is what A3b and
-       A3c did until 2026-10-08.
+       numbers get printed under another model's name.
     2. ``spec.corrected`` is True exactly when the id ends in ``_bc``, so the id
        alone always says which estimates were used.
     3. Every ``_bc`` spec has an uncorrected partner (the id without the suffix)
@@ -2981,7 +2720,7 @@ class ModelFit:
         * Record-only fit: :attr:`V_boot` is ``w' V w``, which leaves out the
           ``w' (sum tau^2 G) w`` part, so the interval is slightly too NARROW.
           The effect is small because T^2 dominates (0.8% of the half-width
-          for A0b theta). Left as it is by decision (2026-10-13), so that no
+          for A0b theta). Left as it is, so that no
           record-only number moves; the ``_hb`` fit has the right one.
         """
         V_M = self.V_boot
@@ -4203,7 +3942,7 @@ class ModelRegistry(fcache.FitCacheMixin):
         if spec.corrected:
             # theta is never corrected (nb 070 section 2.2 corrects it by zero),
             # so on a theta container a `_bc` spec reproduces its partner exactly.
-            # Fitted anyway (user decision 2026-10-07), but said out loud, so a
+            # Fitted anyway, but said out loud, so a
             # table row labelled "bias-corrected" is not read as a correction
             # that happened.
             left, right = con.terms
@@ -4956,7 +4695,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         The full crossed bivariate model: a 2x2 T at design, site and row level
         (9 parameters). Judged against the pre-set failure criteria. rho_d are
         rho_u are set to zero because their variance fraction is small and the rho
-        values are likely to be unreliable anyway."""),
+        values are likely to be unreliable anyway.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
     
     "A8e_bc": JointModelSpec(
         "A8e_bc", "y0_avg", components=("design", "site"),
@@ -4973,7 +4713,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         "d_ln_ds595_sigma_unif",
         "ln_T1", "ln_overstrength", "ln_ductility",),
         correlated=("site",), corrected=True,
-        note="""A8d on bias-corrected beta estimates. See A8d."""),
+        note="""A8d on bias-corrected beta estimates. See A8d.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8e_hb": JointModelSpec(
         "A8e_hb", "y0_avg", components=("design", "site"),
@@ -4990,7 +4731,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         "d_ln_ds595_sigma_unif",
         "ln_T1", "ln_overstrength", "ln_ductility",),
         correlated=("site",), bootstrap_scheme="hybrid",
-        note="""A8d on hybrid bootstrap estimates. See A8d."""),
+        note="""A8d on hybrid bootstrap estimates. See A8d.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8e_bc_hb": JointModelSpec(
         "A8e_bc_hb", "y0_avg", components=("design", "site"),
@@ -5008,7 +4750,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         "ln_T1", "ln_overstrength", "ln_ductility",),
         correlated=("site",), corrected=True,
         bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
-        (theta is never corrected). Hybrid bootstrap. See A8d_bc and A8d_hb."""),
+        (theta is never corrected). Hybrid bootstrap. See A8d_bc and A8d_hb.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
 ####################################################################################
 ##### Joint Models with reduced covariates
@@ -5026,7 +4769,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         (9 parameters). Judged against the pre-set failure criteria. rho_d are
         rho_u are set to zero because their variance fraction is small and the rho
         values are likely to be unreliable anyway. All structural parameters + 
-        the significant site parameters."""),
+        the significant site parameters.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
     
     "A8f_bc": JointModelSpec(
         "A8f_bc", "y0_avg", components=("design", "site"),
@@ -5037,7 +4781,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), corrected=True,
-        note="""A8f on bias-corrected beta estimates. See A8f."""),
+        note="""A8f on bias-corrected beta estimates. See A8f.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8f_hb": JointModelSpec(
         "A8f_hb", "y0_avg", components=("design", "site"),
@@ -5048,7 +4793,8 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), bootstrap_scheme="hybrid",
-        note="""A8f on hybrid bootstrap estimates. See A8f."""),
+        note="""A8f on hybrid bootstrap estimates. See A8f.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8f_bc_hb": JointModelSpec(
         "A8f_bc_hb", "y0_avg", components=("design", "site"),
@@ -5060,13 +4806,13 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), corrected=True,
         bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
-        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb."""),
+        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8g": JointModelSpec(
         "A8g", "y0_avg", components=("design", "site"),
         covariates_theta=(
         "d_ln_ds595_mean_unif", 
-        "d_ln_ds595_sigma_unif",
         "ln_ductility",),
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
@@ -5074,42 +4820,88 @@ JOINT_MODEL_SPECS: dict[str, JointModelSpec] = {
         The full crossed bivariate model: a 2x2 T at design, site and row level
         (9 parameters). Judged against the pre-set failure criteria. rho_d are
         rho_u are set to zero because their variance fraction is small and the rho
-        values are likely to be unreliable anyway. All structural parameters + 
-        the significant site parameters."""),
+        values are likely to be unreliable anyway. reduced structural parameters + 
+        the significant site parameters.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
     
     "A8g_bc": JointModelSpec(
         "A8g_bc", "y0_avg", components=("design", "site"),
         covariates_theta=(
         "d_ln_ds595_mean_unif", 
-        "d_ln_ds595_sigma_unif",
         "ln_ductility",),
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), corrected=True,
-        note="""A8f on bias-corrected beta estimates. See A8f."""),
+        note="""A8f on bias-corrected beta estimates. See A8f.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8g_hb": JointModelSpec(
         "A8g_hb", "y0_avg", components=("design", "site"),
         covariates_theta=(
         "d_ln_ds595_mean_unif", 
-        "d_ln_ds595_sigma_unif",
         "ln_ductility",),
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), bootstrap_scheme="hybrid",
-        note="""A8f on hybrid bootstrap estimates. See A8f."""),
+        note="""A8f on hybrid bootstrap estimates. See A8f.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 
     "A8g_bc_hb": JointModelSpec(
         "A8g_bc_hb", "y0_avg", components=("design", "site"),
         covariates_theta=(
         "d_ln_ds595_mean_unif", 
-        "d_ln_ds595_sigma_unif",
         "ln_ductility",),
         covariates_beta=(
         "d_ln_ds595_sigma_unif",),
         correlated=("site",), corrected=True,
         bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
-        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb."""),
+        (theta is never corrected). Hybrid bootstrap. See A8f_bc and A8f_hb.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
+
+    "A8h": JointModelSpec(
+        "A8h", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), note="""
+        The full crossed bivariate model: a 2x2 T at design, site and row level
+        (9 parameters). Judged against the pre-set failure criteria. rho_d are
+        rho_u are set to zero because their variance fraction is small and the rho
+        values are likely to be unreliable anyway. All structural parameters + 
+        the significant site parameters. No beta parameters
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
+    
+    "A8h_bc": JointModelSpec(
+        "A8h_bc", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), corrected=True,
+        note="""A8f on bias-corrected beta estimates. See A8h.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
+
+    "A8h_hb": JointModelSpec(
+        "A8h_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), bootstrap_scheme="hybrid",
+        note="""A8f on hybrid bootstrap estimates. See A8h.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
+
+    "A8h_bc_hb": JointModelSpec(
+        "A8h_bc_hb", "y0_avg", components=("design", "site"),
+        covariates_theta=(
+        "d_ln_ds595_mean_unif", 
+        "d_ln_ds595_sigma_unif",
+        "ln_T1", "ln_overstrength", "ln_ductility",),
+        correlated=("site",), corrected=True,
+        bootstrap_scheme="hybrid", note="""A8d on bias-corrected beta estimates 
+        (theta is never corrected). Hybrid bootstrap. See A8h_bc and A8h_hb.
+        SD covariates (d_ln_*_sigma_unif[_recs]) are log ratios ln(sigma_site/sigma_FEMA)."""),
 }
 
 
@@ -5558,7 +5350,7 @@ class JointModelFit:
         that. The record-only bootstrap gives ``W V W'``, which omits the
         ``W (sum_l T_l kron G_l) W'`` part, so on a record-only fit this Sigma
         is slightly too small (T_total dominates, so the effect is of the
-        order of 1%). Left as it is by decision (2026-10-13); use the ``_hb``
+        order of 1%). Left as it is; use the ``_hb``
         fit for a number that has to be right.
         """
         p = len(self.beta)
@@ -5759,7 +5551,7 @@ class JointModelFit:
         of the between-row covariance, and the two are JOINT draws (same
         refit). This is the frame the MAFC propagation should read.
 
-        RECORD-ONLY fit: the caveat found 2026-10-08 applies. The replicates
+        RECORD-ONLY fit: a caveat applies. The replicates
         resample RECORDS only, so each one's data are y_hat plus a second dose
         of sampling noise while the fit is told about one (V_known), and every
         replicate T is inflated by roughly the mean sampling variance. On
@@ -6201,8 +5993,7 @@ def _joint_fit_payload(fit: JointModelFit) -> dict:
             "replicates_attrs": None if reps is None else dict(reps.attrs)}
 
 
-# The entry points of the CODE HASH (fit_cache.code_hash; user decision Q3,
-# 2026-10-19). Starting from these, the hash follows every function and module
+# The entry points of the CODE HASH (fit_cache.code_hash). Starting from these, the hash follows every function and module
 # constant they reach in fragility_data_models, metaregression_analysis and
 # data_simulation, so a helper deep in the call tree is covered without being
 # listed. What must be listed by hand is what a static walk cannot resolve:
@@ -6463,10 +6254,10 @@ def arm_column_block(root: Path | str, prefix: str, arm: str, n_storeys: int,
                      ) -> tuple[dict[str, pd.Series], dict] | None:
     """One arm's dataset columns for one storey count, indexed by site.
 
-    The mechanical half of what nb 072 used to do inline: load the replicate
-    cloud, the saved statistics, the bias frame and the point estimates; compute
-    both variances; and lay the results out under the column names of
-    :data:`DATASET_ARM_COLUMNS`.
+    Load the replicate cloud, the saved statistics, the bias frame and the point
+    estimates; compute both variances and the theta-beta covariance on both scales; and
+    lay the results out under the column names of :data:`DATASET_ARM_COLUMNS` and
+    :data:`DATASET_ARM_CROSS_COLUMNS`.
 
     Returns ``None`` when the saved replicate frames for this storey count are
     missing, so the caller can skip a storey count that is not bootstrapped yet.
@@ -6479,6 +6270,8 @@ def arm_column_block(root: Path | str, prefix: str, arm: str, n_storeys: int,
         cloud, the saved stats row, the bias row and both variances -- so the
         CALLER can assert the cross-file consistency of the nb 070 outputs.
         Those assertions stay in nb 072 on purpose; see the section preamble.
+        ``parts["cov"]`` holds the theta-beta covariance frame computed here and
+        ``parts["cov_saved"]`` the one nb 070 wrote, for the same purpose.
 
     Notes
     -----
@@ -6487,6 +6280,18 @@ def arm_column_block(root: Path | str, prefix: str, arm: str, n_storeys: int,
     ``*_stats_*`` frames report ``variance`` through ``np.var`` (``ddof=0``), so
     the two agree only after an ``(N-1)/N`` rescale -- which is one of the
     checks the caller makes.
+
+    The covariances use the same divisor (``mra.bootstrap_theta_beta_cov_frame``,
+    ``np.cov`` with ``ddof=1``), so for any row the dataset columns assemble into
+    a self-consistent 2x2 on each scale:
+
+        [[var_log_theta,            cov_log_theta_log_beta],
+         [cov_log_theta_log_beta,   var_log_beta          ]]
+
+    They are computed here from the clouds, exactly as the variances are, rather
+    than copied from nb 070's ``theta_beta_cov`` file; that file is loaded too, so
+    the caller can check the two agree. A missing file is an error, since it means
+    nb 070 has not written the covariances this dataset is supposed to carry.
     """
     boot = mra.load_saved_bootstrap(root, arm, ("theta", "beta"), n_storeys,
                                     im_tag, "by_site", k_samples=k_samples)
@@ -6534,6 +6339,22 @@ def arm_column_block(root: Path | str, prefix: str, arm: str, n_storeys: int,
 
     parts["n_obs"] = n_obs
     cols[f"{prefix}_n_obs"] = n_obs["theta"].astype(int)
+
+    # -- the theta-beta cross term --------------------------------------------
+    # From the same two clouds the variances above came from. Row r of boot["theta"]
+    # and row r of boot["beta"] are one fit, which bootstrap_theta_beta_cov_frame
+    # checks before pairing them.
+    cov = mra.bootstrap_theta_beta_cov_frame(boot["theta"], boot["beta"])
+    cov_saved = mra.load_saved_theta_beta_cov(root, arm, n_storeys, im_tag, "by_site")
+    if cov_saved is None:
+        raise FileNotFoundError(
+            f"no saved theta_beta_cov frame for {arm} ({n_storeys}s, by_site) - run "
+            "nb 070 section 3.0, which writes the theta-beta sampling covariances")
+
+    cols[f"{prefix}_cov_theta_beta"] = cov["cov_theta_beta"]
+    cols[f"{prefix}_cov_log_theta_log_beta"] = cov["cov_log_theta_log_beta"]
+    parts["cov"] = cov
+    parts["cov_saved"] = cov_saved
 
     return {k: v.rename(k).rename_axis("site") for k, v in cols.items()}, parts
 

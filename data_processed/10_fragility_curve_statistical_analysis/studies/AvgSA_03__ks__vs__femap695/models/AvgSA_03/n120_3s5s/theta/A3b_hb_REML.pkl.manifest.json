@@ -17,7 +17,7 @@
       "summary": "pickagm version"
     },
     "contrast": {
-      "hash": "820094209c8ea7e8cd5feda7ae0d52a44ec4521ab0414a76266621d5ee9b429f",
+      "hash": "7a70bf1dc7d40243d8eea17d42ada9ab7d75e2a717b2674df56d2b31a2732071",
       "summary": "contrast y0_avg (theta, n=120, k=5000, corrected=False)"
     },
     "code": {
@@ -27,14 +27,14 @@
   },
   "_meta": {
     "artifact": "A3b_hb_REML.pkl",
-    "git_commit": "4c58d807",
-    "written_at": "2026-10-27T15:32:46.354596+00:00",
+    "git_commit": "1cc8b954",
+    "written_at": "2026-10-30T10:42:46.376676+00:00",
     "model_id": "A3b_hb",
     "estimator": "REML",
     "im_tag": "AvgSA_03",
     "quantity": "theta",
     "k": 5000,
-    "container_hash": "e8be42650b4b3b0f96688954756f20b0f6be7d14aeb6215014e03d4e0c7d6b43",
+    "container_hash": "714c01d16ee4ab954f9b3f18579cb3e2ab74d16c4802bd4853e4892edacbc156",
     "versions": {
       "python": "3.12.10",
       "numpy": "2.2.6",
@@ -88,6 +88,6 @@
       "metaregression_analysis.summary_variance_re": "8b24a21cf0ad7c5a0f9fe2645233c12792d6a04708a061f022264c5b56fea46c",
       "metaregression_analysis.validate_studies": "21de8ee11c438d8a6425ddf7fc495b715591a66410f66578fb00b02227952f95"
     },
-    "n_boot_saved": 5000
+    "n_boot_saved": 200
   }
 }

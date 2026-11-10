@@ -114,6 +114,12 @@ coupling will read as zero however the covariance is computed.
 - **All code gets extensive documentation comments** explaining what each part
   does and why, not just what. This is a standing instruction.
 - Do not write code unless asked.
+- **No change-history notes in code or notebooks.** Comments and markdown describe
+  what the code does now and why — never when it was changed, what it used to do,
+  or what was removed (no "since 2026-10-29", "until X it was…", "removed on…",
+  "used to be…", "kept so the order is unchanged"). Git holds the history. The
+  code is the record of what actually produced the results, and when it changed is
+  irrelevant to that.
 - **Every saved plot uses `facecolor="w"`** (e.g. `fig.savefig(fp, ..., facecolor="w")`),
   so PNGs have an opaque white background in any viewer. Applies to all
   notebooks and scripts, new and edited.
@@ -131,6 +137,11 @@ coupling will read as zero however the covariance is computed.
   session, FETCH IT AGAIN first. Those copies are point-in-time snapshots and
   the user may have edited the file since. Working from a stale snapshot has
   already clobbered an edit once.
+- **Plans and task descriptions the user explicitly asks for** are saved in
+  `dump/tasks_and_plans/`, named `{plan|task}_yyyymmdd_{name}.md` — the prefix
+  `plan` or `task`, then the date the file was created (e.g.
+  `task_20261103_081_rsd595_given_avgsa_curves.md`), then a short snake_case name.
+  This does not apply to notes or files written on Claude's own initiative.
 - Key files: `admin/analysis_models.md` (the roadmap),
   `phd_project/scripts/metaregression_analysis.py` (the library),
   `notebooks/03_WP1_ground_motion_set/073-statistical_models.ipynb` (A0/A1/A2).

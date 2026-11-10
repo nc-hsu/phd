@@ -99,6 +99,24 @@ record_sets:
       ss: "AvgSA_03__opt_ks_mu_sigma"
       fx: "femap695"
 
+# =====================================================================================
+# STUDY OUTPUTS - named sub-folders of a study folder.
+# =====================================================================================
+# Like record_sets this section holds names, not paths: config.py leaves it as loaded.
+# Each entry is resolved for one study (default: record_sets.active_study) by
+#   config.study_output_dir(cfg, name, study_name=None)
+#     -> study_dir(cfg, section, key, study) / subdir
+# so the folder always sits inside the study it belongs to, and switching study switches
+# folder with it.
+#   section, key   the PATH entry whose studies/{study}/ level holds the output
+#   subdir         the folder name inside studies/{study}/
+study_outputs:
+  # nb 073: every figure of the A-series fits, named {model_tag}_{description}.png
+  model_plots:
+    section: "proc_data"
+    key: "fragility_statistical_analysis"
+    subdir: "model_plots"
+
 raw_data:
   root: "data_raw"
   gm_flatfiles: "data_raw/gm_flatfiles"
@@ -231,7 +249,8 @@ proc_data:
   #   fx/{fx_id}/models/                 A2 fits (b - c: FX only)
   #   studies/{study}/                   nb 072 dataset, stripes, covariates, intermediates,
   #                                      plots, site_regression_variables (nb 078),
-  #                                      models/ (A0 / A1 / A3 fits, nb 073)
+  #                                      models/ (A0 / A1 / A3 fits, nb 073),
+  #                                      model_plots/ (nb 073 figures; study_outputs.model_plots)
   #   regression_coefficients/, gm_property_plots/   shared (hazard / GCIM only)
   fragility_statistical_analysis: data_processed/10_fragility_curve_statistical_analysis
   # Ground-motion properties of the fixed sets (spectra, Ds5-95): fx/{fx_id}/  (nb 072)
