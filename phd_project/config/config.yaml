@@ -1,6 +1,6 @@
-executables:
-  rscript: "C:/Program Files/R/R-4.5.2/bin/Rscript.exe"
-
+# Every path here is inside the repo. Machine-specific settings (executables.rscript, the
+# analysis drives, network shares) are set in config.local.yaml next to this file, which
+# load_config merges over this one and which is not in git. See config.local.example.yaml.
 
 project_root: "../../"
 
@@ -78,6 +78,7 @@ record_sets:
   #   (e.g. ..._ida_femap695_collapsefragility_AvgSA_03.json, ida_femap695_bootstrap_...).
   #   records:                   folder name under raw_data.fixed_record_sets (in-repo copy)
   #   records_analysis_machine:  where the run configs on the analysis machine read the JSONs
+  #                              (machine-specific: set in config.local.yaml)
   #   record_glob:               the set's record JSONs within those folders. A record's
   #                              position in the SORTED listing is its record tag ("0", "1",
   #                              ...), which the IDA / MSA runs and the bootstrap key on.
@@ -85,7 +86,6 @@ record_sets:
   fx:
     femap695:
       records: "femap695"
-      records_analysis_machine: "D:/gm_records_p695"
       record_glob: "fema_p695_*.json"
       label: "FEMA P695"
       description: "FEMA P695 far-field set, 22 records."
@@ -130,8 +130,6 @@ raw_data:
   # e.g. fixed_record_sets/femap695/ = the 22 FEMA P695 JSONs (copy of D:/gm_records_p695).
   # Used by nb 052 / 054 / 070 / 072 to compute record IMs without the analysis drive attached.
   fixed_record_sets: "data_raw/fixed_record_sets"
-  esm_hdf5_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/01_ESM"
-  ngasub_folder: "//filebox.hsu-hh.de/FileBox/institut-Daten/Allgemeine_Resourcen/01_Erdbebenzeitverlaeufe/02_NGASub"
   
 proc_data:
   root: "data_processed"
@@ -267,12 +265,12 @@ proc_data:
   record_set_comparison: "data_processed/14_record_set_comparison"
 
   # SDOF stuff is kinda of irrelevant now. It will probably crash
-  sdof_fitting: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting"
-  sdof_parameters: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/sdof_parameters"
-  sdof_optimisation: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/optimisation_results" 
+  sdof_fitting: "data_processed/09_sdof_fitting"
+  sdof_parameters: "data_processed/09_sdof_fitting/sdof_parameters"
+  sdof_optimisation: "data_processed/09_sdof_fitting/optimisation_results" 
   sdof_fragility_curves: data_processed/09_sdof_fitting/fragility_curves
   
-  approx_sdof_systems: "C:/Users/clemettn/Documents/phd/data_processed/09_sdof_fitting/approx_sdof_systems"
+  approx_sdof_systems: "data_processed/09_sdof_fitting/approx_sdof_systems"
   site_specific_sdofs: "data_processed/10_site_specific_sdofs"
   site_specific_3s_mdof_mechanisms: "data_processed/10_site_specific_sdofs/3s_mdof_mechanisms.json"
 
@@ -366,20 +364,6 @@ templates:
   run_msa_serial: "phd_project/scripts/templates/template_run_msa_serial.py"
   run_batch_msa_buildings: "phd_project/scripts/templates/template_run_batch_msa_buildings.py"
 
-analysis_data:
-  root: "E:"
-  dc2_sdof_fitting: "E:/03_wp1pt4pt1_dc2_sdof_fitting"
-  # On the analysis drive the STRUCTURE folders stay put; the analysis folders inside each
-  # one are named after the record set they ran (names built by the config.py helpers):
-  #   site_{i}/{n}s/mdof/  msa_{ss_id}/  {ss_id}_stripes/  config_msa_{ss_id}.py
-  # e.g. msa_AvgSA_03__ks/ - the ss_id already carries the IM, so it is not repeated.
-  wp1_casestudy_sites: "D:/07_wp1_casestudy_sites"
-  reference_structures_dc2_scA: "D:/06_reference_structures_dc2_scA"
-  # Analyses driven by a FIXED record set (same records at every stripe), organised
-  # per design group: group_{n}s_{gid}/{n}s/mdof/. Written by nb 052 (IDA) and 054 (MSA):
-  #   ida__{fx_id}/  config_ida_htf__{fx_id}.py
-  #   msa_{IM}__{fx_id}/  {IM}__{fx_id}_stripes/  config_msa_{IM}__{fx_id}.py
-  wp1_fixed_record_sets: "D:/08_wp1_fixed_record_sets"
 
 
 

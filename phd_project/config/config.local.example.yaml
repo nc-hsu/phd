@@ -1,0 +1,36 @@
+# Template for config.local.yaml: settings that differ from machine to machine.
+#
+# To use it, copy this file to config.local.yaml in this folder and keep only the keys you
+# need (most users need none). Each key overrides the key of the same name in config.yaml;
+# every key you leave out still comes from config.yaml. Relative paths are resolved against
+# the repo root, absolute paths are used as given. config.local.yaml is not in git.
+
+executables:
+  # Full path to Rscript, used by the R residual-partitioning step (nb 002).
+  # Needed only on Windows when R's bin folder is not on the PATH; otherwise leave it out
+  # and "Rscript" is found on the PATH.
+  rscript: "<path to Rscript.exe, e.g. C:/Program Files/R/R-4.5.2/bin/Rscript.exe>"
+
+record_sets:
+  fx:
+    femap695:
+      # Folder of the FEMA P695 record JSONs that the run configs on the analysis machine
+      # read. Needed only to set up WP1 fixed-set IDA / MSA runs (nb 052 / 054).
+      records_analysis_machine: "<folder of the FEMA P695 record JSONs>"
+
+raw_data:
+  # Folders of the ESM and NGA-Sub record time series (HDF5). Needed only by the WP1
+  # record-download and record-processing notebooks, not by nb 002.
+  esm_hdf5_folder: "<folder of the ESM HDF5 records>"
+  ngasub_folder: "<folder of the NGA-Sub records>"
+
+analysis_data:
+  # Drive and folders where the WP1 structural analyses (SDOF fitting, MSA, IDA) are run
+  # and stored. Needed only by the WP1 analysis notebooks, not by nb 002.
+  root: "<analysis drive, e.g. E:/>"
+  dc2_sdof_fitting: "<folder of the DC2 SDOF fitting runs>"
+  # Site-specific MSA runs: site_{i}/{n}s/mdof/ per structure.
+  wp1_casestudy_sites: "<folder of the case-study site structures>"
+  reference_structures_dc2_scA: "<folder of the DC2 scA reference structures>"
+  # Fixed-record-set IDA / MSA runs: group_{n}s_{gid}/{n}s/mdof/ per design group.
+  wp1_fixed_record_sets: "<folder of the fixed-record-set runs>"

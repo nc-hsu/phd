@@ -23,6 +23,11 @@ depends on record sets, the stage folder has an ``ss/``, ``fx/`` and/or ``studie
 
 The helpers check the id against the registry, so a typo fails loudly instead of quietly
 creating a new, empty folder.
+
+Machine-specific settings (the Rscript path, data on other drives or network shares) do not
+live in config.yaml, which only describes the repo itself. They go in an optional,
+unpublished ``config.local.yaml`` next to it, which :func:`load_config` merges over
+config.yaml key by key. ``config.local.example.yaml`` is the template for it.
 """
 
 import yaml
@@ -31,8 +36,71 @@ from pathlib import Path
 # Sections whose values are names, not paths: left exactly as loaded.
 NON_PATH_SECTIONS = frozenset({"record_sets", "study_outputs"})
 
+# Name of the optional per-machine override file, looked for in the same folder as the main
+# config file. It is git-ignored, so it never reaches the repo or the public export.
+LOCAL_CONFIG_NAME = "config.local.yaml"
 
-def load_config(path=None, cfg_file: str | None = None):
+
+def merge_config(base: dict, override: dict) -> dict:
+    """Return ``base`` with ``override`` merged over it, recursively. Neither input is changed.
+
+    The rule, applied at every level:
+
+    * a key whose value is a dict in BOTH inputs is merged again, key by key, so an override
+      holding only ``{"executables": {"rscript": ...}}`` changes that one key and keeps every
+      other key of ``executables``;
+    * any other value in ``override`` replaces the one in ``base`` (including a dict
+      replacing a non-dict and vice versa);
+    * keys only in ``override`` are added; keys only in ``base`` are kept.
+
+    So an override can change or add settings but never delete one.
+    """
+    merged = dict(base)  # shallow copy: base's own top-level dict is not modified
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            # Both sides are sections: recurse, which also copies the nested dict, so the
+            # nested dicts of base are never modified either.
+            merged[key] = merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _read_local_config(local_path: Path) -> dict:
+    """Read the local override file; an empty file means "no overrides".
+
+    ``yaml.safe_load`` returns None for an empty (or comments-only) file, which is a valid
+    way to have a local file that overrides nothing. Anything other than a mapping at the
+    top level cannot be merged section by section, so it is rejected with the file named.
+    """
+    with open(local_path, "r") as f:
+        local = yaml.safe_load(f)
+    if local is None:
+        return {}
+    if not isinstance(local, dict):
+        raise ValueError(f"{local_path} must contain a mapping of sections at the top level, "
+                         f"got {type(local).__name__}")
+    return local
+
+
+def load_config(path=None, cfg_file: str | None = None, use_local: bool = True):
+    """Load the project config and return it with every path made absolute.
+
+    Steps:
+
+    1. Read the main config file: ``path`` if given, else ``cfg_file`` in this folder, else
+       ``config.yaml`` in this folder.
+    2. If ``use_local`` is True and a ``config.local.yaml`` exists in the SAME folder as the
+       main file, merge it over the main config with :func:`merge_config` (nested sections
+       key by key; other values replaced; new keys added). Without that file the result is
+       exactly the main file's. Pass ``use_local=False`` to ignore it, so tests and the
+       public-repo export do not depend on whatever local file sits on the machine.
+    3. Resolve ``project_root`` (the local file may set it, and then wins) relative to the
+       main file's folder.
+    4. In every section except ``NON_PATH_SECTIONS``, turn each string value into an
+       absolute ``Path``: relative ones against the project root, absolute ones kept. The
+       merge happens before this step, so local values are treated exactly like main ones.
+    """
     if path is None and cfg_file is None:
         path = Path(__file__).parent / "config.yaml"
     elif path is None and not cfg_file is None:
@@ -40,6 +108,12 @@ def load_config(path=None, cfg_file: str | None = None):
     path = Path(path)
     with open(path, "r") as f:
         cfg = yaml.safe_load(f)
+
+    # Merge the per-machine overrides, if any, BEFORE the path conversion below, so a path
+    # in the local file is resolved by exactly the same rules as one in the main file.
+    local_path = path.parent / LOCAL_CONFIG_NAME
+    if use_local and local_path.is_file():
+        cfg = merge_config(cfg, _read_local_config(local_path))
 
     # Convert all paths to absolute Path objects
     root = (path.parent / cfg["project_root"]).resolve()

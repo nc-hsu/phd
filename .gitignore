@@ -1,4 +1,7 @@
 # my folders and files
+# Per-machine config overrides (Rscript path, analysis drives, network shares); merged over
+# config.yaml by load_config. The template config.local.example.yaml stays tracked.
+phd_project/config/config.local.yaml
 _to_delete/
 data_raw/eu_shapefile/
 data_raw/correlation_models/ESHM20/gmm_kotha2020_residuals.csv
