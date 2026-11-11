@@ -1,0 +1,49 @@
+{
+  "inputs": {
+    "config_AvgSA_03_disagg_eps4_rsdcurve": {
+      "hash": "80d0464ecc2298d713ba301c7f5da63b868db6efa53112f375ae5732c562200b",
+      "summary": "file config_AvgSA_03_disagg_eps4_rsdcurve.ini (3029 bytes)"
+    },
+    "levels_AvgSA_03_disagg_eps4_rsdcurve": {
+      "hash": "1232bf7f2f4ff1e9b111d9b183b242079bf6efa38559e38257e714e1c69b52f0",
+      "summary": "file levels_AvgSA_03_disagg_eps4_rsdcurve.csv (274336 bytes)"
+    },
+    "calc_id_AvgSA_03_disagg_eps4_rsdcurve": {
+      "hash": "043066daf2109523a7490d4bfad4766da5719950a2b5f96d192fc0537e84f32a",
+      "summary": "str '152'"
+    },
+    "parent_calc_id_AvgSA_03_disagg_eps4_rsdcurve": {
+      "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+      "summary": "str '143'"
+    },
+    "sites_csv": {
+      "hash": "6b8b769aebdf88816a74f51ca6b37f3491db05d143f1b0f11b1473e35fa0edae",
+      "summary": "file sites.csv (6978 bytes)"
+    },
+    "iml_grid": {
+      "hash": "1659784b65f2a71a11ca579da5ff30674eb11098e2784ab46f6be04fbb01a748",
+      "summary": "file AvgSA_03_imls_for_rsdcurve.csv (1040 bytes)"
+    },
+    "hazard_curves": {
+      "hash": "79f83aa7e545629b888e1b1f1da286694819e863d6510694d8665b0fd1a6d0a3",
+      "summary": "file AvgSA_03_hazard_curves_60sites_4sig.pickle (105723 bytes)"
+    },
+    "frame_transform": {
+      "hash": "281b27dd4102a7e2ff423e75dcc6b891853b3dd9dc5bcac5e9ad08ec2fa9902d",
+      "summary": "str 'rsd595_curves.slim_disagg_frame: eps bins summed (Eps column kept, summed), nu_m == 0 dropped'"
+    },
+    "pickagm_version": {
+      "hash": "0.1.0",
+      "summary": "pickagm version"
+    },
+    "zero_hazard_rule": {
+      "hash": "fc7d4d1a5c708e481ed22e824a6c9eb3d33773198e90ea00f7645ccf370c4937",
+      "summary": "str 'mafe <= 0 or no non-zero disagg bin'"
+    }
+  },
+  "_meta": {
+    "artifact": "AvgSA_03_rsdcurve_disagg_stats_wp1sites_eps4.pickle",
+    "git_commit": "eedfcd4f",
+    "written_at": "2026-11-03T12:59:30.972622+00:00"
+  }
+}

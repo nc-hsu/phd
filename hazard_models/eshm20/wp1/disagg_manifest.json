@@ -1596,5 +1596,137 @@
       "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
       "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
     }
+  },
+  "AvgSA_03_disagg_eps4_rsdcurve": {
+    "calc_id": 152,
+    "kind": "multi_iml_child",
+    "config": "config_AvgSA_03_disagg_eps4_rsdcurve.ini",
+    "description": "[AvgSA_03_disagg_eps4_rsdcurve - multi-IML disagg child - ESHM20 all sites]",
+    "parent": "AvgSA_03_psha_eps4",
+    "parent_manifest": "psha_manifest.json",
+    "parent_calc_id": 143,
+    "levels_csv": "levels_AvgSA_03_disagg_eps4_rsdcurve.csv",
+    "levels_npy": "levels_AvgSA_03_disagg_eps4_rsdcurve.npy",
+    "n_levels": 80,
+    "inputs": {
+      "config": {
+        "hash": "80d0464ecc2298d713ba301c7f5da63b868db6efa53112f375ae5732c562200b",
+        "summary": "file config_AvgSA_03_disagg_eps4_rsdcurve.ini (3029 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      },
+      "levels": {
+        "hash": "1232bf7f2f4ff1e9b111d9b183b242079bf6efa38559e38257e714e1c69b52f0",
+        "summary": "file levels_AvgSA_03_disagg_eps4_rsdcurve.csv (274336 bytes)"
+      },
+      "parent_inputs": {
+        "hash": "582fe193d7e231a0c37b2e6cc1bcf9d840050895592458b65ea4d9edf493a2ff",
+        "summary": "str '{\"config\": {\"hash\": \"6e82d1e99ab40277762417471dfe3a869140a70f8bd2aab2c19c260578b8c5ca\", \"summary\": \"file config_AvgSA_03_psha_eps4.ini (1786 bytes)\"}, \"gmpe_lt\": {\"hash\": \"469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169\", \"summary\": \"file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)\"}, \"pickagm_version\": {\"hash\": \"0.1.0\", \"summary\": \"pickagm version\"}, \"site_model\": {\"hash\": \"e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100\", \"summary\": \"file site_model_casestudy_sites.csv (2641 bytes)\"}, \"source_models_digest\": {\"hash\": \"8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370\", \"summary\": \"str \\'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b\\'\"}, \"ssc_lt\": {\"hash\": \"6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9\", \"summary\": \"file source_model_logic_tree_eshm20.xml (17970 bytes)\"}}'"
+      },
+      "parent_calc_id": {
+        "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+        "summary": "int=143"
+      },
+      "engine_version": {
+        "hash": "62a04afd0071333f9f14d0dad001fe721a56fd004ec025b92fbe87f1dd382f2e",
+        "summary": "str '3.27.0'"
+      },
+      "engine_commit": {
+        "hash": "cdfae11876e44b35e8f171cbea8b7613e0a85ef21fb92edb8b3d8a73fd14f0a3",
+        "summary": "str 'b8f3077961a0bb482b73ffef3b39b45d4d1bf55c'"
+      }
+    },
+    "_meta": {
+      "git_commit": "76d287c4",
+      "written_at": "2026-11-03T10:13:34.780784+00:00",
+      "engine_version": "3.27.0",
+      "dist_version": "3.25.0",
+      "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
+      "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
+    }
+  },
+  "AvgSA_03_disagg_eps4_imlgrid_c01": {
+    "calc_id": 153,
+    "kind": "multi_iml_child",
+    "config": "config_AvgSA_03_disagg_eps4_imlgrid_c01.ini",
+    "description": "[AvgSA_03_disagg_eps4_imlgrid_c01 - multi-IML disagg child - ESHM20 all sites]",
+    "parent": "AvgSA_03_psha_eps4",
+    "parent_manifest": "psha_manifest.json",
+    "parent_calc_id": 143,
+    "levels_csv": "levels_AvgSA_03_disagg_eps4_imlgrid_c01.csv",
+    "levels_npy": "levels_AvgSA_03_disagg_eps4_imlgrid_c01.npy",
+    "n_levels": 26,
+    "inputs": {
+      "config": {
+        "hash": "09f29d70e8638632791c8c0db32408d140071190c3076baaca5522cf9cfae3bf",
+        "summary": "file config_AvgSA_03_disagg_eps4_imlgrid_c01.ini (2426 bytes)"
+      },
+      "gmpe_lt": {
+        "hash": "469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169",
+        "summary": "file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)"
+      },
+      "ssc_lt": {
+        "hash": "6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9",
+        "summary": "file source_model_logic_tree_eshm20.xml (17970 bytes)"
+      },
+      "site_model": {
+        "hash": "e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100",
+        "summary": "file site_model_casestudy_sites.csv (2641 bytes)"
+      },
+      "source_models_digest": {
+        "hash": "8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370",
+        "summary": "str 'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b'"
+      },
+      "pickagm_version": {
+        "hash": "0.1.0",
+        "summary": "pickagm version"
+      },
+      "levels": {
+        "hash": "ea06d2c3f196248318d579e88346afc4ac83aa9677a38469d7511f8af2ebd384",
+        "summary": "file levels_AvgSA_03_disagg_eps4_imlgrid_c01.csv (94336 bytes)"
+      },
+      "parent_inputs": {
+        "hash": "582fe193d7e231a0c37b2e6cc1bcf9d840050895592458b65ea4d9edf493a2ff",
+        "summary": "str '{\"config\": {\"hash\": \"6e82d1e99ab40277762417471dfe3a869140a70f8bd2aab2c19c260578b8c5ca\", \"summary\": \"file config_AvgSA_03_psha_eps4.ini (1786 bytes)\"}, \"gmpe_lt\": {\"hash\": \"469f0c8fb6ddd0862c83f3ba283b9119018432bf24927f74e066e270e3155169\", \"summary\": \"file gmpe_logic_tree_AvgSA_0to3_median_branch.xml (4452 bytes)\"}, \"pickagm_version\": {\"hash\": \"0.1.0\", \"summary\": \"pickagm version\"}, \"site_model\": {\"hash\": \"e388b6bb36bb968be8389fc861c1e8f3d6e3fd1e510c405aac69edf1d8ca8100\", \"summary\": \"file site_model_casestudy_sites.csv (2641 bytes)\"}, \"source_models_digest\": {\"hash\": \"8957b15fabaa001e07c89a177da491ad346c5615211a1c1a03b7b890badb4370\", \"summary\": \"str \\'f9bf265b820a13d7f6fe51e4a1a947799d1cfe5f549746e10d1362456208f04b\\'\"}, \"ssc_lt\": {\"hash\": \"6665c78e164e5e5a3823daaa452da33388d06868f624382d931a8bc9b71e0cf9\", \"summary\": \"file source_model_logic_tree_eshm20.xml (17970 bytes)\"}}'"
+      },
+      "parent_calc_id": {
+        "hash": "d6f0c71ef0c88e45e4b3a2118fcb83b0def392d759c901e9d755d0e879028727",
+        "summary": "int=143"
+      },
+      "engine_version": {
+        "hash": "62a04afd0071333f9f14d0dad001fe721a56fd004ec025b92fbe87f1dd382f2e",
+        "summary": "str '3.27.0'"
+      },
+      "engine_commit": {
+        "hash": "cdfae11876e44b35e8f171cbea8b7613e0a85ef21fb92edb8b3d8a73fd14f0a3",
+        "summary": "str 'b8f3077961a0bb482b73ffef3b39b45d4d1bf55c'"
+      }
+    },
+    "_meta": {
+      "git_commit": "eedfcd4f",
+      "written_at": "2026-11-10T06:50:01.661596+00:00",
+      "engine_version": "3.27.0",
+      "dist_version": "3.25.0",
+      "engine_commit": "b8f3077961a0bb482b73ffef3b39b45d4d1bf55c",
+      "engine_root": "C:\\Users\\clemettn\\Documents\\pypackages\\oq-engine-nc"
+    }
   }
 }
