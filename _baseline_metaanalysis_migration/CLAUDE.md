@@ -46,7 +46,13 @@ _baseline_metaanalysis_migration/
   expected/<case_id>_replicates.npz   bootstrap cases only; for diagnosis, not compared
   calibration/report.json row-permutation noise floors per case and output
   provenance.json         phd commit, clean/dirty tree, library versions, date
+  containers/<quantity>.npz / .json   full data containers (theta, beta) + manifest
+  containers/arm_schema.json          the phd arm tables, for covmar's ArmSchema
+  specs/<case_id>.json    exact phd specs and fit arguments of each model-level case
 ```
+
+`containers/` and `specs/` exist so covmar can rebuild the model-level cases
+without any phd code; see `dump/tasks_and_plans/task_20261110_freeze_baseline_containers.md`.
 
 ## 3. Building each case
 
@@ -103,7 +109,16 @@ written with full precision.
 After the expected results are written:
 
 1. Refit every case once with its rows randomly permuted (fixed seed, recorded),
-   permuting `y`, `X`, `V` and the factor codes consistently.
+   permuting `y`, `X`, `V`, the factor codes and — for bootstrap cases — the
+   replicate matrices consistently. This calibrates the full-sample fits and
+   the **record**-scheme summaries, whose results do not depend on row order.
+   **Hybrid**-scheme summaries cannot be calibrated this way: the hybrid scheme
+   draws new random effects by row position, so permuting rows changes the
+   pseudo-data itself, and the difference is Monte-Carlo variation, not
+   numerical noise. Do not permute-calibrate them; instead give each hybrid
+   summary the record-scheme noise floor of the same case (same fitter, same
+   data size and structure), marked `"calibrated_by": "record_proxy"` in the
+   report.
 2. Record the largest relative difference per output in
    `calibration/report.json`.
 3. Report every case where a tolerance in `tolerances.json` is less than 10x the

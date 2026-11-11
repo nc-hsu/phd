@@ -1,0 +1,61 @@
+{
+  "symbols": {
+    "msa_ss": "a",
+    "msa_fx": "b",
+    "ida_fx": "c",
+    "ida_ub": "c_ub",
+    "ida_avg": "c_avg"
+  },
+  "scope_of_arm": {
+    "msa_ss": "by_site",
+    "msa_fx": "by_group",
+    "ida_fx": "by_group",
+    "ida_ub": "by_group",
+    "ida_avg": "by_group"
+  },
+  "contrast_specs": {
+    "y0": [
+      "a",
+      "c",
+      "row",
+      "MSA-SS / IDA-FX"
+    ],
+    "y1": [
+      "a",
+      "b",
+      "row",
+      "MSA-SS / MSA-FX"
+    ],
+    "y2": [
+      "b",
+      "c",
+      "group",
+      "MSA-FX / IDA-FX"
+    ],
+    "y0_ub": [
+      "a",
+      "c_ub",
+      "row",
+      "MSA-SS / IDA-FX (upper bound)"
+    ],
+    "y0_avg": [
+      "a",
+      "c_avg",
+      "row",
+      "MSA-SS / IDA-FX (geom. avg.)"
+    ],
+    "y2_ub": [
+      "b",
+      "c_ub",
+      "group",
+      "MSA-FX / IDA-FX (upper bound)"
+    ],
+    "y2_avg": [
+      "b",
+      "c_avg",
+      "group",
+      "MSA-FX / IDA-FX (geom. avg.)"
+    ]
+  },
+  "source": "phd fm.SYMBOLS, fm.SCOPE_OF_ARM, fm._CONTRAST_SPECS"
+}

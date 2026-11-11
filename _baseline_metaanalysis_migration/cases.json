@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "_doc": "Baseline cases for the covmar migration. Each case fixes the real data and model exactly. levels_run: 'engine' = frozen arrays straight into the fitter; 'model' = built through data container -> contrast -> spec -> fit. Diagonal / block-diagonal V cases are engine-only because the phd model layer cannot express them; bootstrap cases are model-only because the bootstrap lives in the model layer. factors map canonical level names to dataset columns. correlated lists the multivariate levels with a full 2x2 covariance (null for univariate). V: 'dense' full sampling covariance; 'diag' its diagonal only; 'blockdiag' within-outcome covariance kept, between-outcome sampling covariance zeroed. Covariates enter X untransformed (no centring), as in the phd code.",
+  "_doc": "Baseline cases for the covmar migration. Each case fixes the real data and model exactly. levels_run: 'engine' = frozen arrays straight into the fitter; 'model' = built through data container -> contrast -> spec -> fit. Diagonal / block-diagonal V cases are engine-only because the phd model layer cannot express them; bootstrap cases are model-only because the bootstrap lives in the model layer. factors map canonical level names to dataset columns. correlated lists the multivariate levels with a full 2x2 covariance (null for univariate). V: 'dense' full sampling covariance; 'diag' its diagonal only; 'blockdiag' within-outcome covariance kept, between-outcome sampling covariance zeroed. Covariates enter X as the phd fm.build_X builds it: each covariate centred and scaled to a z-score over the rows of the contrast (mean, SD with ddof=1); intercept unscaled. Engine-level cases use that same X, so both levels fit the identical matrix. The means and SDs used are stored with the inputs.",
   "cases": [
     {
       "case_id": "uni_re2x_int_diag",
@@ -1333,7 +1333,7 @@
         "contrast": "y0_avg",
         "im_tag": "AvgSA_03",
         "outcomes": [
-          "theta"
+          "beta"
         ],
         "corrected": true
       },
@@ -1363,7 +1363,7 @@
         "n_boot": 200,
         "seed": 20261013
       },
-      "note": "As boot_uni_re1f_int_dense with bias-corrected estimates: covers replicate re-centring."
+      "note": "Record and hybrid bootstrap on bias-corrected estimates of BETA: covers replicate re-centring (replicate_shift). Beta, not theta, because theta is never bias-corrected in the phd code (its replicate shift is exactly zero), so a corrected theta fit would not exercise the re-centring."
     },
     {
       "case_id": "uni_re2x_cov2_dense_explicit",

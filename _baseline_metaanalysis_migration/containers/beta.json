@@ -1,0 +1,2159 @@
+{
+  "format_version": 1,
+  "quantity": "beta",
+  "im_tag": "AvgSA_03",
+  "numpy": "2.2.6",
+  "pandas": "2.2.3",
+  "rows": {
+    "column_names": [
+      "structure_id",
+      "tag",
+      "design_group_id",
+      "n_sites_in_group",
+      "is_representative",
+      "msa_fx_beta",
+      "msa_fx_log_beta",
+      "msa_fx_beta_bc",
+      "msa_fx_log_beta_bc",
+      "msa_fx_var_beta",
+      "msa_fx_var_log_beta",
+      "msa_fx_log_beta_bias",
+      "msa_fx_n_obs",
+      "msa_fx_cov_theta_beta",
+      "msa_fx_cov_log_theta_log_beta",
+      "ida_fx_beta",
+      "ida_fx_log_beta",
+      "ida_fx_beta_bc",
+      "ida_fx_log_beta_bc",
+      "ida_fx_var_beta",
+      "ida_fx_var_log_beta",
+      "ida_fx_log_beta_bias",
+      "ida_fx_n_obs",
+      "ida_fx_cov_theta_beta",
+      "ida_fx_cov_log_theta_log_beta",
+      "ida_ub_beta",
+      "ida_ub_log_beta",
+      "ida_ub_beta_bc",
+      "ida_ub_log_beta_bc",
+      "ida_ub_var_beta",
+      "ida_ub_var_log_beta",
+      "ida_ub_log_beta_bias",
+      "ida_ub_n_obs",
+      "ida_ub_cov_theta_beta",
+      "ida_ub_cov_log_theta_log_beta",
+      "ida_avg_beta",
+      "ida_avg_log_beta",
+      "ida_avg_beta_bc",
+      "ida_avg_log_beta_bc",
+      "ida_avg_var_beta",
+      "ida_avg_var_log_beta",
+      "ida_avg_log_beta_bias",
+      "ida_avg_n_obs",
+      "ida_avg_cov_theta_beta",
+      "ida_avg_cov_log_theta_log_beta",
+      "msa_ss_beta",
+      "msa_ss_log_beta",
+      "msa_ss_beta_bc",
+      "msa_ss_log_beta_bc",
+      "msa_ss_var_beta",
+      "msa_ss_var_log_beta",
+      "msa_ss_log_beta_bias",
+      "msa_ss_n_obs",
+      "msa_ss_cov_theta_beta",
+      "msa_ss_cov_log_theta_log_beta",
+      "ln_T1",
+      "ln_overstrength",
+      "ln_ductility",
+      "pushover_is_dummy",
+      "T1",
+      "T1_design",
+      "C_s",
+      "overstrength",
+      "ductility",
+      "d_ln_saratio_mean_unif",
+      "d_ln_saratio_sigma_unif",
+      "d_ln_ds595_mean_unif",
+      "d_ln_ds595_sigma_unif",
+      "d_ln_saratio_mean_unif_recs",
+      "d_ln_saratio_sigma_unif_recs",
+      "d_ln_ds595_mean_unif_recs",
+      "d_ln_ds595_sigma_unif_recs",
+      "gcim_saratio_gmean_unif",
+      "gcim_saratio_sigma_unif",
+      "gcim_ds595_gmean_unif",
+      "gcim_ds595_sigma_unif",
+      "rec_saratio_gmean_unif",
+      "rec_saratio_sigma_unif",
+      "rec_ds595_gmean_unif",
+      "rec_ds595_sigma_unif",
+      "fx_saratio_gmean",
+      "fx_saratio_sigma",
+      "fx_ds595_gmean",
+      "fx_ds595_sigma"
+    ],
+    "column_names_dtype": "object",
+    "columns_name": null,
+    "columns": [
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "object",
+        "kind": "str_object"
+      },
+      {
+        "dtype": "object",
+        "kind": "str_object"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "bool",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "int64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "bool",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      },
+      {
+        "dtype": "float64",
+        "kind": "native"
+      }
+    ],
+    "index": {
+      "type": "MultiIndex",
+      "names": [
+        "site",
+        "n_storeys"
+      ],
+      "levels": [
+        {
+          "dtype": "int64",
+          "kind": "native"
+        },
+        {
+          "dtype": "int64",
+          "kind": "native"
+        }
+      ],
+      "length": 120
+    }
+  },
+  "groups": {
+    "type": "Index",
+    "names": [
+      "design_group_id"
+    ],
+    "levels": [
+      {
+        "dtype": "object",
+        "kind": "str_object"
+      }
+    ],
+    "length": 51
+  },
+  "fields": {
+    "reps": {
+      "order": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "present": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "none": [],
+      "items": {
+        "b": {
+          "type": "DataFrame",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "shape": [
+            51,
+            5000
+          ],
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          },
+          "columns": {
+            "type": "Index",
+            "names": [
+              "k"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 5000
+          }
+        },
+        "c": {
+          "type": "DataFrame",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "shape": [
+            51,
+            5000
+          ],
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          },
+          "columns": {
+            "type": "Index",
+            "names": [
+              "k"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 5000
+          }
+        },
+        "c_ub": {
+          "type": "DataFrame",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "shape": [
+            51,
+            5000
+          ],
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          },
+          "columns": {
+            "type": "Index",
+            "names": [
+              "k"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 5000
+          }
+        },
+        "c_avg": {
+          "type": "DataFrame",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "shape": [
+            51,
+            5000
+          ],
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          },
+          "columns": {
+            "type": "Index",
+            "names": [
+              "k"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 5000
+          }
+        },
+        "a": {
+          "type": "DataFrame",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "shape": [
+            120,
+            5000
+          ],
+          "index": {
+            "type": "MultiIndex",
+            "names": [
+              "site",
+              "n_storeys"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              },
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 120
+          },
+          "columns": {
+            "type": "Index",
+            "names": [
+              "k"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 5000
+          }
+        }
+      }
+    },
+    "estimates": {
+      "order": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "present": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "none": [],
+      "items": {
+        "b": {
+          "type": "Series",
+          "name": "msa_fx_log_beta",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c": {
+          "type": "Series",
+          "name": "ida_fx_log_beta",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_ub": {
+          "type": "Series",
+          "name": "ida_ub_log_beta",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_avg": {
+          "type": "Series",
+          "name": "ida_avg_log_beta",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "a": {
+          "type": "Series",
+          "name": "msa_ss_log_beta",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "MultiIndex",
+            "names": [
+              "site",
+              "n_storeys"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              },
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 120
+          }
+        }
+      }
+    },
+    "estimates_bc": {
+      "order": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "present": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "none": [],
+      "items": {
+        "b": {
+          "type": "Series",
+          "name": "msa_fx_log_beta_bc",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c": {
+          "type": "Series",
+          "name": "ida_fx_log_beta_bc",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_ub": {
+          "type": "Series",
+          "name": "ida_ub_log_beta_bc",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_avg": {
+          "type": "Series",
+          "name": "ida_avg_log_beta_bc",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "a": {
+          "type": "Series",
+          "name": "msa_ss_log_beta_bc",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "MultiIndex",
+            "names": [
+              "site",
+              "n_storeys"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              },
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 120
+          }
+        }
+      }
+    },
+    "bias": {
+      "order": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "present": [
+        "b",
+        "c",
+        "c_ub",
+        "c_avg",
+        "a"
+      ],
+      "none": [],
+      "items": {
+        "b": {
+          "type": "Series",
+          "name": "msa_fx_log_beta_bias",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c": {
+          "type": "Series",
+          "name": "ida_fx_log_beta_bias",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_ub": {
+          "type": "Series",
+          "name": "ida_ub_log_beta_bias",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "c_avg": {
+          "type": "Series",
+          "name": "ida_avg_log_beta_bias",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "Index",
+            "names": [
+              "design_group_id"
+            ],
+            "levels": [
+              {
+                "dtype": "object",
+                "kind": "str_object"
+              }
+            ],
+            "length": 51
+          }
+        },
+        "a": {
+          "type": "Series",
+          "name": "msa_ss_log_beta_bias",
+          "values": {
+            "dtype": "float64",
+            "kind": "native"
+          },
+          "index": {
+            "type": "MultiIndex",
+            "names": [
+              "site",
+              "n_storeys"
+            ],
+            "levels": [
+              {
+                "dtype": "int64",
+                "kind": "native"
+              },
+              {
+                "dtype": "int64",
+                "kind": "native"
+              }
+            ],
+            "length": 120
+          }
+        }
+      }
+    }
+  },
+  "arrays": {
+    "rows/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "8f40c2d181320b7153c6cb9e7dc77eda2cbcc087057b7bdcbae2646698d043e3"
+    },
+    "rows/columns/1": {
+      "dtype": "<U17",
+      "shape": [
+        120
+      ],
+      "kind": "str_object",
+      "sha256": "22e1cfc473ddb9b70ec88b23cf729f4e508cfb09bb381aa80f0f0f2c9030e81e"
+    },
+    "rows/columns/2": {
+      "dtype": "<U11",
+      "shape": [
+        120
+      ],
+      "kind": "str_object",
+      "sha256": "37393806853f518d085a18f6a4947691f8eea702b8a6cf4f17b2bb616a1f13b1"
+    },
+    "rows/columns/3": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "89efa22f75bf0970c32a729cd32ed1664225ec1ec63383f33093d8fd72b1db81"
+    },
+    "rows/columns/4": {
+      "dtype": "|b1",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "f4a8ac80149cf255f2e0ee1f29aa6290617fa8fb79d2211a305e1aa24332af5a"
+    },
+    "rows/columns/5": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "34c53092e23613dcceb3f72e55731054dd01f1b9ed24044e796c6e2b90e5b4fc"
+    },
+    "rows/columns/6": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "188fa232bcfe73deca446a6e844d61b135419f4ac0df77af1fdd700ea9004a53"
+    },
+    "rows/columns/7": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "de4a8fb911e466368b2a74938a39fb36806d32fd790b931e9f21ac5964f479f0"
+    },
+    "rows/columns/8": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e952bc00ebe72297e9ed32864761fec231780a779a20deab268e54a8f2f0cb92"
+    },
+    "rows/columns/9": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "10d8945d18156a150b64ec00a5d60819066e52cf042e65e1e9f5fc582e43a11c"
+    },
+    "rows/columns/10": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "be84b8ab3c405e2309f3380572cd30ea82764b373670071a33dd51a5573087d7"
+    },
+    "rows/columns/11": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "a1af47956192d0bb9b1db2ae9911b2f1233786d9792fb9a13cfe94e970a2e96a"
+    },
+    "rows/columns/12": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6cae0eb15fe218c9b470bdfc27550c85755a1728d1e47934d5dbe6717f8645f5"
+    },
+    "rows/columns/13": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "8a0a55a37d52b6473830152fa6ccbf15c4bff4165ab2d809c0300bddaf02ef27"
+    },
+    "rows/columns/14": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "bd9374ffe8f5dc207ef627a7cfd34c6bed2c7cb21e60000d1ce99969e60860c8"
+    },
+    "rows/columns/15": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "19bb9658db93b09f7e6862b9d35f2c3b864673a3c226a16607629f96da19bdca"
+    },
+    "rows/columns/16": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "d9e1ea8486f415489d158d1d6bae5567bd4afda6b7fe11ebf31ccb494ce40a9d"
+    },
+    "rows/columns/17": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "06023d72a0d0236565f27aed2f24e65db4a7463b36f48a1f4ee942aed2e96800"
+    },
+    "rows/columns/18": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "aa84c371caf578d7cd71623fba8ba6e4d5134e0860874ab2e574cd85ff321da5"
+    },
+    "rows/columns/19": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "a3fddc2f1653a18cccb81555377cee80ef543de92f3584a96fe7927a27a10560"
+    },
+    "rows/columns/20": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "a0975c64ea63bd60d06c65ca4ceee3ac358aa85df92e497d9f4a8286c4ea8f71"
+    },
+    "rows/columns/21": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "9b6cc2fca68a623be9f705162be605a47f8b9bea0b7a49df7ae78acf0cf72f91"
+    },
+    "rows/columns/22": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6cae0eb15fe218c9b470bdfc27550c85755a1728d1e47934d5dbe6717f8645f5"
+    },
+    "rows/columns/23": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "0075c61a2d5453a2e4316ce8d90e9333ad32e7d8df27d6edb147a88cba706734"
+    },
+    "rows/columns/24": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "baf4e5fb013b2881847cad50d14def232206c430d769c14f4176e118a5498fef"
+    },
+    "rows/columns/25": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4f1f8ef6a9148123e5a1ae5b8e988a9aab06e121f583df51f41312d1acf6b887"
+    },
+    "rows/columns/26": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "32405c84f69c11e647f2213076813d353d526c3e3bbde96fc92459bddf3faf15"
+    },
+    "rows/columns/27": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "454fff9fb8b03b46ed2f50dd1a1dfa427aa9776e667fc799b3ceb8753e98ca31"
+    },
+    "rows/columns/28": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "d797eb20ea6cd97a76a93369d7a660ab848ecf78e993369b91ac8d63c5ce235a"
+    },
+    "rows/columns/29": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "58fadbf7958562b4418c9a08ea12e5bf6241a6b060d790be810cadfb369d395b"
+    },
+    "rows/columns/30": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "186f27dc859ed5ffb82ecdc8b5325d138f5d66d291d7b70de84d4820ac4a3017"
+    },
+    "rows/columns/31": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "c794aff6c3032e348e2e8d46e1853227a42645665703bac3b9ba41a48814fa16"
+    },
+    "rows/columns/32": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6cae0eb15fe218c9b470bdfc27550c85755a1728d1e47934d5dbe6717f8645f5"
+    },
+    "rows/columns/33": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "8b053b2691160753d86fe6e7c34e53ab35d599a642015bcb977549a294390097"
+    },
+    "rows/columns/34": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "20cf4c5c26be21b1dc6ffdaf1747896dd3e04bc27611687a74fe28fef329708f"
+    },
+    "rows/columns/35": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "5c53d99b7d7c29fe7df9a36cd5689f861fca9c822b564b2d45c271f7e70a7404"
+    },
+    "rows/columns/36": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "550c1a853eaae9e85ccde91b63df86609fc3198971a2837901ae1d73e589b0c4"
+    },
+    "rows/columns/37": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "94102e2d48c4c81bd758eca9a05451d4af8c8e49cc6acf6fc7f6dddb08425785"
+    },
+    "rows/columns/38": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "ff9edf93459f7a4bbb754a74f63ab9548e466f7d94f43fd393cc0e7ff6d45b5f"
+    },
+    "rows/columns/39": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "b966090a7b4959fb5e050f5c8e115d18d3d39a433f4bbd9794d6f6ab8860ee36"
+    },
+    "rows/columns/40": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "2e385e064c99fba4e119d36008d2460f066f5e804f41457a1c218f621a0d81e7"
+    },
+    "rows/columns/41": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "2cf6ea749de9643365d3174c53a166d66f71acecd6163573bd18a15cec8a1d52"
+    },
+    "rows/columns/42": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6cae0eb15fe218c9b470bdfc27550c85755a1728d1e47934d5dbe6717f8645f5"
+    },
+    "rows/columns/43": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "13a2d12c393da1e7345cc8d1a126db6dbbfefc6727603e123bfd31b33a4af8c1"
+    },
+    "rows/columns/44": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "a049845392cbf808b27c8e85ecd8727c011b791779575e8966a47162de89eae5"
+    },
+    "rows/columns/45": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "57c85d329b18873da3d1b5c75401b3339a0bf84ef19842438a910dec0b25542f"
+    },
+    "rows/columns/46": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "ecfbc0be8506c404096033e23a9846db80cc5a391c3453d5ab6f560f87445070"
+    },
+    "rows/columns/47": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "1c58f5ce0c6e211bf4d71531f086fb3dd54a0909ecdfb98503d447f02f331ef4"
+    },
+    "rows/columns/48": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "fb4dc5235428bef13cbafe14eb1fb8e8a0be60eb7b0a35c4042ac5e26f253c4e"
+    },
+    "rows/columns/49": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "9fed8ef3790889e01f46d819741f027f3f4a7321783753df5fcd7ba59b0bccbb"
+    },
+    "rows/columns/50": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "f3d85ee2d2df27c51b2d8e08836db5da754f5446dca69fc480db9fa80e5605d9"
+    },
+    "rows/columns/51": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "7f8782c0df2ac53c14ac89f2bb93fe0c26a196759cbef587b8ec2f10bc25b548"
+    },
+    "rows/columns/52": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6cae0eb15fe218c9b470bdfc27550c85755a1728d1e47934d5dbe6717f8645f5"
+    },
+    "rows/columns/53": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "3bbf0aa60d21162dc626f771f5d5d1e2a61be7a7a6ba4cc767967c9f3443894c"
+    },
+    "rows/columns/54": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e045bc20d0d06a7a41e00d52c1d649e2522251e769e6eda550bf825b1e5b586e"
+    },
+    "rows/columns/55": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "441bfed16bb0717aac5da73ac72fe0428f5026130a6727ec3220d2f05a9fd0bb"
+    },
+    "rows/columns/56": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "99ca5ec0377dd905ab8138c84801cd25a5a6335f1a925049482577aced349e74"
+    },
+    "rows/columns/57": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "baa2f0155cee9e603e6285a3ab3ef35ee1aa1d28cd9e7ac264f6350ecad2e637"
+    },
+    "rows/columns/58": {
+      "dtype": "|b1",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "6edd9f6f9cc92cded36e6c4a580933f9c9f1b90562b46903b806f21902a1a54f"
+    },
+    "rows/columns/59": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "7913b1e109d250b644504eac4d717854ab6929095d83e59a8c9df03a07569f93"
+    },
+    "rows/columns/60": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "358da0e5c240bdb3a9c5db46b2ec39104d2435f7d559fc6bedd48570ecd76f35"
+    },
+    "rows/columns/61": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "9874bb5f4d3e3d1ed374fd5c89d32f06a80cc8d6e91fc0f76185570b1aa915e7"
+    },
+    "rows/columns/62": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "40fb38836a445bf228a4fb5c67db5c1490112afaf2f118e647b704d0b8b73b68"
+    },
+    "rows/columns/63": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "235ba8dca6312f80fe58baca6529c1aafa26d5f5bc642b3354e8a766e2606478"
+    },
+    "rows/columns/64": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "f4288ad738c5ca181c08d362376fcc1c91ece8c78b31cdf76fa9706da84171ff"
+    },
+    "rows/columns/65": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "75d0aca9464f05c851b1bc7edfe78317d469a1c823a562d8f0f65d90bc48f83b"
+    },
+    "rows/columns/66": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "111386827733130f2fbd8f3b71b3e8c606f12c01d43ef6d60aae32b306e99bc1"
+    },
+    "rows/columns/67": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "eae98b0e293bc4e71029c3a936342ebca066168e7bbab169ec260efe39879870"
+    },
+    "rows/columns/68": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "529df8112a15099573ad0ebcf03d7f8305e3eb3b9ad089ce2c880c2bf4f85bdd"
+    },
+    "rows/columns/69": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "22a1f3703ee0513701e84f73132451b5b8c2e0f6ecbdfd47c8d6fb5e5903e8c3"
+    },
+    "rows/columns/70": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "498035a4e054e234bd9117fea829edcd628590f5c51443c53815af3a8945a855"
+    },
+    "rows/columns/71": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "f95118d60a725a544e0c71d19aedee440b67637e82b0cfef431499db588dd7fd"
+    },
+    "rows/columns/72": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "5088b0707e5f17b755ba0d4f57d9229ceeb3329374649386d40d87c7c54417ae"
+    },
+    "rows/columns/73": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "46fabb31fd070c7680afbcc844b0693aa89844045773df31bf8d1743da5f2d30"
+    },
+    "rows/columns/74": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "c7eac74dd6fc071f2c380b57c6805c491b321cdb286d95f3dcbfe349ec5d8901"
+    },
+    "rows/columns/75": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "7db6268daa81bb581af587ff13681db530d5f3e6e98461e1d177f9119ff3ec43"
+    },
+    "rows/columns/76": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "ea36a6a95527fb33b460bd21e1e264cea32507d619935c849ce1d5bf857842db"
+    },
+    "rows/columns/77": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "233e2629387f6b25b5a3ca7c5a9d19115fa480fe9084154635296eac53d78f70"
+    },
+    "rows/columns/78": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "847301e23a2e7b73aad36da258a38947bfa13ecb033f16c2168af591a940dafb"
+    },
+    "rows/columns/79": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "72b8371da81885b10bf00e66d98d4cf4796a2971448640302afc098f5e674091"
+    },
+    "rows/columns/80": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "dffcfb8d804de2a64377b58db033c22d5988857f46250e3d4c1b2324e070e702"
+    },
+    "rows/columns/81": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "efb478c15ae54889456464c92a4183762a4aa8d547c1df76ed2222669e2b28b6"
+    },
+    "rows/columns/82": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "ac098e781cc3761cce11ebb45b84f8309880c2e4a03af1cdaf61dea3aa53d581"
+    },
+    "rows/columns/83": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "b64a11332279f7b81653c2cea1e0f015684606d19680c9bb3fcdaaa1d88e4ebd"
+    },
+    "rows/index/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4139d54320c5d49719e98b8cd59ec2c3a5230c98f2091966bbd232645e27acd0"
+    },
+    "rows/index/1": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e15f0d17b87e572a2918e41ea1c1af3bbb4e32e6944f7159b41267e53718ee24"
+    },
+    "groups/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "reps/b/values": {
+      "dtype": "<f8",
+      "shape": [
+        51,
+        5000
+      ],
+      "kind": "native",
+      "sha256": "5387511f06e6e4e97e14824361142688c2df8c75b4c8d8ff467b888d426cf9db"
+    },
+    "reps/b/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "reps/b/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a3d44437f284b46e5d827df6101e63efe16f752040ad67db809c061bc367bde5"
+    },
+    "reps/c/values": {
+      "dtype": "<f8",
+      "shape": [
+        51,
+        5000
+      ],
+      "kind": "native",
+      "sha256": "4abb58754595005d7b744486d868811e4c4d3c9bffe53c2c5091289cfe42dc10"
+    },
+    "reps/c/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "reps/c/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a3d44437f284b46e5d827df6101e63efe16f752040ad67db809c061bc367bde5"
+    },
+    "reps/c_ub/values": {
+      "dtype": "<f8",
+      "shape": [
+        51,
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a676f6e457e139e5bac710b597820c8a2486bb899ba70ea39ad66b0981cbe750"
+    },
+    "reps/c_ub/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "reps/c_ub/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a3d44437f284b46e5d827df6101e63efe16f752040ad67db809c061bc367bde5"
+    },
+    "reps/c_avg/values": {
+      "dtype": "<f8",
+      "shape": [
+        51,
+        5000
+      ],
+      "kind": "native",
+      "sha256": "11f944da1c649bdf08875e0b123bbccd0969f4d99a2b17bb17dc997f6c74484f"
+    },
+    "reps/c_avg/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "reps/c_avg/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a3d44437f284b46e5d827df6101e63efe16f752040ad67db809c061bc367bde5"
+    },
+    "reps/a/values": {
+      "dtype": "<f8",
+      "shape": [
+        120,
+        5000
+      ],
+      "kind": "native",
+      "sha256": "736b5471a1d04fe061efe582e4b7e5ad19493576894bc093caaa402beb5a9bdc"
+    },
+    "reps/a/index/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4139d54320c5d49719e98b8cd59ec2c3a5230c98f2091966bbd232645e27acd0"
+    },
+    "reps/a/index/1": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e15f0d17b87e572a2918e41ea1c1af3bbb4e32e6944f7159b41267e53718ee24"
+    },
+    "reps/a/columns/0": {
+      "dtype": "<i8",
+      "shape": [
+        5000
+      ],
+      "kind": "native",
+      "sha256": "a3d44437f284b46e5d827df6101e63efe16f752040ad67db809c061bc367bde5"
+    },
+    "estimates/b/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "e0323c1979d1897e1727531c94013cfbadc22b586bcf16137352e8e19a25d48a"
+    },
+    "estimates/b/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates/c/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "288c0788690e171a6ba3f988f80828080e02b2b373a605fb7637308f0122a168"
+    },
+    "estimates/c/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates/c_ub/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "da0cbbf24ec4b80d430da60417fbde7f2f8e8543ce40760190c952f17801987a"
+    },
+    "estimates/c_ub/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates/c_avg/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "2003398a06e86d3226e5fd08a5e3058ae60cca3b54de580c72a049c84a634f72"
+    },
+    "estimates/c_avg/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates/a/values": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "ecfbc0be8506c404096033e23a9846db80cc5a391c3453d5ab6f560f87445070"
+    },
+    "estimates/a/index/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4139d54320c5d49719e98b8cd59ec2c3a5230c98f2091966bbd232645e27acd0"
+    },
+    "estimates/a/index/1": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e15f0d17b87e572a2918e41ea1c1af3bbb4e32e6944f7159b41267e53718ee24"
+    },
+    "estimates_bc/b/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "375c9bb83177a232a5ed35892e58affee643c05b0ed48ddd7a567dc2fe20a347"
+    },
+    "estimates_bc/b/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates_bc/c/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "7aa73d9bd03d5f906aae7879b3c03f4788d18f4d482ff0c4b8ec110312f73612"
+    },
+    "estimates_bc/c/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates_bc/c_ub/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "0d466cd7f1e63c27d17c89eba19ce6ecc5189e7eef2df10c31a1e524d9abd704"
+    },
+    "estimates_bc/c_ub/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates_bc/c_avg/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "eb62b96ce58ebbc7843df38edfbbe12f6cbbee0cc32a55d6b8d72c62b4cfe226"
+    },
+    "estimates_bc/c_avg/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "estimates_bc/a/values": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "fb4dc5235428bef13cbafe14eb1fb8e8a0be60eb7b0a35c4042ac5e26f253c4e"
+    },
+    "estimates_bc/a/index/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4139d54320c5d49719e98b8cd59ec2c3a5230c98f2091966bbd232645e27acd0"
+    },
+    "estimates_bc/a/index/1": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e15f0d17b87e572a2918e41ea1c1af3bbb4e32e6944f7159b41267e53718ee24"
+    },
+    "bias/b/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "5a38cbd4d15c42f616a646229a27a62ae724fe71bb1a80a14e20010b9691e62d"
+    },
+    "bias/b/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "bias/c/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "44d6320909bf6ccb3193959af046ab71c23d449c342211e8e3e60b5c63aede39"
+    },
+    "bias/c/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "bias/c_ub/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "684ea2e8e69c69a5ac2df7001b7fb0bc7bbff9155353d2fa1ff7f6929cd50ff5"
+    },
+    "bias/c_ub/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "bias/c_avg/values": {
+      "dtype": "<f8",
+      "shape": [
+        51
+      ],
+      "kind": "native",
+      "sha256": "b8228542915d067f045ebbc869619d4a2b1fe830b2a534c17759174823679ccb"
+    },
+    "bias/c_avg/index/0": {
+      "dtype": "<U11",
+      "shape": [
+        51
+      ],
+      "kind": "str_object",
+      "sha256": "82e1e6317b8a26be614853a823b2e80112eeb21b8e2abc66a2c370f60d7c825c"
+    },
+    "bias/a/values": {
+      "dtype": "<f8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "7f8782c0df2ac53c14ac89f2bb93fe0c26a196759cbef587b8ec2f10bc25b548"
+    },
+    "bias/a/index/0": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "4139d54320c5d49719e98b8cd59ec2c3a5230c98f2091966bbd232645e27acd0"
+    },
+    "bias/a/index/1": {
+      "dtype": "<i8",
+      "shape": [
+        120
+      ],
+      "kind": "native",
+      "sha256": "e15f0d17b87e572a2918e41ea1c1af3bbb4e32e6944f7159b41267e53718ee24"
+    }
+  }
+}

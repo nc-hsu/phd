@@ -1,0 +1,46 @@
+{
+  "case_id": "uni_re2x_cov2_dense",
+  "spec_class": "ModelSpec",
+  "registry": "fm.ModelRegistry(theta, specs=specs)",
+  "container": [
+    "theta"
+  ],
+  "specs": {
+    "uni_re2x_cov2_dense": {
+      "model_id": "uni_re2x_cov2_dense",
+      "contrast": "y0_avg",
+      "estimators": [
+        "REML"
+      ],
+      "components": [
+        "design",
+        "site"
+      ],
+      "covariates": [
+        "d_ln_ds595_mean_unif",
+        "d_ln_ds595_sigma_unif"
+      ],
+      "diagonal_V": false,
+      "note": "covmar baseline case uni_re2x_cov2_dense",
+      "corrected": false,
+      "bootstrap_scheme": "record"
+    }
+  },
+  "record_id": "uni_re2x_cov2_dense",
+  "hybrid_id": null,
+  "fitted_ids": [
+    "uni_re2x_cov2_dense"
+  ],
+  "results_from": {
+    "outputs_model": "uni_re2x_cov2_dense"
+  },
+  "fit_kwargs": {
+    "n_starts": 4,
+    "seed": 0,
+    "method": "cholesky",
+    "n_boot": null,
+    "boot_seed": 20261013
+  },
+  "fit_call": "registry.fit(model_id, n_boot=n_boot, boot_seed=boot_seed, n_starts=n_starts, seed=seed, method=method)",
+  "replicate_refit": "method='cholesky', one start (phd default)"
+}

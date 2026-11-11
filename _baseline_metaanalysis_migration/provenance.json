@@ -1,0 +1,62 @@
+{
+  "code": "phd",
+  "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+  "tree_clean_outside_baseline_folder": true,
+  "status_outside_baseline_folder": [],
+  "status_inside_baseline_folder": [
+    " M _baseline_metaanalysis_migration/CLAUDE.md",
+    " M _baseline_metaanalysis_migration/cases.json",
+    "?? _baseline_metaanalysis_migration/expected/",
+    "?? _baseline_metaanalysis_migration/inputs/",
+    "?? _baseline_metaanalysis_migration/phd_adapter.py"
+  ],
+  "python": "3.12.10",
+  "numpy": "2.2.6",
+  "scipy": "1.15.3",
+  "pandas": "2.2.3",
+  "date": "2026-11-10T13:58:47+01:00",
+  "study": "AvgSA_03__ks__vs__femap695",
+  "im_tag": "AvgSA_03",
+  "roots": {
+    "ss": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\ss\\AvgSA_03__ks\\bootstrapping",
+    "fx": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\fx\\femap695\\bootstrapping",
+    "study": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\studies\\AvgSA_03__ks__vs__femap695",
+    "ss_id": "AvgSA_03__ks",
+    "fx_id": "femap695"
+  },
+  "cases_json_sha256": "0bc099ef145467c974c81eb53ffdb9887b61c77b22bd7629de6551d31bf0b32b",
+  "tolerances_json_sha256": "f64608ed331590ab1396a5e183441b9fdcf5a0d918f5a1692979df4ac38eb69a",
+  "producer": "phd_adapter.py",
+  "containers": {
+    "date": "2026-11-10T15:43:25+01:00",
+    "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+    "producer": "freeze_containers.py",
+    "loaded_with": "fm.load_fragility_data(config.bootstrap_roots(cfg), 'AvgSA_03', quantity=q, verbose=False)",
+    "sha256": {
+      "containers/theta.npz": "59f06bceab5009682b9ec7bbd87497a2a4bd6e27385d3c162d9e3afb96bce07b",
+      "containers/theta.json": "d82ae4c533c81af1bd81e9bc83ae7f5cfad618eec3d98b5ce3338297cb36f74d",
+      "containers/beta.npz": "cde664cee5521a323d415a54bde79476c7173d4983c916074dc37d999335e966",
+      "containers/beta.json": "109cb463ac1f616f6ae7828adf8323f27a6886039e80b7f821f4e435979ac6f2",
+      "containers/arm_schema.json": "7d660b5f421529d50b985e8702ed0b1fbd25b64469febe7a4acb0e7bd0501710",
+      "specs/uni_re2x_int_dense.json": "66b284eb3720870571afb531441d30f697348654afda36418453f0255fc6c1a2",
+      "specs/uni_re2x_cov2_dense.json": "40251d63ff2db5aaefc3d35ac8fb191d6d4528e7d6168899b79acdc5a9471400",
+      "specs/mv_re_int_dense_all.json": "af2deefef42aa89ec3520bd26a6a7c2106b60ef26f39251733b797f871098c0b",
+      "specs/mv_re_int_dense_mixed.json": "2ee257db9fa0e905fd5a2e6b6c66bb3d3a0fb8774c22469385ed4c0a611f48dc",
+      "specs/mv_re1f_int_dense_all.json": "ff27aea7db968e5985a9ee0178b83366db8097f7343572c7d68e254333584a2a",
+      "specs/mv_re1f_int_dense_mixed.json": "def1b3542dcd25f6821e507868eff6eb1c80c3d8d4d2ba0209e7479ac3290ac5",
+      "specs/mv_re2x_int_dense_all.json": "2efb972fe33a0ff48117009d908e55899dc2a236375510e26cb5b71187e5e4b4",
+      "specs/mv_re2x_int_dense_mixed.json": "2d76f1983f2d5c7aa505cccb225300fe5010f82b9fd7b5b84afabc9426e96b13",
+      "specs/mv_re_cov2_dense_all.json": "271fe829448cbc3ecb81e6ad30be9e280d00eae327a6499d68ade525998ed2f2",
+      "specs/mv_re_cov2_dense_mixed.json": "8b262ec102d901cb8e7a3edce293c2f5ec74cf27a95a5f64f65ac2ceb35ae467",
+      "specs/mv_re1f_cov2_dense_all.json": "0a7d558503ca216a59b71235192350f83766dbc5edc445508ae415e587d24cb3",
+      "specs/mv_re1f_cov2_dense_mixed.json": "0023fa482e089d1e1eff420bd65806ea80efead2d89506104197d93466991c80",
+      "specs/mv_re2x_cov2_dense_all.json": "e5c1e19ad72944ed92109f8642ebceb7959225762047694f73cd63df9dfa8390",
+      "specs/mv_re2x_cov2_dense_mixed.json": "d4bf4b066629ffe0a829859b06179688739a8d56184c65750acc957bfc96ec55",
+      "specs/mv_re2x_int_dense_all_neldermead.json": "5a43d43bdfc13e8ab8b06ec74f9353ef37cab2c2565f11df0e181defa06fd458",
+      "specs/boot_uni_re1f_int_dense.json": "7e8b8a91e43278732998c7d7018385ff07e3363af1c724ecd01143e50b60b87a",
+      "specs/boot_mv_re2x_int_dense_all.json": "58558c102e37c1e0111f28cd13076da4d287bdc75819c500e833958d984ff3df",
+      "specs/boot_uni_re1f_int_dense_bc.json": "11c3a46a289f8056eaccb680b8b16a9839bcfc9edd86fc62b434c3855582ad70",
+      "specs/uni_re2x_cov2_dense_explicit.json": "289e3a856b86037e03631a2d1177c3507214655e0a35f5636c9d4585e4f5d397"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "case_id": "mv_re1f_cov2_dense_all",
+  "spec_class": "JointModelSpec",
+  "registry": "fm.JointModelRegistry(theta, beta, specs=specs)",
+  "container": [
+    "theta",
+    "beta"
+  ],
+  "specs": {
+    "mv_re1f_cov2_dense_all": {
+      "model_id": "mv_re1f_cov2_dense_all",
+      "contrast": "y0_avg",
+      "components": [
+        "site"
+      ],
+      "correlated": [
+        "site",
+        "row"
+      ],
+      "covariates_theta": [
+        "d_ln_ds595_mean_unif",
+        "d_ln_ds595_sigma_unif"
+      ],
+      "covariates_beta": [
+        "d_ln_ds595_mean_unif",
+        "d_ln_ds595_sigma_unif"
+      ],
+      "estimators": [
+        "REML"
+      ],
+      "note": "covmar baseline case mv_re1f_cov2_dense_all",
+      "corrected": false,
+      "bootstrap_scheme": "record"
+    }
+  },
+  "record_id": "mv_re1f_cov2_dense_all",
+  "hybrid_id": null,
+  "fitted_ids": [
+    "mv_re1f_cov2_dense_all"
+  ],
+  "results_from": {
+    "outputs_model": "mv_re1f_cov2_dense_all"
+  },
+  "fit_kwargs": {
+    "n_starts": 4,
+    "seed": 0,
+    "method": "L-BFGS-B",
+    "n_boot": null,
+    "boot_seed": 20261013
+  },
+  "fit_call": "registry.fit(model_id, n_boot=n_boot, boot_seed=boot_seed, n_starts=n_starts, seed=seed, method=method)",
+  "replicate_refit": "one start, warm-started from the full-sample T (phd default)"
+}

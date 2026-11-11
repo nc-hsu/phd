@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "case_id": "mv_re2x_int_dense_all",
+  "meta": {
+    "n_rows": 120,
+    "n_outcomes": 2,
+    "outcomes": [
+      "theta",
+      "beta"
+    ],
+    "levels": [
+      "factor1",
+      "factor2",
+      "row"
+    ],
+    "fixed": {
+      "0": [
+        "intercept"
+      ],
+      "1": [
+        "intercept"
+      ]
+    },
+    "mean_diag_V": 0.021834219117156526,
+    "covariate_scaling": {
+      "0": {},
+      "1": {}
+    },
+    "covariate_scaling_rule": "z-score over the rows of the contrast: (x - mean) / sd, sd with ddof=1; intercept unscaled (fm.build_X / fm.build_X_joint)",
+    "levels_run": [
+      "engine",
+      "model"
+    ],
+    "V": "dense",
+    "fit": {
+      "engine": "multivariate",
+      "optimiser": "L-BFGS-B",
+      "n_starts": 4,
+      "seed": 0
+    },
+    "corrected": false,
+    "loglik_definition": "loglik = -nll, where nll is the minimised objective returned by the phd fitter: 0.5 * (log|Sigma| + log|X' Sigma^-1 X| + r' Sigma^-1 r), the REML negative log-likelihood with the constant (N - p)/2 * log(2 pi) dropped. Evaluated at the optimiser's final point, BEFORE variance components below zero_tol are snapped to zero (beta and se_beta are computed after snapping).",
+    "produced_by": {
+      "code": "phd",
+      "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+      "tree_clean_outside_baseline_folder": true,
+      "status_outside_baseline_folder": [],
+      "status_inside_baseline_folder": [
+        " M _baseline_metaanalysis_migration/CLAUDE.md",
+        " M _baseline_metaanalysis_migration/cases.json",
+        "?? _baseline_metaanalysis_migration/expected/",
+        "?? _baseline_metaanalysis_migration/inputs/",
+        "?? _baseline_metaanalysis_migration/phd_adapter.py"
+      ],
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3",
+      "date": "2026-11-10T13:58:47+01:00",
+      "study": "AvgSA_03__ks__vs__femap695",
+      "im_tag": "AvgSA_03",
+      "roots": {
+        "ss": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\ss\\AvgSA_03__ks\\bootstrapping",
+        "fx": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\fx\\femap695\\bootstrapping",
+        "study": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\studies\\AvgSA_03__ks__vs__femap695",
+        "ss_id": "AvgSA_03__ks",
+        "fx_id": "femap695"
+      },
+      "cases_json_sha256": "0bc099ef145467c974c81eb53ffdb9887b61c77b22bd7629de6551d31bf0b32b",
+      "tolerances_json_sha256": "f64608ed331590ab1396a5e183441b9fdcf5a0d918f5a1692979df4ac38eb69a",
+      "producer": "phd_adapter.py"
+    },
+    "engine_diagnostics": {
+      "converged": true,
+      "start_spread": 5.002220859751105e-12
+    },
+    "model_diagnostics": {
+      "converged": true,
+      "start_spread": 5.002220859751105e-12,
+      "spec_ids": [
+        "mv_re2x_int_dense_all"
+      ],
+      "warnings": []
+    }
+  },
+  "outputs": {
+    "loglik": 404.1843464968521,
+    "beta": {
+      "0": {
+        "intercept": 0.014019181007867285
+      },
+      "1": {
+        "intercept": 0.005202776392040806
+      }
+    },
+    "se_beta": {
+      "0": {
+        "intercept": 0.018739033968035404
+      },
+      "1": {
+        "intercept": 0.044739794164204844
+      }
+    },
+    "T": {
+      "factor1": {
+        "var": [
+          6.832545542852713e-05,
+          0.001429148689896716
+        ],
+        "cov": 0.0003124855758466783,
+        "corr": 0.9999999999997651
+      },
+      "factor2": {
+        "var": [
+          0.007334098874519056,
+          0.011584844493606238
+        ],
+        "cov": -0.0001219399023907791,
+        "corr": -0.01322901041866758
+      },
+      "row": {
+        "var": [
+          0.0004881898877801158,
+          0.00011324550284903211
+        ],
+        "cov": -0.00023512828270425842,
+        "corr": -0.9999999999998364
+      }
+    },
+    "at_zero_boundary": {
+      "factor1": [
+        false,
+        false
+      ],
+      "factor2": [
+        false,
+        false
+      ],
+      "row": [
+        false,
+        false
+      ]
+    }
+  },
+  "outputs_model": {
+    "loglik": 404.1843464968521,
+    "beta": {
+      "0": {
+        "intercept": 0.014019181007867285
+      },
+      "1": {
+        "intercept": 0.005202776392040806
+      }
+    },
+    "se_beta": {
+      "0": {
+        "intercept": 0.018739033968035404
+      },
+      "1": {
+        "intercept": 0.044739794164204844
+      }
+    },
+    "T": {
+      "factor1": {
+        "var": [
+          6.832545542852713e-05,
+          0.001429148689896716
+        ],
+        "cov": 0.0003124855758466783,
+        "corr": 0.9999999999997651
+      },
+      "factor2": {
+        "var": [
+          0.007334098874519056,
+          0.011584844493606238
+        ],
+        "cov": -0.0001219399023907791,
+        "corr": -0.01322901041866758
+      },
+      "row": {
+        "var": [
+          0.0004881898877801158,
+          0.00011324550284903211
+        ],
+        "cov": -0.00023512828270425842,
+        "corr": -0.9999999999998364
+      }
+    },
+    "at_zero_boundary": {
+      "factor1": [
+        false,
+        false
+      ],
+      "factor2": [
+        false,
+        false
+      ],
+      "row": [
+        false,
+        false
+      ]
+    }
+  },
+  "engine_vs_model": {
+    "agree": true
+  },
+  "tolerance_override": {
+    "beta": {
+      "rtol": 1e-05,
+      "atol": 1e-10,
+      "default_rtol": 1e-06,
+      "noise_floor": {
+        "max_abs_diff": 3.029142147184527e-09,
+        "max_rel_diff": 5.822164780747643e-07,
+        "worst": "beta.1.intercept",
+        "n_compared": 2
+      },
+      "calibrated_by": "permutation",
+      "margin_default": 1.7505868441893808,
+      "margin_override": 17.208754620135224,
+      "margin_override_worst": "beta.1.intercept",
+      "decided_by": "user"
+    }
+  }
+}

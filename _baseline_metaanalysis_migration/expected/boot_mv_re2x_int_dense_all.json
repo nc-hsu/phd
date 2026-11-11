@@ -1,0 +1,681 @@
+{
+  "schema_version": 1,
+  "case_id": "boot_mv_re2x_int_dense_all",
+  "meta": {
+    "n_rows": 120,
+    "n_outcomes": 2,
+    "outcomes": [
+      "theta",
+      "beta"
+    ],
+    "levels": [
+      "factor1",
+      "factor2",
+      "row"
+    ],
+    "fixed": {
+      "0": [
+        "intercept"
+      ],
+      "1": [
+        "intercept"
+      ]
+    },
+    "mean_diag_V": 0.021834219117156526,
+    "covariate_scaling": {
+      "0": {},
+      "1": {}
+    },
+    "covariate_scaling_rule": "z-score over the rows of the contrast: (x - mean) / sd, sd with ddof=1; intercept unscaled (fm.build_X / fm.build_X_joint)",
+    "levels_run": [
+      "model"
+    ],
+    "V": "dense",
+    "fit": {
+      "engine": "multivariate",
+      "optimiser": "L-BFGS-B",
+      "n_starts": 4,
+      "seed": 0
+    },
+    "corrected": false,
+    "loglik_definition": "loglik = -nll, where nll is the minimised objective returned by the phd fitter: 0.5 * (log|Sigma| + log|X' Sigma^-1 X| + r' Sigma^-1 r), the REML negative log-likelihood with the constant (N - p)/2 * log(2 pi) dropped. Evaluated at the optimiser's final point, BEFORE variance components below zero_tol are snapped to zero (beta and se_beta are computed after snapping).",
+    "produced_by": {
+      "code": "phd",
+      "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+      "tree_clean_outside_baseline_folder": true,
+      "status_outside_baseline_folder": [],
+      "status_inside_baseline_folder": [
+        " M _baseline_metaanalysis_migration/CLAUDE.md",
+        " M _baseline_metaanalysis_migration/cases.json",
+        "?? _baseline_metaanalysis_migration/expected/",
+        "?? _baseline_metaanalysis_migration/inputs/",
+        "?? _baseline_metaanalysis_migration/phd_adapter.py"
+      ],
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3",
+      "date": "2026-11-10T13:58:47+01:00",
+      "study": "AvgSA_03__ks__vs__femap695",
+      "im_tag": "AvgSA_03",
+      "roots": {
+        "ss": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\ss\\AvgSA_03__ks\\bootstrapping",
+        "fx": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\fx\\femap695\\bootstrapping",
+        "study": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\studies\\AvgSA_03__ks__vs__femap695",
+        "ss_id": "AvgSA_03__ks",
+        "fx_id": "femap695"
+      },
+      "cases_json_sha256": "0bc099ef145467c974c81eb53ffdb9887b61c77b22bd7629de6551d31bf0b32b",
+      "tolerances_json_sha256": "f64608ed331590ab1396a5e183441b9fdcf5a0d918f5a1692979df4ac38eb69a",
+      "producer": "phd_adapter.py"
+    },
+    "note": "Record and hybrid bootstrap, multivariate.",
+    "model_diagnostics": {
+      "converged": true,
+      "start_spread": 5.002220859751105e-12,
+      "spec_ids": [
+        "boot_mv_re2x_int_dense_all",
+        "boot_mv_re2x_int_dense_all_hb"
+      ],
+      "warnings": []
+    },
+    "bootstrap": {
+      "schemes": [
+        "record",
+        "hybrid"
+      ],
+      "k_total": 5000,
+      "n_boot": 200,
+      "columns_used": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199
+      ],
+      "columns_rule": "the first n_boot replicate columns of the stored cloud, in order",
+      "seed": 20261013,
+      "seed_applies_to": "hybrid scheme effect draws only (record scheme has no randomness)",
+      "hybrid_noise_centring": "replicate deviations from the mean over all k_total replicates",
+      "replicate_refit": "mra.fit_reml_mv, L-BFGS-B, n_starts=1, warm-started from the full-sample T",
+      "quantile_method": "linear",
+      "sd_ddof": 1
+    }
+  },
+  "outputs": {
+    "loglik": 404.1843464968521,
+    "beta": {
+      "0": {
+        "intercept": 0.014019181007867285
+      },
+      "1": {
+        "intercept": 0.005202776392040806
+      }
+    },
+    "se_beta": {
+      "0": {
+        "intercept": 0.018739033968035404
+      },
+      "1": {
+        "intercept": 0.044739794164204844
+      }
+    },
+    "T": {
+      "factor1": {
+        "var": [
+          6.832545542852713e-05,
+          0.001429148689896716
+        ],
+        "cov": 0.0003124855758466783,
+        "corr": 0.9999999999997651
+      },
+      "factor2": {
+        "var": [
+          0.007334098874519056,
+          0.011584844493606238
+        ],
+        "cov": -0.0001219399023907791,
+        "corr": -0.01322901041866758
+      },
+      "row": {
+        "var": [
+          0.0004881898877801158,
+          0.00011324550284903211
+        ],
+        "cov": -0.00023512828270425842,
+        "corr": -0.9999999999998364
+      }
+    },
+    "at_zero_boundary": {
+      "factor1": [
+        false,
+        false
+      ],
+      "factor2": [
+        false,
+        false
+      ],
+      "row": [
+        false,
+        false
+      ]
+    }
+  },
+  "bootstrap": {
+    "record": {
+      "beta": {
+        "0": {
+          "intercept": {
+            "mean": 0.014551911374043413,
+            "sd": 0.01513884815603468,
+            "q2.5": -0.018748820203966284,
+            "q50": 0.014872880960204733,
+            "q97.5": 0.04248995703733347,
+            "n_valid": 200
+          }
+        },
+        "1": {
+          "intercept": {
+            "mean": 0.029872422020725514,
+            "sd": 0.044361616645725147,
+            "q2.5": -0.05028658830758551,
+            "q50": 0.02802463822769761,
+            "q97.5": 0.12095817776390588,
+            "n_valid": 200
+          }
+        }
+      },
+      "T": {
+        "factor1": {
+          "var": [
+            {
+              "mean": 0.000251841824802581,
+              "sd": 0.00022290886195789697,
+              "q2.5": 0.0,
+              "q50": 0.00020851522086541032,
+              "q97.5": 0.0008079405527956369,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.005630037666563018,
+              "sd": 0.004197346625169027,
+              "q2.5": 0.0,
+              "q50": 0.004981521903773536,
+              "q97.5": 0.016589997404174984,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": 0.0008160925831010237,
+            "sd": 0.0008289181431388177,
+            "q2.5": -0.0006935238421496004,
+            "q50": 0.0008088973545994184,
+            "q97.5": 0.0026887068161875077,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": 0.743916894901935,
+            "sd": 0.5878252923641758,
+            "q2.5": -0.999999999999262,
+            "q50": 0.9999999999992999,
+            "q97.5": 0.9999999999999982,
+            "n_valid": 191
+          }
+        },
+        "factor2": {
+          "var": [
+            {
+              "mean": 0.007473382533127027,
+              "sd": 0.0005392573612213993,
+              "q2.5": 0.0065365771167182375,
+              "q50": 0.007437422700174626,
+              "q97.5": 0.008554876102031457,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.015032348583497415,
+              "sd": 0.005135038450859239,
+              "q2.5": 0.005345310700683119,
+              "q50": 0.015044122737619334,
+              "q97.5": 0.0242367692861929,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": -7.314129857216413e-05,
+            "sd": 0.0014668114204088682,
+            "q2.5": -0.002915482064909144,
+            "q50": -7.442420913157026e-05,
+            "q97.5": 0.002948229479949029,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": -0.010423065186023029,
+            "sd": 0.13883429892424282,
+            "q2.5": -0.2896391527285004,
+            "q50": -0.006410834934669487,
+            "q97.5": 0.24288710521698909,
+            "n_valid": 200
+          }
+        },
+        "row": {
+          "var": [
+            {
+              "mean": 0.0009438467210975359,
+              "sd": 0.000268679547514175,
+              "q2.5": 0.0004123748382092991,
+              "q50": 0.000957834650387098,
+              "q97.5": 0.0014701550683193787,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.012631531070441229,
+              "sd": 0.006030538050023078,
+              "q2.5": 0.002180437786027307,
+              "q50": 0.012114783196716427,
+              "q97.5": 0.026197294174179903,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": -0.00038416873797018144,
+            "sd": 0.0008914574031994133,
+            "q2.5": -0.0021494340237520884,
+            "q50": -0.000248010388355536,
+            "q97.5": 0.0010860656268685404,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": -0.11028150266586981,
+            "sd": 0.31302789353104854,
+            "q2.5": -0.7124984471543357,
+            "q50": -0.08504356547461006,
+            "q97.5": 0.3965173810158735,
+            "n_valid": 200
+          }
+        }
+      }
+    },
+    "hybrid": {
+      "beta": {
+        "0": {
+          "intercept": {
+            "mean": 0.015534525180563974,
+            "sd": 0.019337156463059963,
+            "q2.5": -0.020955393648116633,
+            "q50": 0.014838060393796553,
+            "q97.5": 0.05402106092761515,
+            "n_valid": 200
+          }
+        },
+        "1": {
+          "intercept": {
+            "mean": 0.006244219746558025,
+            "sd": 0.048431923158987165,
+            "q2.5": -0.08042375018205351,
+            "q50": 0.005805243388343548,
+            "q97.5": 0.1036070397440021,
+            "n_valid": 200
+          }
+        }
+      },
+      "T": {
+        "factor1": {
+          "var": [
+            {
+              "mean": 0.00016478268569004585,
+              "sd": 0.0001856041011377008,
+              "q2.5": 0.0,
+              "q50": 9.9233734283964e-05,
+              "q97.5": 0.0006455985318030735,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.0021829794858710563,
+              "sd": 0.0024498343877222056,
+              "q2.5": 0.0,
+              "q50": 0.0013835530041239972,
+              "q97.5": 0.007689841997639712,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": 0.00022227008944140147,
+            "sd": 0.000522215430160874,
+            "q2.5": -0.0007943562202213908,
+            "q50": 0.00010996722530688923,
+            "q97.5": 0.0013578334023840876,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": 0.3681661061673566,
+            "sd": 0.8879708777800998,
+            "q2.5": -0.9999999999999913,
+            "q50": 0.9999999999970757,
+            "q97.5": 0.9999999999999972,
+            "n_valid": 172
+          }
+        },
+        "factor2": {
+          "var": [
+            {
+              "mean": 0.007403653651693466,
+              "sd": 0.0015225548172036656,
+              "q2.5": 0.005121554224398492,
+              "q50": 0.007162480397658062,
+              "q97.5": 0.011186543427852564,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.010013579895343518,
+              "sd": 0.004601696186091698,
+              "q2.5": 0.0025469296821087235,
+              "q50": 0.009741276792513145,
+              "q97.5": 0.020906183649864064,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": -0.00016292519187633995,
+            "sd": 0.0019836508592680838,
+            "q2.5": -0.003939753074763484,
+            "q50": -0.0001744155120052267,
+            "q97.5": 0.0036808746002888085,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": -0.016904821192572556,
+            "sd": 0.25954497045714514,
+            "q2.5": -0.5149489634861637,
+            "q50": -0.02084317024091853,
+            "q97.5": 0.5103390342148152,
+            "n_valid": 200
+          }
+        },
+        "row": {
+          "var": [
+            {
+              "mean": 0.00042764303849025727,
+              "sd": 0.00020592075290384393,
+              "q2.5": 5.782680793313336e-05,
+              "q50": 0.0004198316812436888,
+              "q97.5": 0.0008678488562396087,
+              "n_valid": 200
+            },
+            {
+              "mean": 0.0017243420589386294,
+              "sd": 0.0022832651014846237,
+              "q2.5": 2.6582018060721107e-06,
+              "q50": 0.0007905044165165844,
+              "q97.5": 0.007634348166845534,
+              "n_valid": 200
+            }
+          ],
+          "cov": {
+            "mean": -0.00014105377232626992,
+            "sd": 0.0005579894413377933,
+            "q2.5": -0.0011549788998763406,
+            "q50": -0.00014633403102978998,
+            "q97.5": 0.000931134917521665,
+            "n_valid": 200
+          },
+          "corr": {
+            "mean": -0.22485516667788588,
+            "sd": 0.863591955391347,
+            "q2.5": -0.9999999999999978,
+            "q50": -0.6778524053462021,
+            "q97.5": 0.9999999999999961,
+            "n_valid": 200
+          }
+        }
+      }
+    }
+  },
+  "tolerance_override": {
+    "beta": {
+      "rtol": 1e-05,
+      "atol": 1e-10,
+      "default_rtol": 1e-06,
+      "noise_floor": {
+        "max_abs_diff": 3.029142147184527e-09,
+        "max_rel_diff": 5.822164780747643e-07,
+        "worst": "beta.1.intercept",
+        "n_compared": 2
+      },
+      "calibrated_by": "permutation",
+      "margin_default": 1.7505868441893808,
+      "margin_override": 17.208754620135224,
+      "margin_override_worst": "beta.1.intercept",
+      "decided_by": "user"
+    },
+    "bootstrap.record.T": {
+      "rtol": 0.0005,
+      "atol": 1e-08,
+      "atol_scale": "mean_diag_V",
+      "default_rtol": 0.0001,
+      "noise_floor": {
+        "max_abs_diff": 1.0578752163148408e-07,
+        "max_rel_diff": 1.6282366552118466e-05,
+        "worst": "T.factor2.cov.q50",
+        "n_compared": 60
+      },
+      "calibrated_by": "permutation",
+      "margin_default": 6.321793083511591,
+      "margin_override": 30.888246536063104,
+      "margin_override_worst": "T.factor2.cov.q50",
+      "decided_by": "user"
+    },
+    "bootstrap.hybrid.T": {
+      "rtol": 0.0005,
+      "atol": 1e-08,
+      "atol_scale": "mean_diag_V",
+      "default_rtol": 0.0001,
+      "noise_floor": {
+        "max_abs_diff": 1.0578752163148408e-07,
+        "max_rel_diff": 1.6282366552118466e-05,
+        "worst": "T.factor2.cov.q50",
+        "n_compared": 60
+      },
+      "calibrated_by": "record_proxy",
+      "margin_default": 6.321793083511591,
+      "margin_override": 30.888246536063104,
+      "margin_override_worst": "T.factor2.cov.q50",
+      "decided_by": "user"
+    }
+  }
+}

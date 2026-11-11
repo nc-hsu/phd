@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "case_id": "mv_re2x_cov2_blockdiag_all",
+  "meta": {
+    "n_rows": 120,
+    "n_outcomes": 2,
+    "outcomes": [
+      "theta",
+      "beta"
+    ],
+    "levels": [
+      "factor1",
+      "factor2",
+      "row"
+    ],
+    "fixed": {
+      "0": [
+        "intercept",
+        "d_ln_ds595_mean_unif",
+        "d_ln_ds595_sigma_unif"
+      ],
+      "1": [
+        "intercept",
+        "d_ln_ds595_mean_unif",
+        "d_ln_ds595_sigma_unif"
+      ]
+    },
+    "mean_diag_V": 0.021834219117156526,
+    "covariate_scaling": {
+      "0": {
+        "d_ln_ds595_mean_unif": {
+          "mean": -0.040803501654634304,
+          "sd": 0.5954789336294397
+        },
+        "d_ln_ds595_sigma_unif": {
+          "mean": 0.012986323687261972,
+          "sd": 0.21540734035024378
+        }
+      },
+      "1": {
+        "d_ln_ds595_mean_unif": {
+          "mean": -0.040803501654634304,
+          "sd": 0.5954789336294397
+        },
+        "d_ln_ds595_sigma_unif": {
+          "mean": 0.012986323687261972,
+          "sd": 0.21540734035024378
+        }
+      }
+    },
+    "covariate_scaling_rule": "z-score over the rows of the contrast: (x - mean) / sd, sd with ddof=1; intercept unscaled (fm.build_X / fm.build_X_joint)",
+    "levels_run": [
+      "engine"
+    ],
+    "V": "blockdiag",
+    "fit": {
+      "engine": "multivariate",
+      "optimiser": "L-BFGS-B",
+      "n_starts": 4,
+      "seed": 0
+    },
+    "corrected": false,
+    "loglik_definition": "loglik = -nll, where nll is the minimised objective returned by the phd fitter: 0.5 * (log|Sigma| + log|X' Sigma^-1 X| + r' Sigma^-1 r), the REML negative log-likelihood with the constant (N - p)/2 * log(2 pi) dropped. Evaluated at the optimiser's final point, BEFORE variance components below zero_tol are snapped to zero (beta and se_beta are computed after snapping).",
+    "produced_by": {
+      "code": "phd",
+      "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+      "tree_clean_outside_baseline_folder": true,
+      "status_outside_baseline_folder": [],
+      "status_inside_baseline_folder": [
+        " M _baseline_metaanalysis_migration/CLAUDE.md",
+        " M _baseline_metaanalysis_migration/cases.json",
+        "?? _baseline_metaanalysis_migration/expected/",
+        "?? _baseline_metaanalysis_migration/inputs/",
+        "?? _baseline_metaanalysis_migration/phd_adapter.py"
+      ],
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3",
+      "date": "2026-11-10T13:58:47+01:00",
+      "study": "AvgSA_03__ks__vs__femap695",
+      "im_tag": "AvgSA_03",
+      "roots": {
+        "ss": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\ss\\AvgSA_03__ks\\bootstrapping",
+        "fx": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\fx\\femap695\\bootstrapping",
+        "study": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\studies\\AvgSA_03__ks__vs__femap695",
+        "ss_id": "AvgSA_03__ks",
+        "fx_id": "femap695"
+      },
+      "cases_json_sha256": "0bc099ef145467c974c81eb53ffdb9887b61c77b22bd7629de6551d31bf0b32b",
+      "tolerances_json_sha256": "f64608ed331590ab1396a5e183441b9fdcf5a0d918f5a1692979df4ac38eb69a",
+      "producer": "phd_adapter.py"
+    },
+    "engine_diagnostics": {
+      "converged": true,
+      "start_spread": 4.320099833421409e-12
+    }
+  },
+  "outputs": {
+    "loglik": 431.1516850046033,
+    "beta": {
+      "0": {
+        "intercept": -0.012510097982136044,
+        "d_ln_ds595_mean_unif": -0.07351046716801105,
+        "d_ln_ds595_sigma_unif": -0.0027510439709421885
+      },
+      "1": {
+        "intercept": 0.033437754440340736,
+        "d_ln_ds595_mean_unif": -0.0012723492919752485,
+        "d_ln_ds595_sigma_unif": 0.0753571751078326
+      }
+    },
+    "se_beta": {
+      "0": {
+        "intercept": 0.020354085675115503,
+        "d_ln_ds595_mean_unif": 0.006611820199582219,
+        "d_ln_ds595_sigma_unif": 0.006548718494231402
+      },
+      "1": {
+        "intercept": 0.047807632573792246,
+        "d_ln_ds595_mean_unif": 0.018512878477981783,
+        "d_ln_ds595_sigma_unif": 0.018273791300468308
+      }
+    },
+    "T": {
+      "factor1": {
+        "var": [
+          0.00021827449913560464,
+          0.00274100498151089
+        ],
+        "cov": 0.0007734930442269579,
+        "corr": 0.9999999999999999
+      },
+      "factor2": {
+        "var": [
+          0.0017008892222139245,
+          0.0056446952567618235
+        ],
+        "cov": 0.0008689599479307341,
+        "corr": 0.2804409919657698
+      },
+      "row": {
+        "var": [
+          0.00019024060433614915,
+          2.215919636706739e-05
+        ],
+        "cov": 6.49274896208121e-05,
+        "corr": 0.9999999999983823
+      }
+    },
+    "at_zero_boundary": {
+      "factor1": [
+        false,
+        false
+      ],
+      "factor2": [
+        false,
+        false
+      ],
+      "row": [
+        false,
+        false
+      ]
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "case_id": "uni_re2x_int_dense",
+  "meta": {
+    "n_rows": 120,
+    "n_outcomes": 1,
+    "outcomes": [
+      "theta"
+    ],
+    "levels": [
+      "factor1",
+      "factor2",
+      "row"
+    ],
+    "fixed": [
+      "intercept"
+    ],
+    "mean_diag_V": 0.0025223554848488967,
+    "covariate_scaling": {},
+    "covariate_scaling_rule": "z-score over the rows of the contrast: (x - mean) / sd, sd with ddof=1; intercept unscaled (fm.build_X / fm.build_X_joint)",
+    "levels_run": [
+      "engine",
+      "model"
+    ],
+    "V": "dense",
+    "fit": {
+      "engine": "univariate",
+      "objective": "cholesky",
+      "n_starts": 4,
+      "seed": 0
+    },
+    "corrected": false,
+    "loglik_definition": "loglik = -nll, where nll is the minimised objective returned by the phd fitter: 0.5 * (log|Sigma| + log|X' Sigma^-1 X| + r' Sigma^-1 r), the REML negative log-likelihood with the constant (N - p)/2 * log(2 pi) dropped. Evaluated at the optimiser's final point, BEFORE variance components below zero_tol are snapped to zero (beta and se_beta are computed after snapping).",
+    "produced_by": {
+      "code": "phd",
+      "commit": "7d5f5931af362bb73d76697b5af0ae503bca8139",
+      "tree_clean_outside_baseline_folder": true,
+      "status_outside_baseline_folder": [],
+      "status_inside_baseline_folder": [
+        " M _baseline_metaanalysis_migration/CLAUDE.md",
+        " M _baseline_metaanalysis_migration/cases.json",
+        "?? _baseline_metaanalysis_migration/expected/",
+        "?? _baseline_metaanalysis_migration/inputs/",
+        "?? _baseline_metaanalysis_migration/phd_adapter.py"
+      ],
+      "python": "3.12.10",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "pandas": "2.2.3",
+      "date": "2026-11-10T13:58:47+01:00",
+      "study": "AvgSA_03__ks__vs__femap695",
+      "im_tag": "AvgSA_03",
+      "roots": {
+        "ss": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\ss\\AvgSA_03__ks\\bootstrapping",
+        "fx": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\fx\\femap695\\bootstrapping",
+        "study": "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\10_fragility_curve_statistical_analysis\\studies\\AvgSA_03__ks__vs__femap695",
+        "ss_id": "AvgSA_03__ks",
+        "fx_id": "femap695"
+      },
+      "cases_json_sha256": "0bc099ef145467c974c81eb53ffdb9887b61c77b22bd7629de6551d31bf0b32b",
+      "tolerances_json_sha256": "f64608ed331590ab1396a5e183441b9fdcf5a0d918f5a1692979df4ac38eb69a",
+      "producer": "phd_adapter.py"
+    },
+    "engine_diagnostics": {
+      "converged": true,
+      "start_spread": 5.684341886080802e-14
+    },
+    "model_diagnostics": {
+      "converged": true,
+      "start_spread": 5.684341886080802e-14,
+      "spec_ids": [
+        "uni_re2x_int_dense"
+      ],
+      "warnings": []
+    }
+  },
+  "outputs": {
+    "loglik": 259.76337466151443,
+    "beta": {
+      "intercept": 0.006746509175621745
+    },
+    "se_beta": {
+      "intercept": 0.022786764059814817
+    },
+    "tau2": {
+      "factor1": 4.746834205660634e-05,
+      "factor2": 0.006993834279235592,
+      "row": 0.00038996286078208037
+    },
+    "at_zero_boundary": {
+      "factor1": false,
+      "factor2": false,
+      "row": false
+    }
+  },
+  "outputs_model": {
+    "loglik": 259.76337466151443,
+    "beta": {
+      "intercept": 0.006746509175621745
+    },
+    "se_beta": {
+      "intercept": 0.022786764059814817
+    },
+    "tau2": {
+      "factor1": 4.746834205660634e-05,
+      "factor2": 0.006993834279235592,
+      "row": 0.00038996286078208037
+    },
+    "at_zero_boundary": {
+      "factor1": false,
+      "factor2": false,
+      "row": false
+    }
+  },
+  "engine_vs_model": {
+    "agree": true
+  }
+}

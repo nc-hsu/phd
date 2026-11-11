@@ -1,0 +1,60 @@
+{
+  "case_id": "boot_uni_re1f_int_dense",
+  "spec_class": "ModelSpec",
+  "registry": "fm.ModelRegistry(theta, specs=specs)",
+  "container": [
+    "theta"
+  ],
+  "specs": {
+    "boot_uni_re1f_int_dense": {
+      "model_id": "boot_uni_re1f_int_dense",
+      "contrast": "y0_avg",
+      "estimators": [
+        "REML"
+      ],
+      "components": [
+        "site"
+      ],
+      "covariates": [],
+      "diagonal_V": false,
+      "note": "covmar baseline case boot_uni_re1f_int_dense",
+      "corrected": false,
+      "bootstrap_scheme": "record"
+    },
+    "boot_uni_re1f_int_dense_hb": {
+      "model_id": "boot_uni_re1f_int_dense_hb",
+      "contrast": "y0_avg",
+      "estimators": [
+        "REML"
+      ],
+      "components": [
+        "site"
+      ],
+      "covariates": [],
+      "diagonal_V": false,
+      "note": "covmar baseline case boot_uni_re1f_int_dense",
+      "corrected": false,
+      "bootstrap_scheme": "hybrid"
+    }
+  },
+  "record_id": "boot_uni_re1f_int_dense",
+  "hybrid_id": "boot_uni_re1f_int_dense_hb",
+  "fitted_ids": [
+    "boot_uni_re1f_int_dense",
+    "boot_uni_re1f_int_dense_hb"
+  ],
+  "results_from": {
+    "outputs": "boot_uni_re1f_int_dense",
+    "bootstrap.record": "boot_uni_re1f_int_dense",
+    "bootstrap.hybrid": "boot_uni_re1f_int_dense_hb"
+  },
+  "fit_kwargs": {
+    "n_starts": 4,
+    "seed": 0,
+    "method": "cholesky",
+    "n_boot": 200,
+    "boot_seed": 20261013
+  },
+  "fit_call": "registry.fit(model_id, n_boot=n_boot, boot_seed=boot_seed, n_starts=n_starts, seed=seed, method=method)",
+  "replicate_refit": "method='cholesky', one start (phd default)"
+}
