@@ -204,8 +204,3 @@ def build_correlation_matrix(periods) -> np.ndarray:
 
 def htg20_correlation_model(periods) -> pd.DataFrame:
     return build_correlation_matrix(periods)
-
-
-if __name__ == "__main__":
-    rhos = htg20_correlation_model(np.array([0.1, 0.3, 0.5, 1.0, 2, 3, 4]))
-    ...

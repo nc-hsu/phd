@@ -198,10 +198,3 @@ RSD595_SA_RHO_SSLAB = [
     (4.8, -0.042), (5.531, 0.009), (6.623, 0.021), (7.342, 0.042), (8.034, 0.05), 
     (8.568, 0.011), (10.0, 0.039)
 ]
-
-
-if __name__ == "__main__":
-
-    periods = np.linspace(0.01, 10, 30)
-    rhos = ml21_correlation_model("sinter_total", periods)
-    pass

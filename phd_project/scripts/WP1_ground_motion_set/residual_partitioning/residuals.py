@@ -253,27 +253,3 @@ def unmangle_AvgSA_column_names(column_name):
         return f"{prefix}([{x1}, {x2}]){suffix}"
     
     return column_name
-
-
-
-if __name__ == "__main__":  
-    from openquake.hazardlib.gsim.kotha_2020 import KothaEtAl2020ESHM20
-    from openquake.hazardlib.gsim.bahrampouri_2021_duration import BahrampouriEtAldm2021Asc
-    from pickagm.avgSA import indirect_AvgSA_GMPE 
-    flatfile_fp = Path(r"C:/Users/clemettn/Documents/phd/data_processed/02_im_correlation_model/reverse/flatfiles/asc_reverse_flatfile.csv")
-    residuals_fp = Path(r"C:/Users/clemettn/Documents/phd/data_processed/02_im_correlation_model/reverse/residual_partitioning/asc_reverse_total_residuals.csv")
-    gmms = {
-        "file": "",
-        "gmm_PGA_SA": KothaEtAl2020ESHM20(),
-        "gmm_RSD595": BahrampouriEtAldm2021Asc(),
-        "gmm_AvgSA": indirect_AvgSA_GMPE(KothaEtAl2020ESHM20(), mean_only=True)
-        }
-    calculate_residuals(flatfile_fp, gmms, residuals_fp)
-    pass
-
-    # test_input = "rotD50_AvgSA..0..3.._None_dBe"
-    # output = unmangle_AvgSA_column_names(test_input)
-
-    # print(f"Input:  {test_input}")
-    # print(f"Output: {output}")
-    ...

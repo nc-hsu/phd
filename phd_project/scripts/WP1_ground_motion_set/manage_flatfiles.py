@@ -638,10 +638,3 @@ def network_code_lookup(gm_db_fp, recs: pd.DataFrame) -> pd.Series:
     # empty text means "no network code" (NGA-Sub rows whose flatfile value was -999)
     net = matched["network_code"].replace("", np.nan).to_numpy()
     return pd.Series(net, index=recs.index, name="network_code")
-
-
-if __name__ == "__main__":
-    ...
-    
-
-

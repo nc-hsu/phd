@@ -61,19 +61,3 @@ def run_r_script(script_path, additional_params: list=[]):
         print(f"Execution failed with exit code {e.returncode}")
         print("--- R Error Output ---")
         print(e.stderr)
-
-
-
-if __name__ == "__main__":
-    r_script_fp = cfg["scripts"]["residual_partitioning"] / "residual_partitioning_lmer.R"
-
-    folder = str(cfg['data']['residuals']) 
-    models = ",".join(["asc", "sslab", "sinter", "vran"])
-    tails = [
-        "_total_residuals.csv",
-        "_periods.csv",
-        "_partitioned_residuals_lmer.csv",
-        "_partitioned_residuals_summary_lmer.json"
-    ]
-    additional_parameters = [folder, models] +  tails + [str(3)]
-    run_r_script(r_script_fp, additional_parameters)

@@ -194,18 +194,3 @@ def get_correlations_for_residual_dataset(residuals_filepath: Path):
     rhos["rho_total_B"] = rho_Delta_B
 
     return rhos
-
-
-
-
-
-if __name__ == "__main__":
-    from phd_project.config.config import load_config
-    cfg = load_config()
-
-    residuals_folder = cfg['data']['residuals'] 
-    tr = "asc"
-    partitioned_residuals_tail = "_partitioned_residuals_lmer.csv"
-    residuals_filepath =  residuals_folder/ f"{tr}{partitioned_residuals_tail}"
-
-    rhos = get_correlations_for_residual_dataset(residuals_filepath)

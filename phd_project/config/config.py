@@ -281,13 +281,3 @@ def setup_project(cfg: dict):
                         path.parent.mkdir(parents=True, exist_ok=True)
                     else:
                         path.mkdir(parents=True, exist_ok=True)
-
-if __name__ == "__main__":
-    # 1. Load configuration (Read-only)
-    config = load_config()
-
-    # 2. Setup environment (Side-effect - explicit)
-    setup_project(config)
-
-    # 3. Proceed with analysis
-    print(f"Project root is set to: {config['project_root']}")
