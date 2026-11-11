@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "phd_project"
 version = "0.1.0"
 description = "PhD research package"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 
 [tool.setuptools]
 packages = ["phd_project"]     # ← Tell setuptools the ONLY package
