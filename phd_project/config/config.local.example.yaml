@@ -7,8 +7,9 @@
 
 executables:
   # Full path to Rscript, used by the R residual-partitioning step (nb 002).
-  # Needed only on Windows when R's bin folder is not on the PATH; otherwise leave it out
-  # and "Rscript" is found on the PATH.
+  # Needed only on Windows when R's bin folder is not on the PATH. It must be a FULL path:
+  # a bare "Rscript" is read as a path inside the repo. To use Rscript from the PATH,
+  # leave this key out.
   rscript: "<path to Rscript.exe, e.g. C:/Program Files/R/R-4.5.2/bin/Rscript.exe>"
 
 record_sets:

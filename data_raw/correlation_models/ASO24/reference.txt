@@ -1,0 +1,11 @@
+The correlation model in this folder is that described in the paper:
+Aristeidou, S., Shahnazaryan, D. and O'Reilly, G.J. (2024). Correlation models for
+next-generation amplitude and cumulative intensity measures using artificial neural networks.
+Earthquake Spectra. https://doi.org/10.1177/87552930241270563
+
+The authors' code for evaluating the model: https://github.com/Savvinos-Aristeidou/ANN_correlation_models
+
+aso24_correlations.csv holds the ANN-predicted correlation coefficients between SA(T) at the
+SA periods of the CG26 model, RSD595 (Ds595) and Sa_avg3 at T = 1 s and 2 s. It is written by
+phd_project/scripts/WP1_ground_motion_set/correlationmodels/export_aso24_correlations.py
+(see the top of that script for how to run it) and read by nb 002.

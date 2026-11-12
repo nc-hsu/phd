@@ -1,0 +1,1215 @@
+{
+  "created": "2026-11-11T13:19:57+01:00",
+  "task": "dump/tasks_and_plans/task_20261111_asc_flatfile_filter_bug_check.md",
+  "git": {
+    "commit": "0decdb002c37afebd928038c9712da1f25312756",
+    "status_porcelain": [
+      " M notebooks/03_WP1_ground_motion_set/002-im_correlations.ipynb",
+      " M notebooks/03_WP1_ground_motion_set/README.md",
+      " M phd_project/config/config.yaml",
+      " M phd_project/scripts/WP1_ground_motion_set/correlation.py",
+      " M phd_project/scripts/WP1_ground_motion_set/manage_flatfiles.py",
+      " M phd_project/scripts/run_r_code.py",
+      "?? data_raw/correlation_models/ASO24/",
+      "?? data_raw/eshm20_trt_record_ids/",
+      "?? notebooks/03_WP1_ground_motion_set/002a-correlation_model_hdf5_files.ipynb",
+      "?? notebooks/03_WP1_ground_motion_set/002b-comparison_with_eshm20_digitised_correlations.ipynb",
+      "?? notebooks/03_WP1_ground_motion_set/002c-extract_gfz_esm_record_ids.ipynb",
+      "?? phd_project/scripts/WP1_ground_motion_set/correlationmodels/export_aso24_correlations.py",
+      "?? tests/test_run_r_code.py"
+    ]
+  },
+  "versions": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "pandas": "2.2.3",
+    "numpy": "2.2.6",
+    "openquake": "3.27.0",
+    "R": "R version 4.5.2 (2025-10-31 ucrt)",
+    "lme4": "1.1.38"
+  },
+  "code_sha256": {
+    "phd_project/scripts/WP1_ground_motion_set/manage_flatfiles.py": "c8e0944b44186a128e3b5fac9985a7af8d060810a5da81e4a7b7cf119306606f",
+    "notebooks/03_WP1_ground_motion_set/002-im_correlations.ipynb": "62b489e5a5054f61a3ff034a493e34df14881d50d97c7d5d98ae3e35b7a2b06e"
+  },
+  "files": [
+    {
+      "path": "data_processed/normal/flatfiles/asc_normal_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/normal/flatfiles/asc_normal_flatfile.csv",
+      "size_bytes": 54242849,
+      "mtime": "2026-10-02T11:00:21.977974+02:00",
+      "sha256": "3a6b84f5fb09e47e2d14be22e1f57212576b7fce9a51a83b75ae2715323eb021"
+    },
+    {
+      "path": "data_processed/normal/flatfiles/sinter_normal_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/normal/flatfiles/sinter_normal_flatfile.csv",
+      "size_bytes": 1613712,
+      "mtime": "2026-10-02T11:00:18.195256+02:00",
+      "sha256": "618d879da51aa2b412c66355563a2c42becea257a62aefd001298c3683259ea2"
+    },
+    {
+      "path": "data_processed/normal/flatfiles/sslab_normal_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/normal/flatfiles/sslab_normal_flatfile.csv",
+      "size_bytes": 1846086,
+      "mtime": "2026-10-02T11:00:18.108001+02:00",
+      "sha256": "61d2533490ba1cb7a80703348a6b89211b88cc985f71ac348e2f50a94eee6fb0"
+    },
+    {
+      "path": "data_processed/normal/flatfiles/vran_normal_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/normal/flatfiles/vran_normal_flatfile.csv",
+      "size_bytes": 1903191,
+      "mtime": "2026-10-02T11:00:18.307109+02:00",
+      "sha256": "6d62a76c44ec1aba6d9b3c3f3dee2aa2a28035f811b6ecf117bec332db1a0d36"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/asc_normal_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/asc_normal_partitioned_residuals_lmer.csv",
+      "size_bytes": 52095927,
+      "mtime": "2026-03-27T11:58:36.379923+01:00",
+      "sha256": "7c1ecd9dfcdb1cfcc7643e074060b5bfed4aaa022c6013d6ac7b6507867de1ea"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/asc_normal_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/asc_normal_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12538,
+      "mtime": "2026-03-27T11:58:37.259469+01:00",
+      "sha256": "892cafda508ca8653a1cbdc92a3699d89814f22260fa8f84c096c0e96a71a51d"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/asc_normal_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/asc_normal_total_residuals.csv",
+      "size_bytes": 14485629,
+      "mtime": "2026-03-27T11:54:41.012122+01:00",
+      "sha256": "06e4c60c36815a4a358f3c86fcaee59cc5719bce438337f581fcb6443eb49024"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sinter_normal_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sinter_normal_partitioned_residuals_lmer.csv",
+      "size_bytes": 1516804,
+      "mtime": "2026-03-27T11:58:36.731204+01:00",
+      "sha256": "0fb25a7ede3e6abaf1a3886cb1d6932dac3eedc40a09c4edeb48b23419ce2e36"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sinter_normal_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sinter_normal_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12353,
+      "mtime": "2026-03-27T11:58:37.264282+01:00",
+      "sha256": "18dc939c4bb66116b6edf3e6df83916ddf9fba65b750d0c4cefc65b53ec3a165"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sinter_normal_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sinter_normal_total_residuals.csv",
+      "size_bytes": 426150,
+      "mtime": "2026-03-27T11:54:41.657388+01:00",
+      "sha256": "bce3880d81ea1264ba3284bb31c71d2d706f53d1f9c486e6991090f69a1ee240"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sslab_normal_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sslab_normal_partitioned_residuals_lmer.csv",
+      "size_bytes": 1733541,
+      "mtime": "2026-03-27T11:58:36.963954+01:00",
+      "sha256": "911040d423b7da6ab2e35682a8a17b6f8ee394a05906361d953c6e1a5c01c509"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sslab_normal_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sslab_normal_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12387,
+      "mtime": "2026-03-27T11:58:37.276160+01:00",
+      "sha256": "3b4e375b202a3ac89b74c42f684720a3a931c63fd60eed6c8ea477bec130776d"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/sslab_normal_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/sslab_normal_total_residuals.csv",
+      "size_bytes": 488940,
+      "mtime": "2026-03-27T11:54:41.357142+01:00",
+      "sha256": "7ab17f5b687023b0ea7deb5bd773d8deffb2eb4cb69b3efe4beb9863605f39d5"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/vran_normal_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/vran_normal_partitioned_residuals_lmer.csv",
+      "size_bytes": 1796302,
+      "mtime": "2026-03-27T11:58:37.255098+01:00",
+      "sha256": "30fa711289f7992aee101f8036b8ab2bf7afbc3e85f56d0f0598a36b33a79961"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/vran_normal_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/vran_normal_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12333,
+      "mtime": "2026-03-27T11:58:37.313761+01:00",
+      "sha256": "5524a1a124d3da6fa7527a77c2c69ffa1f2fe52577cb8986e4175f12fcab7224"
+    },
+    {
+      "path": "data_processed/normal/residual_partitioning/vran_normal_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/normal/residual_partitioning/vran_normal_total_residuals.csv",
+      "size_bytes": 511473,
+      "mtime": "2026-03-27T11:54:42.036575+01:00",
+      "sha256": "8ab94487e44de24e07eeb81ea50a96cc41f82ceaca81688514031f617e91270a"
+    },
+    {
+      "path": "data_processed/normal/correlations/asc_normal_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/asc_normal_rho_dBe.csv",
+      "size_bytes": 28094,
+      "mtime": "2026-03-27T11:58:54.999768+01:00",
+      "sha256": "fc79156dd13eedf54209369b9a102dab0fff877cf142de8820a0f44be01565e6"
+    },
+    {
+      "path": "data_processed/normal/correlations/asc_normal_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/asc_normal_rho_dS2Ss.csv",
+      "size_bytes": 28098,
+      "mtime": "2026-03-27T11:58:55.004491+01:00",
+      "sha256": "096e776046622b60daedb0920ba0371ec50009cc1723e69da1a5741edadafb97"
+    },
+    {
+      "path": "data_processed/normal/correlations/asc_normal_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/asc_normal_rho_dWSes.csv",
+      "size_bytes": 28132,
+      "mtime": "2026-03-27T11:58:55.009094+01:00",
+      "sha256": "d20b5916f84d007ab584a3c69da52a596a0934e090ff01f076418042fb37a5ee"
+    },
+    {
+      "path": "data_processed/normal/correlations/asc_normal_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/asc_normal_rho_total.csv",
+      "size_bytes": 28685,
+      "mtime": "2026-03-27T11:58:54.994196+01:00",
+      "sha256": "aff6b0333305653d7d90dc8f78d7a673558ecc7cf88a5a5781c83be44d9e4501"
+    },
+    {
+      "path": "data_processed/normal/correlations/asc_normal_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/asc_normal_rho_total_B.csv",
+      "size_bytes": 28134,
+      "mtime": "2026-03-27T11:58:55.011977+01:00",
+      "sha256": "00fbb6f49cf54def4dc9f652782eae125a240b52f94e838f7ff4aff6cb09da07"
+    },
+    {
+      "path": "data_processed/normal/correlations/sinter_normal_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sinter_normal_rho_dBe.csv",
+      "size_bytes": 28106,
+      "mtime": "2026-03-27T11:58:55.234727+01:00",
+      "sha256": "7664af47426b9ca69d21fe607327f46ab2f71fea51628a5b546ffe696bef1f4d"
+    },
+    {
+      "path": "data_processed/normal/correlations/sinter_normal_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sinter_normal_rho_dS2Ss.csv",
+      "size_bytes": 28010,
+      "mtime": "2026-03-27T11:58:55.240129+01:00",
+      "sha256": "4c9d56afabbec585547d6ea1f67642384e96597abda079e0f0e193e1daa1df30"
+    },
+    {
+      "path": "data_processed/normal/correlations/sinter_normal_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sinter_normal_rho_dWSes.csv",
+      "size_bytes": 28230,
+      "mtime": "2026-03-27T11:58:55.243491+01:00",
+      "sha256": "6212bda394e371b0bac1fb8d684ebee92d814a9762cc410d2e8f281c13540381"
+    },
+    {
+      "path": "data_processed/normal/correlations/sinter_normal_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sinter_normal_rho_total.csv",
+      "size_bytes": 28532,
+      "mtime": "2026-03-27T11:58:55.228938+01:00",
+      "sha256": "55ef32fafd9b9183c9fee5f1389e9b24d117603b456f58c9d884f8efc9db3fd4"
+    },
+    {
+      "path": "data_processed/normal/correlations/sinter_normal_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sinter_normal_rho_total_B.csv",
+      "size_bytes": 28024,
+      "mtime": "2026-03-27T11:58:55.246978+01:00",
+      "sha256": "91c18feed0c651480312f008feb02629227894ef1bd17d22339e129169f0abca"
+    },
+    {
+      "path": "data_processed/normal/correlations/sslab_normal_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sslab_normal_rho_dBe.csv",
+      "size_bytes": 28032,
+      "mtime": "2026-03-27T11:58:55.112828+01:00",
+      "sha256": "4db2cda51b7c7a98388c478c85017c5dbfd5e773928094036ae66678e31c7e10"
+    },
+    {
+      "path": "data_processed/normal/correlations/sslab_normal_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sslab_normal_rho_dS2Ss.csv",
+      "size_bytes": 28022,
+      "mtime": "2026-03-27T11:58:55.120034+01:00",
+      "sha256": "2fef62839df4457ab4df02054fa136c2e014f9c207a00da23e74b8fe4f17bb3d"
+    },
+    {
+      "path": "data_processed/normal/correlations/sslab_normal_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sslab_normal_rho_dWSes.csv",
+      "size_bytes": 28106,
+      "mtime": "2026-03-27T11:58:55.128677+01:00",
+      "sha256": "bc907856a55193cf0acc51924cebf05effad40933c5c8e5b6ac5e782681402d8"
+    },
+    {
+      "path": "data_processed/normal/correlations/sslab_normal_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sslab_normal_rho_total.csv",
+      "size_bytes": 28482,
+      "mtime": "2026-03-27T11:58:55.109808+01:00",
+      "sha256": "aab10f29d2f11aef39672466373e1e367a067bcbd8e102d5733ec4da35629284"
+    },
+    {
+      "path": "data_processed/normal/correlations/sslab_normal_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/sslab_normal_rho_total_B.csv",
+      "size_bytes": 27960,
+      "mtime": "2026-03-27T11:58:55.136949+01:00",
+      "sha256": "d8905aa997661ead97ee7cc3d268bd21b2d47bf4bd3793441ff2419064483863"
+    },
+    {
+      "path": "data_processed/normal/correlations/vran_normal_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/vran_normal_rho_dBe.csv",
+      "size_bytes": 27988,
+      "mtime": "2026-03-27T11:58:55.345993+01:00",
+      "sha256": "f374fc390c565d977daf2f21072d9bdd1e20dbeb62ae2d6aa5fefaa24a242573"
+    },
+    {
+      "path": "data_processed/normal/correlations/vran_normal_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/vran_normal_rho_dS2Ss.csv",
+      "size_bytes": 28026,
+      "mtime": "2026-03-27T11:58:55.350597+01:00",
+      "sha256": "3c8d06f7b324aa893d088e2611fefdc274b72f68f1c5bce1743efba499382012"
+    },
+    {
+      "path": "data_processed/normal/correlations/vran_normal_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/vran_normal_rho_dWSes.csv",
+      "size_bytes": 27930,
+      "mtime": "2026-03-27T11:58:55.354089+01:00",
+      "sha256": "4a29f1808b1dbafb648de575a6ce9e8079127ed858135b72a2bce13860fb098f"
+    },
+    {
+      "path": "data_processed/normal/correlations/vran_normal_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/vran_normal_rho_total.csv",
+      "size_bytes": 28477,
+      "mtime": "2026-03-27T11:58:55.343985+01:00",
+      "sha256": "231204795c8cee3e431e88ed091b34c8f08e6c24da31dcdea8d2d77923ddb5ca"
+    },
+    {
+      "path": "data_processed/normal/correlations/vran_normal_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/normal/correlations/vran_normal_rho_total_B.csv",
+      "size_bytes": 28026,
+      "mtime": "2026-03-27T11:58:55.359701+01:00",
+      "sha256": "8ffd540d6e836a23e146a8d537dd455cad0747601b9553f00f5f8f0cfe607977"
+    },
+    {
+      "path": "results/normal/asc_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/normal/asc_rho_dBe_PD.csv",
+      "size_bytes": 28111,
+      "mtime": "2026-03-27T12:00:14.542927+01:00",
+      "sha256": "624c00f4c214d5f1e4cc27ed831b7aabe00ac7d52ab0456261eccca74937e581"
+    },
+    {
+      "path": "results/normal/asc_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/normal/asc_rho_dS2Ss_PD.csv",
+      "size_bytes": 28584,
+      "mtime": "2026-03-27T12:00:14.552571+01:00",
+      "sha256": "a1760241cfa8a24f60128c30975f1fa8d0e16d697bb903220173e93cb23865a5"
+    },
+    {
+      "path": "results/normal/asc_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/normal/asc_rho_dWSes_PD.csv",
+      "size_bytes": 28662,
+      "mtime": "2026-03-27T12:00:14.563211+01:00",
+      "sha256": "6ea4ea6811d2c425b989f8396e659ce52515542dcde05e4239daaf0c7a9fecae"
+    },
+    {
+      "path": "results/normal/asc_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/normal/asc_rho_total_B_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.573781+01:00",
+      "sha256": "17d86835fcf9503d2b9d8346966994b98b4df2d17e566896d52c9366bba3f043"
+    },
+    {
+      "path": "results/normal/asc_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/normal/asc_rho_total_PD.csv",
+      "size_bytes": 28694,
+      "mtime": "2026-03-27T12:00:14.531949+01:00",
+      "sha256": "19ef2eb4cc1a71548e353980a562dab06d60ba43ef42241968c34d3d5ae6bb52"
+    },
+    {
+      "path": "results/normal/sinter_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sinter_rho_dBe_PD.csv",
+      "size_bytes": 28088,
+      "mtime": "2026-03-27T12:00:14.667074+01:00",
+      "sha256": "5c93db8f07c8dfbcfc31a2ab57c756192cf9c81cf1d044388f14095a44812f07"
+    },
+    {
+      "path": "results/normal/sinter_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sinter_rho_dS2Ss_PD.csv",
+      "size_bytes": 28008,
+      "mtime": "2026-03-27T12:00:14.682360+01:00",
+      "sha256": "a292a6801a0172213cc7102457651b3732ac1066517b3fdc4c49ec39058b7b37"
+    },
+    {
+      "path": "results/normal/sinter_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sinter_rho_dWSes_PD.csv",
+      "size_bytes": 28762,
+      "mtime": "2026-03-27T12:00:14.696035+01:00",
+      "sha256": "bae6e665c7cc9c8741cd0f25a5cb332183fe8ffc1fa646c5442ff17a930afbbf"
+    },
+    {
+      "path": "results/normal/sinter_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sinter_rho_total_B_PD.csv",
+      "size_bytes": 28085,
+      "mtime": "2026-03-27T12:00:14.708743+01:00",
+      "sha256": "3bc3fb57ba539be2a3536e717b8a6e7fc9bbd703281781d3c7026e8cd0a90eb6"
+    },
+    {
+      "path": "results/normal/sinter_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sinter_rho_total_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.649748+01:00",
+      "sha256": "558fcc283a94a537de189b70a1bf6f0c7b6b7a8c94b9c780b1a39667a7225453"
+    },
+    {
+      "path": "results/normal/sslab_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sslab_rho_dBe_PD.csv",
+      "size_bytes": 28055,
+      "mtime": "2026-03-27T12:00:14.595832+01:00",
+      "sha256": "edd308594f1b86b4ad2a750145b4ab708b207f612a54ac6021996741f6dc9ee1"
+    },
+    {
+      "path": "results/normal/sslab_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sslab_rho_dS2Ss_PD.csv",
+      "size_bytes": 28005,
+      "mtime": "2026-03-27T12:00:14.608886+01:00",
+      "sha256": "c2b99c3cd8e700de0c181c5d8054395f57b14a4c8476065ebf74d6a22034d339"
+    },
+    {
+      "path": "results/normal/sslab_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sslab_rho_dWSes_PD.csv",
+      "size_bytes": 28558,
+      "mtime": "2026-03-27T12:00:14.622416+01:00",
+      "sha256": "f8a675fd6973e315b2a8cd5ab8684359555082c6c9532fe52ec7151287123c91"
+    },
+    {
+      "path": "results/normal/sslab_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sslab_rho_total_B_PD.csv",
+      "size_bytes": 28021,
+      "mtime": "2026-03-27T12:00:14.634126+01:00",
+      "sha256": "2d8a983d311dacc86d4e96986237f42136c10dcbbc44cee322dfa83c14100e9d"
+    },
+    {
+      "path": "results/normal/sslab_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/normal/sslab_rho_total_PD.csv",
+      "size_bytes": 28549,
+      "mtime": "2026-03-27T12:00:14.584262+01:00",
+      "sha256": "39b823c90346486b1c44d9b2190e85404f8c223bf0ddd3179eec248c0e30f3b3"
+    },
+    {
+      "path": "results/normal/vran_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/normal/vran_rho_dBe_PD.csv",
+      "size_bytes": 27983,
+      "mtime": "2026-03-27T12:00:14.730297+01:00",
+      "sha256": "e82516883400ff570c6bfae8a22245561218234499189e7a637680407b61bbbe"
+    },
+    {
+      "path": "results/normal/vran_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/normal/vran_rho_dS2Ss_PD.csv",
+      "size_bytes": 27978,
+      "mtime": "2026-03-27T12:00:14.742897+01:00",
+      "sha256": "f8ac965c510b4579ccba75014432e700d133f5629f6d4facb87cd4bd9a2aa94a"
+    },
+    {
+      "path": "results/normal/vran_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/normal/vran_rho_dWSes_PD.csv",
+      "size_bytes": 28522,
+      "mtime": "2026-03-27T12:00:14.754562+01:00",
+      "sha256": "55f3d9366d6912b65b7f65b703e9e1d8c743f0f792a4902d352aabe0e3e4568f"
+    },
+    {
+      "path": "results/normal/vran_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/normal/vran_rho_total_B_PD.csv",
+      "size_bytes": 27984,
+      "mtime": "2026-03-27T12:00:14.765514+01:00",
+      "sha256": "249c0af4cc299c08e7319df88058132a8b4ceba08a8ba70c7efb206bad5d1d81"
+    },
+    {
+      "path": "results/normal/vran_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/normal/vran_rho_total_PD.csv",
+      "size_bytes": 28509,
+      "mtime": "2026-03-27T12:00:14.719063+01:00",
+      "sha256": "f2b11e6f0ef9887a38b9a3fc2381e007ff9f39dcfc681b3fdca541c7a5b90011"
+    },
+    {
+      "path": "data_processed/reverse/flatfiles/asc_reverse_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/flatfiles/asc_reverse_flatfile.csv",
+      "size_bytes": 54242849,
+      "mtime": "2026-10-02T11:00:18.006315+02:00",
+      "sha256": "3a6b84f5fb09e47e2d14be22e1f57212576b7fce9a51a83b75ae2715323eb021"
+    },
+    {
+      "path": "data_processed/reverse/flatfiles/sinter_reverse_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/flatfiles/sinter_reverse_flatfile.csv",
+      "size_bytes": 1613460,
+      "mtime": "2026-10-02T11:00:14.937045+02:00",
+      "sha256": "0f072e7997ddbd167e4d894038b7f9da0cf027e06b983df11fb24acac4ee31fc"
+    },
+    {
+      "path": "data_processed/reverse/flatfiles/sslab_reverse_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/flatfiles/sslab_reverse_flatfile.csv",
+      "size_bytes": 1846019,
+      "mtime": "2026-10-02T11:00:14.767355+02:00",
+      "sha256": "f1ee0a6d0f7e80650dbc13f87ad53fccca26bc2901baa2a335b06a78e8f1d556"
+    },
+    {
+      "path": "data_processed/reverse/flatfiles/vran_reverse_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/flatfiles/vran_reverse_flatfile.csv",
+      "size_bytes": 1903077,
+      "mtime": "2026-10-02T11:00:15.100320+02:00",
+      "sha256": "c35952f9dae77acaa6a638e17e163c2fe6c36f7e2b071e15cd22c8eb496d9145"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/asc_reverse_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/asc_reverse_partitioned_residuals_lmer.csv",
+      "size_bytes": 52095927,
+      "mtime": "2026-03-27T11:58:27.606740+01:00",
+      "sha256": "7c1ecd9dfcdb1cfcc7643e074060b5bfed4aaa022c6013d6ac7b6507867de1ea"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/asc_reverse_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/asc_reverse_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12538,
+      "mtime": "2026-03-27T11:58:27.946824+01:00",
+      "sha256": "892cafda508ca8653a1cbdc92a3699d89814f22260fa8f84c096c0e96a71a51d"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/asc_reverse_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/asc_reverse_total_residuals.csv",
+      "size_bytes": 14485629,
+      "mtime": "2026-03-27T11:54:28.399064+01:00",
+      "sha256": "06e4c60c36815a4a358f3c86fcaee59cc5719bce438337f581fcb6443eb49024"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sinter_reverse_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sinter_reverse_partitioned_residuals_lmer.csv",
+      "size_bytes": 1516804,
+      "mtime": "2026-03-27T11:58:27.708460+01:00",
+      "sha256": "0fb25a7ede3e6abaf1a3886cb1d6932dac3eedc40a09c4edeb48b23419ce2e36"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sinter_reverse_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sinter_reverse_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12353,
+      "mtime": "2026-03-27T11:58:27.948888+01:00",
+      "sha256": "18dc939c4bb66116b6edf3e6df83916ddf9fba65b750d0c4cefc65b53ec3a165"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sinter_reverse_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sinter_reverse_total_residuals.csv",
+      "size_bytes": 426150,
+      "mtime": "2026-03-27T11:54:29.226767+01:00",
+      "sha256": "bce3880d81ea1264ba3284bb31c71d2d706f53d1f9c486e6991090f69a1ee240"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sslab_reverse_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sslab_reverse_partitioned_residuals_lmer.csv",
+      "size_bytes": 1733561,
+      "mtime": "2026-03-27T11:58:27.821205+01:00",
+      "sha256": "4f095f5e5a22c5712ef753be83ba478611cce8cf1345fb0be3278af3b945333b"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sslab_reverse_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sslab_reverse_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12387,
+      "mtime": "2026-03-27T11:58:27.951774+01:00",
+      "sha256": "327fe3282dbd5e82ae067538933c2f293e24b344a5544747067da29dc3a0ccfe"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/sslab_reverse_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/sslab_reverse_total_residuals.csv",
+      "size_bytes": 488954,
+      "mtime": "2026-03-27T11:54:28.750454+01:00",
+      "sha256": "249c4d93f02cfa47f66767b7daa4b23b4f460939616abf947e4892fb1d665c1d"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/vran_reverse_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/vran_reverse_partitioned_residuals_lmer.csv",
+      "size_bytes": 1796289,
+      "mtime": "2026-03-27T11:58:27.944250+01:00",
+      "sha256": "e7c8a541b8c36f7a7311ce32b3c297a9dd7969f9d44bdfe5a8d033b05029a591"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/vran_reverse_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/vran_reverse_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12335,
+      "mtime": "2026-03-27T11:58:27.955174+01:00",
+      "sha256": "97086832fa845a4134e5c20843ab0931071407485c6b26e9247044b97d362928"
+    },
+    {
+      "path": "data_processed/reverse/residual_partitioning/vran_reverse_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/residual_partitioning/vran_reverse_total_residuals.csv",
+      "size_bytes": 511484,
+      "mtime": "2026-03-27T11:54:29.599332+01:00",
+      "sha256": "5db4ab6d1ff75b96454a3fc76d5523a3f3522ef8da353f446fd11409190bac91"
+    },
+    {
+      "path": "data_processed/reverse/correlations/asc_reverse_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_dBe.csv",
+      "size_bytes": 28094,
+      "mtime": "2026-03-27T11:58:53.682337+01:00",
+      "sha256": "fc79156dd13eedf54209369b9a102dab0fff877cf142de8820a0f44be01565e6"
+    },
+    {
+      "path": "data_processed/reverse/correlations/asc_reverse_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_dS2Ss.csv",
+      "size_bytes": 28098,
+      "mtime": "2026-03-27T11:58:53.685655+01:00",
+      "sha256": "096e776046622b60daedb0920ba0371ec50009cc1723e69da1a5741edadafb97"
+    },
+    {
+      "path": "data_processed/reverse/correlations/asc_reverse_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_dWSes.csv",
+      "size_bytes": 28132,
+      "mtime": "2026-03-27T11:58:53.689743+01:00",
+      "sha256": "d20b5916f84d007ab584a3c69da52a596a0934e090ff01f076418042fb37a5ee"
+    },
+    {
+      "path": "data_processed/reverse/correlations/asc_reverse_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_total.csv",
+      "size_bytes": 28685,
+      "mtime": "2026-03-27T11:58:53.677733+01:00",
+      "sha256": "aff6b0333305653d7d90dc8f78d7a673558ecc7cf88a5a5781c83be44d9e4501"
+    },
+    {
+      "path": "data_processed/reverse/correlations/asc_reverse_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_total_B.csv",
+      "size_bytes": 28134,
+      "mtime": "2026-03-27T11:58:53.695167+01:00",
+      "sha256": "00fbb6f49cf54def4dc9f652782eae125a240b52f94e838f7ff4aff6cb09da07"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sinter_reverse_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sinter_reverse_rho_dBe.csv",
+      "size_bytes": 28106,
+      "mtime": "2026-03-27T11:58:53.855385+01:00",
+      "sha256": "7664af47426b9ca69d21fe607327f46ab2f71fea51628a5b546ffe696bef1f4d"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sinter_reverse_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sinter_reverse_rho_dS2Ss.csv",
+      "size_bytes": 28010,
+      "mtime": "2026-03-27T11:58:53.859115+01:00",
+      "sha256": "4c9d56afabbec585547d6ea1f67642384e96597abda079e0f0e193e1daa1df30"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sinter_reverse_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sinter_reverse_rho_dWSes.csv",
+      "size_bytes": 28230,
+      "mtime": "2026-03-27T11:58:53.861508+01:00",
+      "sha256": "6212bda394e371b0bac1fb8d684ebee92d814a9762cc410d2e8f281c13540381"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sinter_reverse_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sinter_reverse_rho_total.csv",
+      "size_bytes": 28532,
+      "mtime": "2026-03-27T11:58:53.852065+01:00",
+      "sha256": "55ef32fafd9b9183c9fee5f1389e9b24d117603b456f58c9d884f8efc9db3fd4"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sinter_reverse_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sinter_reverse_rho_total_B.csv",
+      "size_bytes": 28024,
+      "mtime": "2026-03-27T11:58:53.863526+01:00",
+      "sha256": "91c18feed0c651480312f008feb02629227894ef1bd17d22339e129169f0abca"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sslab_reverse_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sslab_reverse_rho_dBe.csv",
+      "size_bytes": 28030,
+      "mtime": "2026-03-27T11:58:53.776663+01:00",
+      "sha256": "5d8c9b3674b5c835f9b42c10bf2e486e5692fd1b16b7ceac65b21fc04adc245a"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sslab_reverse_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sslab_reverse_rho_dS2Ss.csv",
+      "size_bytes": 28022,
+      "mtime": "2026-03-27T11:58:53.779735+01:00",
+      "sha256": "6fecc04d60699a71fb165455877da9c5cc25ae729532d563738c064821ef3487"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sslab_reverse_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sslab_reverse_rho_dWSes.csv",
+      "size_bytes": 28100,
+      "mtime": "2026-03-27T11:58:53.783031+01:00",
+      "sha256": "d4aaaf7934df2a0621d063600bb78e86e05ab0a59aa83725897d34c46a37831a"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sslab_reverse_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sslab_reverse_rho_total.csv",
+      "size_bytes": 28495,
+      "mtime": "2026-03-27T11:58:53.771347+01:00",
+      "sha256": "391f90e08641164de9b94b67c1cdc489313462e1feb037fdd5dc8cbabf06a323"
+    },
+    {
+      "path": "data_processed/reverse/correlations/sslab_reverse_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/sslab_reverse_rho_total_B.csv",
+      "size_bytes": 27958,
+      "mtime": "2026-03-27T11:58:53.786283+01:00",
+      "sha256": "e7b42af75d74ff80e1d78120dcb3bc7ccc8280e5f8b8913b5be128b0930a00ad"
+    },
+    {
+      "path": "data_processed/reverse/correlations/vran_reverse_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/vran_reverse_rho_dBe.csv",
+      "size_bytes": 27998,
+      "mtime": "2026-03-27T11:58:53.952443+01:00",
+      "sha256": "b9156fb07790e8b23b3942911897e77b3dfb32652ad60b53b0b6273fb9b11361"
+    },
+    {
+      "path": "data_processed/reverse/correlations/vran_reverse_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/vran_reverse_rho_dS2Ss.csv",
+      "size_bytes": 28024,
+      "mtime": "2026-03-27T11:58:53.957671+01:00",
+      "sha256": "aa32ad4e6e2785b4052df44f07565323f221c9ce3e37f165cec4eecc8064b61e"
+    },
+    {
+      "path": "data_processed/reverse/correlations/vran_reverse_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/vran_reverse_rho_dWSes.csv",
+      "size_bytes": 27930,
+      "mtime": "2026-03-27T11:58:53.961241+01:00",
+      "sha256": "482b7a7b84bbf2a932d9d0c71bbc18fea015ba71005a528f9e630a1fc405d06d"
+    },
+    {
+      "path": "data_processed/reverse/correlations/vran_reverse_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/vran_reverse_rho_total.csv",
+      "size_bytes": 28487,
+      "mtime": "2026-03-27T11:58:53.949129+01:00",
+      "sha256": "287fd80c2b922b3e30771437aa9988f93f8492b0d2c1210978340cc3e6b3f27b"
+    },
+    {
+      "path": "data_processed/reverse/correlations/vran_reverse_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/reverse/correlations/vran_reverse_rho_total_B.csv",
+      "size_bytes": 28022,
+      "mtime": "2026-03-27T11:58:53.964460+01:00",
+      "sha256": "85123fdef4294b55ce6abc4c7a98108c4a3308e22deeec41b13fbbaeea1d518b"
+    },
+    {
+      "path": "results/reverse/asc_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/asc_rho_dBe_PD.csv",
+      "size_bytes": 28111,
+      "mtime": "2026-03-27T12:00:14.391244+01:00",
+      "sha256": "624c00f4c214d5f1e4cc27ed831b7aabe00ac7d52ab0456261eccca74937e581"
+    },
+    {
+      "path": "results/reverse/asc_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/asc_rho_dS2Ss_PD.csv",
+      "size_bytes": 28584,
+      "mtime": "2026-03-27T12:00:14.395446+01:00",
+      "sha256": "a1760241cfa8a24f60128c30975f1fa8d0e16d697bb903220173e93cb23865a5"
+    },
+    {
+      "path": "results/reverse/asc_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/asc_rho_dWSes_PD.csv",
+      "size_bytes": 28662,
+      "mtime": "2026-03-27T12:00:14.401356+01:00",
+      "sha256": "6ea4ea6811d2c425b989f8396e659ce52515542dcde05e4239daaf0c7a9fecae"
+    },
+    {
+      "path": "results/reverse/asc_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/asc_rho_total_B_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.406184+01:00",
+      "sha256": "17d86835fcf9503d2b9d8346966994b98b4df2d17e566896d52c9366bba3f043"
+    },
+    {
+      "path": "results/reverse/asc_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/asc_rho_total_PD.csv",
+      "size_bytes": 28694,
+      "mtime": "2026-03-27T12:00:14.383452+01:00",
+      "sha256": "19ef2eb4cc1a71548e353980a562dab06d60ba43ef42241968c34d3d5ae6bb52"
+    },
+    {
+      "path": "results/reverse/sinter_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sinter_rho_dBe_PD.csv",
+      "size_bytes": 28088,
+      "mtime": "2026-03-27T12:00:14.436163+01:00",
+      "sha256": "5c93db8f07c8dfbcfc31a2ab57c756192cf9c81cf1d044388f14095a44812f07"
+    },
+    {
+      "path": "results/reverse/sinter_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sinter_rho_dS2Ss_PD.csv",
+      "size_bytes": 28008,
+      "mtime": "2026-03-27T12:00:14.440956+01:00",
+      "sha256": "a292a6801a0172213cc7102457651b3732ac1066517b3fdc4c49ec39058b7b37"
+    },
+    {
+      "path": "results/reverse/sinter_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sinter_rho_dWSes_PD.csv",
+      "size_bytes": 28762,
+      "mtime": "2026-03-27T12:00:14.445279+01:00",
+      "sha256": "bae6e665c7cc9c8741cd0f25a5cb332183fe8ffc1fa646c5442ff17a930afbbf"
+    },
+    {
+      "path": "results/reverse/sinter_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sinter_rho_total_B_PD.csv",
+      "size_bytes": 28085,
+      "mtime": "2026-03-27T12:00:14.455901+01:00",
+      "sha256": "3bc3fb57ba539be2a3536e717b8a6e7fc9bbd703281781d3c7026e8cd0a90eb6"
+    },
+    {
+      "path": "results/reverse/sinter_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sinter_rho_total_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.431682+01:00",
+      "sha256": "558fcc283a94a537de189b70a1bf6f0c7b6b7a8c94b9c780b1a39667a7225453"
+    },
+    {
+      "path": "results/reverse/sslab_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sslab_rho_dBe_PD.csv",
+      "size_bytes": 28028,
+      "mtime": "2026-03-27T12:00:14.415152+01:00",
+      "sha256": "f010d66c246bd58567258e0d89348f659ad00a4940a71f0d95f2380d6c42ccd4"
+    },
+    {
+      "path": "results/reverse/sslab_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sslab_rho_dS2Ss_PD.csv",
+      "size_bytes": 27980,
+      "mtime": "2026-03-27T12:00:14.419695+01:00",
+      "sha256": "b96227f69441c9fa94fd753367ca9330af8a121b923e0e717aabf7734ab86b5c"
+    },
+    {
+      "path": "results/reverse/sslab_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sslab_rho_dWSes_PD.csv",
+      "size_bytes": 28640,
+      "mtime": "2026-03-27T12:00:14.423401+01:00",
+      "sha256": "61ba206498a62f7cc0483b71789b1244facf17f1104966fd0412ff9fc774977f"
+    },
+    {
+      "path": "results/reverse/sslab_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sslab_rho_total_B_PD.csv",
+      "size_bytes": 28020,
+      "mtime": "2026-03-27T12:00:14.427758+01:00",
+      "sha256": "91fbe4cb156636df08349b1aeff00af708b841a897cbd8ce0bc09edd67a97828"
+    },
+    {
+      "path": "results/reverse/sslab_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/sslab_rho_total_PD.csv",
+      "size_bytes": 28497,
+      "mtime": "2026-03-27T12:00:14.410689+01:00",
+      "sha256": "40d1055aff75b03d14d4060caa1837e957af6fc98ffbcf88375ee06f33ffebfb"
+    },
+    {
+      "path": "results/reverse/vran_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/vran_rho_dBe_PD.csv",
+      "size_bytes": 27971,
+      "mtime": "2026-03-27T12:00:14.484364+01:00",
+      "sha256": "de45d91f3ce4cae46cfdb7c53500a37b2bf9edd2d97d544a421e8014e9a1ca76"
+    },
+    {
+      "path": "results/reverse/vran_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/vran_rho_dS2Ss_PD.csv",
+      "size_bytes": 27998,
+      "mtime": "2026-03-27T12:00:14.497431+01:00",
+      "sha256": "b94f5736bdb745d6dd12a9eff06ec3b6011d013ea371d44fe340ac3fda497773"
+    },
+    {
+      "path": "results/reverse/vran_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/vran_rho_dWSes_PD.csv",
+      "size_bytes": 28513,
+      "mtime": "2026-03-27T12:00:14.510406+01:00",
+      "sha256": "0fdeff807ffdb95a22e4de31351600c4cb2bdbd78843bf81fe423502ac1811ed"
+    },
+    {
+      "path": "results/reverse/vran_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/vran_rho_total_B_PD.csv",
+      "size_bytes": 27989,
+      "mtime": "2026-03-27T12:00:14.521338+01:00",
+      "sha256": "a102391420273e5608dc581d6c262387ecebf578f8366815d62d574ccc7c3f55"
+    },
+    {
+      "path": "results/reverse/vran_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/reverse/vran_rho_total_PD.csv",
+      "size_bytes": 28482,
+      "mtime": "2026-03-27T12:00:14.471919+01:00",
+      "sha256": "f7243189e7b34faa0982adf1860630bf35d570813a2e00d2907dd85889990ad0"
+    },
+    {
+      "path": "data_processed/strikeslip/flatfiles/asc_strikeslip_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/flatfiles/asc_strikeslip_flatfile.csv",
+      "size_bytes": 54242849,
+      "mtime": "2026-10-02T11:00:24.936995+02:00",
+      "sha256": "3a6b84f5fb09e47e2d14be22e1f57212576b7fce9a51a83b75ae2715323eb021"
+    },
+    {
+      "path": "data_processed/strikeslip/flatfiles/sinter_strikeslip_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/flatfiles/sinter_strikeslip_flatfile.csv",
+      "size_bytes": 1613208,
+      "mtime": "2026-10-02T11:00:22.257208+02:00",
+      "sha256": "a05120ab3d4c3d0ef33b7662757071f574bb87b4885ddb08f62a0436ccb37429"
+    },
+    {
+      "path": "data_processed/strikeslip/flatfiles/sslab_strikeslip_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/flatfiles/sslab_strikeslip_flatfile.csv",
+      "size_bytes": 1845952,
+      "mtime": "2026-10-02T11:00:22.159122+02:00",
+      "sha256": "5a559364d0577eebb643971dea36f64de3ef68e3f680279b3060d79b1fe73a67"
+    },
+    {
+      "path": "data_processed/strikeslip/flatfiles/vran_strikeslip_flatfile.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/flatfiles/vran_strikeslip_flatfile.csv",
+      "size_bytes": 1902963,
+      "mtime": "2026-10-02T11:00:22.405585+02:00",
+      "sha256": "0331ee503201ac38fdbc293bb2b907af0e5aefa30c4a979d66d5efe4772a622b"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/asc_strikeslip_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/asc_strikeslip_partitioned_residuals_lmer.csv",
+      "size_bytes": 52095927,
+      "mtime": "2026-03-27T11:58:46.240942+01:00",
+      "sha256": "7c1ecd9dfcdb1cfcc7643e074060b5bfed4aaa022c6013d6ac7b6507867de1ea"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/asc_strikeslip_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/asc_strikeslip_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12538,
+      "mtime": "2026-03-27T11:58:46.850357+01:00",
+      "sha256": "892cafda508ca8653a1cbdc92a3699d89814f22260fa8f84c096c0e96a71a51d"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/asc_strikeslip_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/asc_strikeslip_total_residuals.csv",
+      "size_bytes": 14485629,
+      "mtime": "2026-03-27T11:54:52.543659+01:00",
+      "sha256": "06e4c60c36815a4a358f3c86fcaee59cc5719bce438337f581fcb6443eb49024"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sinter_strikeslip_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sinter_strikeslip_partitioned_residuals_lmer.csv",
+      "size_bytes": 1516804,
+      "mtime": "2026-03-27T11:58:46.422823+01:00",
+      "sha256": "0fb25a7ede3e6abaf1a3886cb1d6932dac3eedc40a09c4edeb48b23419ce2e36"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sinter_strikeslip_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sinter_strikeslip_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12353,
+      "mtime": "2026-03-27T11:58:46.855135+01:00",
+      "sha256": "18dc939c4bb66116b6edf3e6df83916ddf9fba65b750d0c4cefc65b53ec3a165"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sinter_strikeslip_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sinter_strikeslip_total_residuals.csv",
+      "size_bytes": 426150,
+      "mtime": "2026-03-27T11:54:53.452254+01:00",
+      "sha256": "bce3880d81ea1264ba3284bb31c71d2d706f53d1f9c486e6991090f69a1ee240"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sslab_strikeslip_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sslab_strikeslip_partitioned_residuals_lmer.csv",
+      "size_bytes": 1733498,
+      "mtime": "2026-03-27T11:58:46.634093+01:00",
+      "sha256": "f96594e268c6d416bb8b206c7f9decf62bdd9f727b7c65942d5026355af933b5"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sslab_strikeslip_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sslab_strikeslip_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12388,
+      "mtime": "2026-03-27T11:58:46.858630+01:00",
+      "sha256": "ae792bc546c3d26778b8cf333814c8e6b51ccb7afb375dd582e0e24655e6f880"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/sslab_strikeslip_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/sslab_strikeslip_total_residuals.csv",
+      "size_bytes": 488935,
+      "mtime": "2026-03-27T11:54:53.087764+01:00",
+      "sha256": "8666c2495ef8810fb08b988a9a7d1377357fe767cab240811d316163417fcab5"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/vran_strikeslip_partitioned_residuals_lmer.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/vran_strikeslip_partitioned_residuals_lmer.csv",
+      "size_bytes": 1796182,
+      "mtime": "2026-03-27T11:58:46.846805+01:00",
+      "sha256": "2090915fcde28aee51d80cac783201dd0ecba25488301d0ebcce4817602d0451"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/vran_strikeslip_partitioned_residuals_summary_lmer.json",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/vran_strikeslip_partitioned_residuals_summary_lmer.json",
+      "size_bytes": 12335,
+      "mtime": "2026-03-27T11:58:46.861878+01:00",
+      "sha256": "993a5e8d0b15b7dfbe6d86988e2677f21d193f29e92e748fe0e4202bd856282e"
+    },
+    {
+      "path": "data_processed/strikeslip/residual_partitioning/vran_strikeslip_total_residuals.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/residual_partitioning/vran_strikeslip_total_residuals.csv",
+      "size_bytes": 511456,
+      "mtime": "2026-03-27T11:54:53.752446+01:00",
+      "sha256": "292ef9c4dd44c5072dc7db7218120008f6a13d86f2ae1e3d8f70e6b106007fa2"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/asc_strikeslip_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/asc_strikeslip_rho_dBe.csv",
+      "size_bytes": 28094,
+      "mtime": "2026-03-27T11:58:56.849529+01:00",
+      "sha256": "fc79156dd13eedf54209369b9a102dab0fff877cf142de8820a0f44be01565e6"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/asc_strikeslip_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/asc_strikeslip_rho_dS2Ss.csv",
+      "size_bytes": 28098,
+      "mtime": "2026-03-27T11:58:56.866221+01:00",
+      "sha256": "096e776046622b60daedb0920ba0371ec50009cc1723e69da1a5741edadafb97"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/asc_strikeslip_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/asc_strikeslip_rho_dWSes.csv",
+      "size_bytes": 28132,
+      "mtime": "2026-03-27T11:58:56.882068+01:00",
+      "sha256": "d20b5916f84d007ab584a3c69da52a596a0934e090ff01f076418042fb37a5ee"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/asc_strikeslip_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/asc_strikeslip_rho_total.csv",
+      "size_bytes": 28685,
+      "mtime": "2026-03-27T11:58:56.832211+01:00",
+      "sha256": "aff6b0333305653d7d90dc8f78d7a673558ecc7cf88a5a5781c83be44d9e4501"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/asc_strikeslip_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/asc_strikeslip_rho_total_B.csv",
+      "size_bytes": 28134,
+      "mtime": "2026-03-27T11:58:56.894338+01:00",
+      "sha256": "00fbb6f49cf54def4dc9f652782eae125a240b52f94e838f7ff4aff6cb09da07"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sinter_strikeslip_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sinter_strikeslip_rho_dBe.csv",
+      "size_bytes": 28106,
+      "mtime": "2026-03-27T11:58:58.111437+01:00",
+      "sha256": "7664af47426b9ca69d21fe607327f46ab2f71fea51628a5b546ffe696bef1f4d"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sinter_strikeslip_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sinter_strikeslip_rho_dS2Ss.csv",
+      "size_bytes": 28010,
+      "mtime": "2026-03-27T11:58:58.127029+01:00",
+      "sha256": "4c9d56afabbec585547d6ea1f67642384e96597abda079e0f0e193e1daa1df30"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sinter_strikeslip_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sinter_strikeslip_rho_dWSes.csv",
+      "size_bytes": 28230,
+      "mtime": "2026-03-27T11:58:58.135284+01:00",
+      "sha256": "6212bda394e371b0bac1fb8d684ebee92d814a9762cc410d2e8f281c13540381"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sinter_strikeslip_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sinter_strikeslip_rho_total.csv",
+      "size_bytes": 28532,
+      "mtime": "2026-03-27T11:58:58.098375+01:00",
+      "sha256": "55ef32fafd9b9183c9fee5f1389e9b24d117603b456f58c9d884f8efc9db3fd4"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sinter_strikeslip_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sinter_strikeslip_rho_total_B.csv",
+      "size_bytes": 28024,
+      "mtime": "2026-03-27T11:58:58.143647+01:00",
+      "sha256": "91c18feed0c651480312f008feb02629227894ef1bd17d22339e129169f0abca"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sslab_strikeslip_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sslab_strikeslip_rho_dBe.csv",
+      "size_bytes": 28030,
+      "mtime": "2026-03-27T11:58:57.333540+01:00",
+      "sha256": "a9385d52c5ef1d35d34e925d3526337c35cc9bdbc12b03e2870579855d16f581"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sslab_strikeslip_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sslab_strikeslip_rho_dS2Ss.csv",
+      "size_bytes": 28032,
+      "mtime": "2026-03-27T11:58:57.342996+01:00",
+      "sha256": "adbd2e1e592ffa23af9927920e98cac45ec3c27d13afc88598bdff30d028c655"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sslab_strikeslip_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sslab_strikeslip_rho_dWSes.csv",
+      "size_bytes": 28096,
+      "mtime": "2026-03-27T11:58:57.350229+01:00",
+      "sha256": "be85cd0042bf7194632b4a39304ef533d9310e85a830c2ee1cec453c840441f3"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sslab_strikeslip_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sslab_strikeslip_rho_total.csv",
+      "size_bytes": 28481,
+      "mtime": "2026-03-27T11:58:57.322000+01:00",
+      "sha256": "e63f0dc917ee403fab432631751126ffb600760c10e1c3fa125ebf74444571be"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/sslab_strikeslip_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/sslab_strikeslip_rho_total_B.csv",
+      "size_bytes": 27952,
+      "mtime": "2026-03-27T11:58:57.383489+01:00",
+      "sha256": "8193c14a6ff2d55d0ff5e6b0e1c3c14d8ff03ba47975bc1e00022327f2ed09ef"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/vran_strikeslip_rho_dBe.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/vran_strikeslip_rho_dBe.csv",
+      "size_bytes": 27974,
+      "mtime": "2026-03-27T11:58:58.328917+01:00",
+      "sha256": "e590a06924a4eca3f85120d9869d317092985fa1d1cbbc05e8455cc53772a4db"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/vran_strikeslip_rho_dS2Ss.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/vran_strikeslip_rho_dS2Ss.csv",
+      "size_bytes": 28024,
+      "mtime": "2026-03-27T11:58:58.334411+01:00",
+      "sha256": "0380b804576bc3bf993eb2f515f8e1eac034429a575c3eebcca62611cce32cb4"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/vran_strikeslip_rho_dWSes.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/vran_strikeslip_rho_dWSes.csv",
+      "size_bytes": 27936,
+      "mtime": "2026-03-27T11:58:58.341135+01:00",
+      "sha256": "47009acb8502c52866f365c2a5e6ddb0d5c46eb35016bd4d26c3c04b10dba099"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/vran_strikeslip_rho_total.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/vran_strikeslip_rho_total.csv",
+      "size_bytes": 28491,
+      "mtime": "2026-03-27T11:58:58.313448+01:00",
+      "sha256": "2f6f214c91fc5e616ff58034f816e6e38c8a627ed8929aacca4b937d07eb2939"
+    },
+    {
+      "path": "data_processed/strikeslip/correlations/vran_strikeslip_rho_total_B.csv",
+      "source": "data_processed/02_im_correlation_model/strikeslip/correlations/vran_strikeslip_rho_total_B.csv",
+      "size_bytes": 28012,
+      "mtime": "2026-03-27T11:58:58.347913+01:00",
+      "sha256": "585586e326a0b20a72b13225cb7ddfb60a749b126a6033709defc301dca82e94"
+    },
+    {
+      "path": "results/strikeslip/asc_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/asc_rho_dBe_PD.csv",
+      "size_bytes": 28111,
+      "mtime": "2026-03-27T12:00:14.789829+01:00",
+      "sha256": "624c00f4c214d5f1e4cc27ed831b7aabe00ac7d52ab0456261eccca74937e581"
+    },
+    {
+      "path": "results/strikeslip/asc_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/asc_rho_dS2Ss_PD.csv",
+      "size_bytes": 28584,
+      "mtime": "2026-03-27T12:00:14.801045+01:00",
+      "sha256": "a1760241cfa8a24f60128c30975f1fa8d0e16d697bb903220173e93cb23865a5"
+    },
+    {
+      "path": "results/strikeslip/asc_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/asc_rho_dWSes_PD.csv",
+      "size_bytes": 28662,
+      "mtime": "2026-03-27T12:00:14.814764+01:00",
+      "sha256": "6ea4ea6811d2c425b989f8396e659ce52515542dcde05e4239daaf0c7a9fecae"
+    },
+    {
+      "path": "results/strikeslip/asc_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/asc_rho_total_B_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.830096+01:00",
+      "sha256": "17d86835fcf9503d2b9d8346966994b98b4df2d17e566896d52c9366bba3f043"
+    },
+    {
+      "path": "results/strikeslip/asc_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/asc_rho_total_PD.csv",
+      "size_bytes": 28694,
+      "mtime": "2026-03-27T12:00:14.778300+01:00",
+      "sha256": "19ef2eb4cc1a71548e353980a562dab06d60ba43ef42241968c34d3d5ae6bb52"
+    },
+    {
+      "path": "results/strikeslip/sinter_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sinter_rho_dBe_PD.csv",
+      "size_bytes": 28088,
+      "mtime": "2026-03-27T12:00:14.914297+01:00",
+      "sha256": "5c93db8f07c8dfbcfc31a2ab57c756192cf9c81cf1d044388f14095a44812f07"
+    },
+    {
+      "path": "results/strikeslip/sinter_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sinter_rho_dS2Ss_PD.csv",
+      "size_bytes": 28008,
+      "mtime": "2026-03-27T12:00:14.924232+01:00",
+      "sha256": "a292a6801a0172213cc7102457651b3732ac1066517b3fdc4c49ec39058b7b37"
+    },
+    {
+      "path": "results/strikeslip/sinter_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sinter_rho_dWSes_PD.csv",
+      "size_bytes": 28762,
+      "mtime": "2026-03-27T12:00:14.933952+01:00",
+      "sha256": "bae6e665c7cc9c8741cd0f25a5cb332183fe8ffc1fa646c5442ff17a930afbbf"
+    },
+    {
+      "path": "results/strikeslip/sinter_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sinter_rho_total_B_PD.csv",
+      "size_bytes": 28085,
+      "mtime": "2026-03-27T12:00:14.944096+01:00",
+      "sha256": "3bc3fb57ba539be2a3536e717b8a6e7fc9bbd703281781d3c7026e8cd0a90eb6"
+    },
+    {
+      "path": "results/strikeslip/sinter_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sinter_rho_total_PD.csv",
+      "size_bytes": 28063,
+      "mtime": "2026-03-27T12:00:14.903498+01:00",
+      "sha256": "558fcc283a94a537de189b70a1bf6f0c7b6b7a8c94b9c780b1a39667a7225453"
+    },
+    {
+      "path": "results/strikeslip/sslab_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sslab_rho_dBe_PD.csv",
+      "size_bytes": 28007,
+      "mtime": "2026-03-27T12:00:14.860452+01:00",
+      "sha256": "6bdb7187a1ed56807e8052df867629e5fb32a77afcbf3bceecffc85c16ac958a"
+    },
+    {
+      "path": "results/strikeslip/sslab_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sslab_rho_dS2Ss_PD.csv",
+      "size_bytes": 28002,
+      "mtime": "2026-03-27T12:00:14.871493+01:00",
+      "sha256": "76c43eb881f7526e7791c240daa6933acc27dd03e034cbd4b0ce5a351ae9ec26"
+    },
+    {
+      "path": "results/strikeslip/sslab_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sslab_rho_dWSes_PD.csv",
+      "size_bytes": 28587,
+      "mtime": "2026-03-27T12:00:14.882517+01:00",
+      "sha256": "bcf4ad9f6eff344e848ae9ff11cee44fe569d1102c85905ac19ba0428107d392"
+    },
+    {
+      "path": "results/strikeslip/sslab_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sslab_rho_total_B_PD.csv",
+      "size_bytes": 27971,
+      "mtime": "2026-03-27T12:00:14.892947+01:00",
+      "sha256": "c1815887bfc39e53e54165b8ac733dde333c67041a1137beab5ce87c46b69ca9"
+    },
+    {
+      "path": "results/strikeslip/sslab_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/sslab_rho_total_PD.csv",
+      "size_bytes": 28610,
+      "mtime": "2026-03-27T12:00:14.845217+01:00",
+      "sha256": "cc34ec087b6f4fa6e4d432725fce2dbd28dc6d67fd42bf935bb124647f7901d3"
+    },
+    {
+      "path": "results/strikeslip/vran_rho_dBe_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/vran_rho_dBe_PD.csv",
+      "size_bytes": 28000,
+      "mtime": "2026-03-27T12:00:14.967212+01:00",
+      "sha256": "01e80ad8d5dd6f53eb311e81ac8f5a800c70903dd0a8167c9147dbaaa863cb78"
+    },
+    {
+      "path": "results/strikeslip/vran_rho_dS2Ss_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/vran_rho_dS2Ss_PD.csv",
+      "size_bytes": 28005,
+      "mtime": "2026-03-27T12:00:14.978803+01:00",
+      "sha256": "6d672492062d9ffe2c071627dd792395e537eb2d64cf529f8b2654a0bf1ae4b6"
+    },
+    {
+      "path": "results/strikeslip/vran_rho_dWSes_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/vran_rho_dWSes_PD.csv",
+      "size_bytes": 28562,
+      "mtime": "2026-03-27T12:00:14.990344+01:00",
+      "sha256": "34fad342c009fecb4671ae34daec18dba9af7e8f9a9e4d830f9901267c485270"
+    },
+    {
+      "path": "results/strikeslip/vran_rho_total_B_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/vran_rho_total_B_PD.csv",
+      "size_bytes": 28012,
+      "mtime": "2026-03-27T12:00:15.001180+01:00",
+      "sha256": "98727389285dc4c7e2dbeaa96f433b92f589d69a38999cd11eab6cd77cc7e486"
+    },
+    {
+      "path": "results/strikeslip/vran_rho_total_PD.csv",
+      "source": "results/02_im_correlation_model/strikeslip/vran_rho_total_PD.csv",
+      "size_bytes": 28537,
+      "mtime": "2026-03-27T12:00:14.957007+01:00",
+      "sha256": "eca2864b7295d8d9b9300a040d63342388fb1c44878ccb24ac34c49dee48884d"
+    }
+  ],
+  "n_files": 168,
+  "total_bytes": 401514411
+}

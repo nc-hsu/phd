@@ -10,8 +10,11 @@ if(length(new_packages)) {
   install.packages(new_packages, repos="https://cloud.r-project.org")
 }
 
-# Load all packages
-invisible(lapply(required_packages, library, character.only = TRUE))
+# Load all packages. The start-up messages (tidyverse's attach list, masking notes) are
+# suppressed so that R's stderr, which run_r_script prints, holds only real warnings
+# such as lme4's singular-fit or convergence messages.
+invisible(lapply(required_packages, function(p)
+  suppressPackageStartupMessages(library(p, character.only = TRUE))))
 
 # --- Command Line Argument Logic ---
 # Capture arguments from Python
@@ -62,8 +65,12 @@ for (model in model_tags) {
   
   # load the data and periods
   residuals_file <-  paste0(residuals_folder, "\\", model, residuals_file_tail)
-  df <- read.csv(file=residuals_file)
-  names(df)[colnames(df) == "X"] <- "index"
+  # check.names = FALSE keeps the IM column names exactly as Python wrote them (e.g.
+  # "rotD50_AvgSA([0, 3])_3.0_Delta"); R would otherwise rewrite the brackets, comma and
+  # space as dots. The unnamed first column (the row index) is then read as "" rather than
+  # "X", so both are renamed to "index".
+  df <- read.csv(file=residuals_file, check.names = FALSE)
+  names(df)[colnames(df) %in% c("", "X")] <- "index"
   
   # make the event_id and station_code factors (i.e. categorical data)
   df$event_id <- as.factor(df$event_id)
@@ -106,7 +113,9 @@ for (model in model_tags) {
     # been removed from the data and that we are only interested in the random
     # effects. "(1| ...)" indicates that "..." is a random effect that affects the intercept.
     # "(1| A)" + "(1|B) indicates two uncorrelated random effects
-    formula = paste(im_columns[im_i], "~ 1 + (1|event_id) + (1|station_code)")
+    # The response is wrapped in backticks because the IM column names are not
+    # syntactic R names (they contain brackets, commas and spaces).
+    formula = paste0("`", im_columns[im_i], "` ~ 1 + (1|event_id) + (1|station_code)")
     formula <- as.formula(formula)
     fit <- lmer(formula, usable_data)
     
@@ -126,7 +135,15 @@ for (model in model_tags) {
       phi_ss = sigma(fit),
       n_records = length(usable_data$index),
       n_events = length(unique(usable_data$event_id)),
-      n_stations = length(unique(usable_data$station_code))
+      n_stations = length(unique(usable_data$station_code)),
+      # Fit diagnostics, kept with the results so a doubtful fit stays visible later:
+      #   singular - TRUE if a variance component is estimated at (or near) zero, which
+      #              lme4 reports as "boundary (singular) fit";
+      #   convergence_messages - lme4's convergence checks and the optimiser's warnings,
+      #              joined into one string ("" when there are none).
+      singular = isSingular(fit),
+      convergence_messages = paste(c(fit@optinfo$conv$lme4$messages,
+                                     unlist(fit@optinfo$warnings)), collapse = "; ")
     )
     summary_results[[im]] <- current_results
     

@@ -1,63 +1,123 @@
+"""Run R scripts from Python through Rscript.
+
+Rscript is looked up in this order (see :func:`find_rscript`):
+
+1. ``executables.rscript`` in the merged config, i.e. a full path set in the per-machine
+   ``phd_project/config/config.local.yaml``. If it is set it must exist.
+2. Otherwise ``Rscript`` on the PATH (the normal case on Linux and macOS).
+3. Otherwise an error explaining both ways to make R findable.
+"""
+
+import shutil
 import subprocess
 from pathlib import Path
+
 from phd_project.config.config import load_config
 
-# Load your centralized configuration
+# The merged project config (config.yaml plus config.local.yaml, if present), loaded once
+# when the module is imported.
 cfg = load_config()
 
-def run_r_script(script_path, additional_params: list=[]):
-    """
-    Launches an R script via the command line.
+# Shown in every "Rscript not found" error: the two ways a user can make R findable.
+_HOW_TO_FIX = (
+    "R must be installed. On Windows, R's installer does not put R's bin folder on the PATH, "
+    "so either add that folder (e.g. C:/Program Files/R/R-4.5.2/bin) to the PATH, or set "
+    "executables.rscript to the FULL path of Rscript.exe in "
+    "phd_project/config/config.local.yaml (template: config.local.example.yaml). "
+    "A bare name such as 'Rscript' does not work there: it is read as a path inside the repo. "
+    "To use the PATH, leave executables.rscript out."
+)
 
-    Example Usage in your notebook:
-    execute_r_script("seismic_analysis_v2.R")
-    df = pd.read_csv("r_output_data.csv")
-    
+
+def find_rscript(cfg: dict) -> Path:
+    """Return the Rscript executable to use, following the lookup order in the module docstring.
+
+    ``cfg`` is passed in, rather than read from the module-level config, so the lookup can be
+    tested with a plain dict.
+
+    A configured path that does not exist raises instead of falling back to the PATH: the
+    path was set on purpose, so a typo in it should be fixed, not silently bypassed.
+    """
+    configured = cfg.get("executables", {}).get("rscript")
+    if configured is not None:
+        # load_config has already turned the value into an absolute Path.
+        configured = Path(configured)
+        if not configured.is_file():
+            raise FileNotFoundError(
+                f"executables.rscript is set to {configured}, which does not exist. {_HOW_TO_FIX}")
+        return configured
+
+    # No configured path: use whatever "Rscript" the PATH finds (Rscript.exe on Windows).
+    on_path = shutil.which("Rscript")
+    if on_path is None:
+        raise FileNotFoundError(f"Rscript was not found on the PATH. {_HOW_TO_FIX}")
+    return Path(on_path)
+
+
+class RScriptError(RuntimeError):
+    """An R script exited with a non-zero status. Carries R's exit code and error output."""
+
+    def __init__(self, script: Path, returncode: int, stderr: str):
+        self.script, self.returncode, self.stderr = script, returncode, stderr
+        super().__init__(f"R script '{script.name}' failed with exit code {returncode}.\n"
+                         f"--- R error output ---\n{stderr}")
+
+
+def run_r_script(script_path, additional_params: list | None = None) -> None:
+    """Run an R script through Rscript, printing its output, and raise if it fails.
+
+    Example (in a notebook)::
+
+        run_r_script(cfg["scripts"]["residual_partitioning"] / "residual_partitioning_lmer.R",
+                     [str(folder), "asc,sslab", ...])
+        df = pd.read_csv(folder / "asc_..._partitioned_residuals_lmer.csv")
+
     Args:
-        script_path (Path): A pathlib.Path object pointing to the .R file.
-        additional_params(list): List of strings that are passed to the R script
-            as parameters
+        script_path (Path | str): the .R file to run.
+        additional_params (list of str, optional): command-line arguments passed to the
+            script, in order (R reads them with ``commandArgs(trailingOnly = TRUE)``).
+
+    Raises:
+        FileNotFoundError: the script does not exist, or no Rscript can be found
+            (see :func:`find_rscript`).
+        RScriptError: R exited with a non-zero status. Raising, rather than printing and
+            returning, stops a notebook at the failing cell, so later cells cannot go on to
+            read output files left over from an earlier run as if they were new.
+
+    R's stderr is printed even when the script succeeds: R writes its warnings and messages
+    there (e.g. lme4's singular-fit and convergence warnings), and they must be seen.
     """
+    # A fresh list per call (a list default would be one object shared by every call).
+    params = [] if additional_params is None else [str(p) for p in additional_params]
 
-    # 1. Validation and existence check
-    if not isinstance(script_path, Path):
-        print("Error: script_path must be a pathlib.Path object.")
-        return
+    # Accept a str as well as a Path, and resolve it, so R finds the script even if the
+    # working directory changes.
+    script = Path(script_path).resolve()
+    if not script.is_file():
+        raise FileNotFoundError(f"R script not found: {script}")
 
-    if not script_path.exists():
-        print(f"Error: The file at {script_path} was not found.")
-        return
-    
-    r_exe = cfg['executables']['rscript'] # Access the Rscript executable via path in config the config file
-    
-    if not r_exe.exists():
-        raise FileNotFoundError(f"Rscript not found at {r_exe}. Check phd_project/config/config.yaml")
+    # The configured Rscript if config.local.yaml sets one, else Rscript on the PATH; raises
+    # FileNotFoundError with instructions if neither is available.
+    r_exe = find_rscript(cfg)
 
-    # 2. Resolve to absolute path for robustness
-    # This ensures R finds the script even if the working directory changes
-    abs_path = script_path.resolve()
-    
-    # 3. Set up the command
-    command = [str(r_exe), str(abs_path)] + additional_params
+    command = [str(r_exe), str(script)] + params
+    print(f"Executing R script: {script.name}...")
 
-    print(f"Executing R script: {abs_path.name}...")
+    # check=False: the exit code is inspected below, so R's stderr can be put into the
+    # exception. R on Windows (UCRT builds) writes UTF-8; undecodable bytes are replaced
+    # rather than allowed to crash the call after R has already finished.
+    result = subprocess.run(command, check=False, capture_output=True,
+                            text=True, encoding="utf-8", errors="replace")
 
-    try:
-        # 4. Execute
-        result = subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        
-        if result.stdout:
-            print("--- R Standard Output ---")
-            print(result.stdout)
+    if result.stdout:
+        print("--- R Standard Output ---")
+        print(result.stdout)
 
-        print(f"R script '{abs_path.name}' completed successfully.")
-            
-    except subprocess.CalledProcessError as e:
-        print(f"Execution failed with exit code {e.returncode}")
-        print("--- R Error Output ---")
-        print(e.stderr)
+    if result.returncode != 0:
+        raise RScriptError(script, result.returncode, result.stderr)
+
+    if result.stderr.strip():
+        print("--- R messages and warnings ---")
+        print(result.stderr)
+
+    print(f"R script '{script.name}' completed successfully.")

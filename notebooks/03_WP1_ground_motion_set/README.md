@@ -85,6 +85,10 @@ filenames are just the analysis type (`po.py`, `cpo.py`, `modal.py`, `ida.py`).
 |---|---|---|---|
 | `001-site_selection` | ESHM20 / site data | `results/01_site_selection/sites.csv` | — |
 | `002-im_correlations` | record flatfiles | IM correlation models | — |
+| `002a-correlation_model_hdf5_files` | positive-definite correlation csvs `results/02_im_correlation_model/reverse/*_PD.csv` (`002`) | `results/02_im_correlation_model/clemett_corr_coeffs_{openquake,pickagm}.hdf5` — the CG26 model for OpenQuake and `pickagm` | `002` |
+| `002b-comparison_with_eshm20_digitised_correlations` | raw correlations `data_processed/02_im_correlation_model/reverse/correlations/asc_reverse_rho_total.csv` (`002`), digitised ESHM20 points `data_raw/correlation_models/ESHM20/rho_T_*.csv` | comparison plot (not saved) | `002` |
+| `002c-extract_gfz_esm_record_ids` | GFZ datasets `data_raw/eshm20_subduction_vrancea_datasets/{hellenic_inslab,hellenic_interface,vrancea}_db.json` | ESM record ID lists `data_raw/eshm20_trt_record_ids/{sslab,sinter,vran}_esm_record_ids.csv`, read by `002` | — |
+| `002d-asc_filter_bug_impact` | pre-fix baseline `data_processed/02_im_correlation_model/baseline_for_bug_check/` and the live `002` outputs (flatfiles, lmer summaries, raw and PD correlations); helper scripts in `dump/bug_check/` | how much the fix of the ASC record filter in `manage_flatfiles.get_active_shallow_crust_flatfile` changes the ASC variance components and correlations; figures `results/02_im_correlation_model/bug_check/*.png` | `002` |
 | `003-psha_setup_and_analyses` | `sites.csv` | OpenQuake hazard calcs | `001` |
 | `004-psha_results` | OQ calcs | hazard curves per site | `003` |
 | `005-sa_psha_results` | OQ calc `SA_psha_eps4` | PGA/SA hazard curves per site + per-site hazard surfaces (IML x period) | `003` |

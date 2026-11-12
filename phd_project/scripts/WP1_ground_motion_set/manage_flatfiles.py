@@ -4,7 +4,6 @@ Module for obtaining the flatfiles for each tectonic regime in ESHM20 and
 populating any required data that is missing.
 """
 import re
-import json
 from pathlib import Path
 import pandas as pd
 import geopandas as gpd
@@ -94,8 +93,111 @@ def extract_flatfile_for_dataset(database: dict, esm: pd.DataFrame):
     # also in B.
     new_df = esm.merge(
         df_B[keys], on=keys, how="inner")
-    
+
     return new_df
+
+
+# ---------------------------------------------------------------------------------------------
+# Regional datasets defined by ESM record ID lists
+# ---------------------------------------------------------------------------------------------
+# The ESHM20 subduction (in-slab, interface) and Vrancea datasets are subsets of the ESM
+# flatfile. Each record in them is identified in ESM by the four columns below, the same
+# columns the JSON-based functions above match on. Publishing a list of these four values per
+# dataset is therefore enough to rebuild each regional flatfile from the ESM flatfile.
+
+# The columns that identify one ESM record (one event recorded by one sensor). The sensor
+# depth is needed because some stations have several sensors (e.g. surface and borehole).
+ESM_RECORD_KEYS = ["event_id", "network_code", "station_code", "sensor_depth_m"]
+
+
+def record_ids_from_dataset(database: dict) -> pd.DataFrame:
+    """The ESM record IDs of a dataset in the GFZ JSON format, one row per record.
+
+    Uses the same conversion as ``extract_flatfile_for_dataset``: the three code columns as
+    strings and the sensor depth as float64 (a missing depth becomes NaN). Rows are de-duplicated
+    and sorted on the key columns, so the list is a canonical description of the dataset that
+    does not depend on the order of the records in the JSON.
+
+    Parameters
+    ----------
+    database : dict
+        A dataset as loaded from one of the GFZ JSON files.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``ESM_RECORD_KEYS``, a fresh RangeIndex.
+    """
+    ids = _convert_dict_to_df(database).astype(str)
+    ids["sensor_depth_m"] = ids["sensor_depth_m"].astype(np.float64)
+    ids = ids[ESM_RECORD_KEYS].drop_duplicates()
+    return ids.sort_values(ESM_RECORD_KEYS).reset_index(drop=True)
+
+
+def load_esm_record_ids(file_path) -> pd.DataFrame:
+    """Load an ESM record ID list written by nb 002c.
+
+    The code columns are read as literal text, so codes such as station "0703" keep their
+    leading zero and codes that pandas would otherwise read as missing (e.g. "NA") stay strings.
+    Only an empty sensor-depth cell is read as missing (NaN); the depth is then float64, the
+    type ``extract_flatfile_for_dataset`` matches on.
+
+    Parameters
+    ----------
+    file_path : str or Path
+        CSV file with the columns ``ESM_RECORD_KEYS``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``ESM_RECORD_KEYS``.
+    """
+    ids = pd.read_csv(file_path, sep=",", dtype=str,
+                      keep_default_na=False, na_values={"sensor_depth_m": [""]})
+    ids["sensor_depth_m"] = ids["sensor_depth_m"].astype(np.float64)
+    return ids[ESM_RECORD_KEYS]
+
+
+def record_ids_found_in_esm(record_ids: pd.DataFrame, esm: pd.DataFrame) -> pd.Series:
+    """For each record ID, whether the ESM flatfile has a record with those four keys.
+
+    ``esm`` is not modified; its sensor depth is converted to float64 on a copy of the key
+    columns only.
+
+    Returns
+    -------
+    pd.Series
+        Boolean, aligned with ``record_ids``.
+    """
+    esm_keys = esm[ESM_RECORD_KEYS].astype({"sensor_depth_m": np.float64}).drop_duplicates()
+    check = record_ids[ESM_RECORD_KEYS].merge(esm_keys, on=ESM_RECORD_KEYS,
+                                              how="left", indicator=True)
+    return pd.Series((check["_merge"] == "both").to_numpy(), index=record_ids.index)
+
+
+def extract_flatfile_for_record_ids(record_ids: pd.DataFrame, esm: pd.DataFrame) -> pd.DataFrame:
+    """The ESM records listed in an ESM record ID list, as a flatfile.
+
+    Gives the same result as ``extract_flatfile_for_dataset`` does for the GFZ dataset the list
+    was made from: an inner merge of ``esm`` with the key columns, so the rows keep the ESM
+    order and all ESM columns, with a fresh RangeIndex, and ``sensor_depth_m`` is float64.
+    Unlike ``extract_flatfile_for_dataset``, ``esm`` itself is not modified.
+
+    Parameters
+    ----------
+    record_ids : pd.DataFrame
+        Columns ``ESM_RECORD_KEYS`` (e.g. from ``load_esm_record_ids``).
+    esm : pd.DataFrame
+        The ESM flatfile (any extra columns are carried through).
+
+    Returns
+    -------
+    pd.DataFrame
+        The matching ESM rows.
+    """
+    # convert the depth on a new frame so the caller's ESM frame is left as it is
+    esm = esm.assign(sensor_depth_m=esm["sensor_depth_m"].astype(np.float64))
+    return esm.merge(record_ids[ESM_RECORD_KEYS], on=ESM_RECORD_KEYS, how="inner")
 
 
 def add_site_rup_ctx_columns(esm_db: pd.DataFrame, rake_angle: float):
@@ -457,21 +559,80 @@ def extract_PGA_data(flatfile_df: pd.DataFrame, idx_im_data:int):
 
 
 def get_active_shallow_crust_flatfile(deep_events, database_df):
-    # get the active shallow crust flatfile based on the filter criteria described 
-    # in section 4.2.1 of the ESHM20 report. Danciu et al. (2021)
-    # i) events must be classified as non-subduction (according to the 
-    # classification scheme indicated in the subsequent section), 
-    # ii) reported hypocentral depth must be shallower than 40 km, 
-    # iii) events must have â‰¥ 3 records, 
-    # iv) only records with high-pass filter frequency ð�‘“Hp â‰¤ 0.8 ð�‘‡ are retained
-    # for each period in the regression. 
-    # 
-    # According to the report the final database yields 18,222 records from 927 
-    # events (3.1 â‰¤ ð�‘€w â‰¤ 7.4) recorded at 1829 stations (0 â‰¤ ð�‘…JB(ð�‘˜ð�‘š) â‰¤ 545).
-    asc_esm_df = database_df.loc[~database_df.index.isin(deep_events)]    # (i)
+    """The active shallow crust (ASC) flatfile, following section 4.2.1 of the ESHM20 report
+    (Danciu et al. 2021):
+
+    (i)   the record is not in a subduction or deep dataset: every record in ``deep_events``
+          (the ESHM20 in-slab, interface and Vrancea flatfiles) is removed;
+    (ii)  the reported hypocentral depth is at most 40 km;
+    (iii) the event has at least 3 records;
+    (iv)  only records whose high-pass filter frequency allows the period are used at that
+          period. This is applied later, per IM, in the residual partitioning.
+
+    Parameters
+    ----------
+    deep_events : pd.DataFrame
+        The regional flatfiles concatenated; only the columns ``ESM_RECORD_KEYS`` are used.
+    database_df : pd.DataFrame
+        The ESM flatfile. Its ``sensor_depth_m`` must already be float64, as in nb 002.
+
+    Returns
+    -------
+    pd.DataFrame
+        The ASC rows of ``database_df``, in their original order and with their original
+        index labels. The labels matter: nb 002 writes the flatfile with ``index=True``, and the
+        residual files are keyed on that index.
+
+    Raises
+    ------
+    ValueError
+        If, after step (i), a remaining row still matches a ``deep_events`` record, or if the
+        number of rows removed is not the number of ``deep_events`` records found in
+        ``database_df``.
+    """
+    # ---- (i) remove the regional records ----------------------------------------------------
+    # The match is on the four ESM record keys, the same keys the regional flatfiles were
+    # selected with, and not on the index. The regional flatfiles come from a merge
+    # (extract_flatfile_for_record_ids), which gives them a fresh 0..n-1 RangeIndex, so their
+    # index labels say nothing about which ESM row a record came from.
+    #
+    # The keys are taken on both sides with the sensor depth as float64, so the depth is matched
+    # as a number (and a missing depth, NaN, matches a missing depth, as in the merge that built
+    # the regional flatfiles). The regional keys are de-duplicated so the merge below gives
+    # exactly one output row per ESM row.
+    db_keys = database_df[ESM_RECORD_KEYS].astype({"sensor_depth_m": np.float64})
+    deep_keys = (deep_events[ESM_RECORD_KEYS].astype({"sensor_depth_m": np.float64})
+                 .drop_duplicates())
+
+    # Anti-join: a left merge with indicator=True marks each ESM row "both" (it is a regional
+    # record) or "left_only" (it is not). A merge drops the index, so each row's POSITION in
+    # database_df is carried through as a column; selecting by position afterwards keeps the
+    # original index labels and the original row order (a left merge keeps the left order).
+    flagged = (db_keys.assign(_position=np.arange(len(database_df)))
+               .merge(deep_keys, on=ESM_RECORD_KEYS, how="left", indicator=True))
+    if len(flagged) != len(database_df):
+        raise ValueError("Matching the regional records changed the number of ESM rows.")
+    keep = flagged.loc[flagged["_merge"] == "left_only", "_position"].to_numpy()
+    asc_esm_df = database_df.iloc[keep]    # (i)
+
+    # Check (i) against an independent count. No remaining row may match a regional record...
+    leftover = asc_esm_df[ESM_RECORD_KEYS].astype({"sensor_depth_m": np.float64}).merge(
+        deep_keys, on=ESM_RECORD_KEYS, how="inner")
+    if len(leftover) > 0:
+        raise ValueError(f"{len(leftover)} ASC rows still match a subduction/deep record.")
+    # ...and the rows removed must be exactly the regional records present in the ESM frame
+    # (each record key appears once in ESM, so one key removes one row).
+    n_removed = len(database_df) - len(asc_esm_df)
+    n_found = len(deep_keys.merge(db_keys.drop_duplicates(), on=ESM_RECORD_KEYS, how="inner"))
+    if n_removed != n_found:
+        raise ValueError(f"Step (i) removed {n_removed} rows, but {n_found} distinct regional "
+                         "record keys were found in the ESM flatfile.")
+    if len(deep_events) > 0 and n_removed == 0:
+        raise ValueError("Step (i) removed no rows although deep_events is not empty.")
+
+    # ---- (ii) and (iii) ---------------------------------------------------------------------
     asc_esm_df = asc_esm_df[asc_esm_df["ev_depth_km"] <= 40]    # (ii)
-    asc_esm_df = asc_esm_df.groupby("event_id").filter(lambda g: len(g) >= 3) # (iii)  
-    #(iv) is done later when working with the data    
+    asc_esm_df = asc_esm_df.groupby("event_id").filter(lambda g: len(g) >= 3)    # (iii)
     return asc_esm_df
 
 
@@ -491,39 +652,43 @@ def set_new_rake(df: pd.DataFrame, new_rake_angle: float):
 
 
 def label_record_trts_esm(esm_df, col_idx=None):
-    
-    non_asc_data_folder = cfg["raw_data"]["root"] / "eshm20_subduction_vrancea_datasets"
-    non_asc_data_files = [
-        "hellenic_inslab_db.json", 
-        "hellenic_interface_db.json", 
-        "vrancea_db.json"
-        ]
-    
-    tags = ["Subduction Inslab", "Subduction Interface", "Non-Subduction Deep"]
+    """Add a column "trt" labelling each ESM record with its tectonic region type.
+
+    Records in the ESHM20 subduction in-slab, subduction interface and Vrancea datasets
+    (identified by their ESM record ID lists, see ``load_esm_record_ids``) are labelled
+    "Subduction Inslab", "Subduction Interface" and "Non-Subduction Deep"; every other record
+    is "Shallow Default". The column is appended, or inserted at position ``col_idx``.
+    ``esm_df["sensor_depth_m"]`` is converted to float64 so it can be matched.
+    """
+    record_ids_folder = cfg["raw_data"]["trt_record_ids"]
+
+    # region tag of each ID list -> label written to the "trt" column
+    trt_labels = {
+        "sslab": "Subduction Inslab",
+        "sinter": "Subduction Interface",
+        "vran": "Non-Subduction Deep",
+        }
 
     esm_df.loc[:, "sensor_depth_m"] = esm_df["sensor_depth_m"].astype(np.float64)
     if col_idx is None:
-        esm_df = esm_df.assign(trt="Shallow Default") 
+        esm_df = esm_df.assign(trt="Shallow Default")
     else:
         esm_df.insert(col_idx, "trt", "Shallow Default")
-    
-    df_A = esm_df.reset_index() 
-    
-    for f, tag in zip(non_asc_data_files, tags):
-        with open(non_asc_data_folder / f, "r") as file:
-            db = json.load(file)
-            df_B = _convert_dict_to_df(db)
-            df_B = df_B.astype(str)
-            df_B["sensor_depth_m"] = df_B["sensor_depth_m"].astype(np.float64)
-            keys = ["event_id", "network_code", "station_code", "sensor_depth_m"]
 
-            # Merge using only the stable identifier columns
-            matched = df_A.merge(df_B[keys], on=keys, how='inner')
-            indices = matched['index'].tolist() # Extract the list of indices
+    # keep the row labels in a column so the matched rows can be found after the merge
+    df_A = esm_df.reset_index()
 
-            # update the appropriate rows in the trt column
-            esm_df.loc[indices, "trt"] = tag
+    for tag, label in trt_labels.items():
+        ids = load_esm_record_ids(record_ids_folder / f"{tag}_esm_record_ids.csv")
+
+        # Merge using only the stable identifier columns
+        matched = df_A.merge(ids[ESM_RECORD_KEYS], on=ESM_RECORD_KEYS, how='inner')
+        indices = matched['index'].tolist()  # row labels of the matched records
+
+        # update the appropriate rows in the trt column
+        esm_df.loc[indices, "trt"] = label
     return esm_df
+
 
 def scale_cols(df: pd.DataFrame, conversion_map: dict) -> pd.DataFrame:
     """multiples each colum by a value according to conversion map, which
