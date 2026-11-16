@@ -1,20 +1,45 @@
 # Script for partitioning the residuals 
 # --- Reproducibility Block: Package Management ---
-required_packages <- c("tidyverse", "lme4", "jsonlite", "stringr")
+# The add-on packages this script uses, and the functions it takes from each:
+#   dplyr    - %>%, filter, group_by, n, ungroup, select, all_of, everything, left_join,
+#              and the .data pronoun (%>%, all_of, everything and .data are re-exported
+#              by dplyr from magrittr, tidyselect and rlang)
+#   readr    - write_csv
+#   stringr  - str_split_i, str_replace
+#   lme4     - lmer, ranef, fixef, VarCorr, isSingular, and lme4's methods for the
+#              stats generics sigma and residuals
+#   jsonlite - write_json
+# Everything else (read.csv, as.factor, as.formula, paste, ...) is base R.
+# Only these packages are loaded, so the pinned set in the repo's renv.lock stays small.
+required_packages <- c("dplyr", "readr", "stringr", "lme4", "jsonlite")
 
-new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
-
-if(length(new_packages)) {
-  print(paste("Installing missing packages:", paste(new_packages, collapse=", ")))
-  # repos="https://cloud.r-project.org" ensures a reliable mirror is used in headless mode
-  install.packages(new_packages, repos="https://cloud.r-project.org")
+# The packages are never installed here. They come from renv.lock: renv::restore() in the
+# repo root installs the pinned versions into the project library, and the repo's
+# .Rprofile makes that library active whenever R starts in the repo root (which is where
+# run_r_script starts Rscript). Installing at run time would fetch whatever versions are
+# newest, so a missing package stops the script with instructions instead.
+# find.package(..., quiet = TRUE) returns an empty result for a package that is not
+# installed, without loading anything.
+missing_packages <- required_packages[
+  vapply(required_packages, function(p) length(find.package(p, quiet = TRUE)) == 0,
+         logical(1))]
+if (length(missing_packages) > 0) {
+  stop("Required R package(s) not installed: ", paste(missing_packages, collapse = ", "),
+       ".\nInstall the pinned versions by running renv::restore() in R, started in the ",
+       "repository root (or run `python install.py`). This script does not install ",
+       "packages itself.", call. = FALSE)
 }
 
-# Load all packages. The start-up messages (tidyverse's attach list, masking notes) are
-# suppressed so that R's stderr, which run_r_script prints, holds only real warnings
-# such as lme4's singular-fit or convergence messages.
-invisible(lapply(required_packages, function(p)
-  suppressPackageStartupMessages(library(p, character.only = TRUE))))
+# Load the packages. Their start-up messages (attach notes, masking notes) are suppressed
+# so that R's stderr, which run_r_script prints, holds only real warnings such as lme4's
+# singular-fit or convergence messages.
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(readr)
+  library(stringr)
+  library(lme4)
+  library(jsonlite)
+})
 
 # --- Command Line Argument Logic ---
 # Capture arguments from Python

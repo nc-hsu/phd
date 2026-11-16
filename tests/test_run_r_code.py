@@ -100,3 +100,53 @@ def test_str_path_and_params_passed_through(r_script, monkeypatch):
     monkeypatch.setattr(rrc.subprocess, "run", fake_run)
     rrc.run_r_script(str(r_script), ["a", 3])
     assert seen["command"] == ["Rscript", str(r_script.resolve()), "a", "3"]
+
+
+# ---------------------------------------------------------------------------------------
+# run_r_script: Rscript starts in the project root, and every path it is given is absolute.
+# R reads .Rprofile from the folder it starts in, which is how an renv project (the public
+# repo) activates its pinned package library. Because that folder is not the caller's
+# working folder, a relative path handed to R would point somewhere else; these tests check
+# that none reaches R. subprocess.run is replaced, so no R installation is needed.
+# ---------------------------------------------------------------------------------------
+def test_project_root_matches_repo_root():
+    # The real config sets project_root relative to the config folder ("../../"); it must
+    # resolve to the repo root, i.e. the folder that holds the phd_project package.
+    repo_root = Path(rrc.__file__).resolve().parents[2]
+    assert rrc.project_root(rrc.cfg) == repo_root
+
+
+def test_project_root_absolute_value_used_as_is(tmp_path):
+    assert rrc.project_root({"project_root": str(tmp_path)}) == tmp_path.resolve()
+
+
+def test_rscript_runs_in_project_root_with_absolute_paths(tmp_path, monkeypatch):
+    # Layout: the "project root" and the caller's working folder are different folders, so
+    # a relative path that was not made absolute would show up as wrong.
+    root = tmp_path / "project"
+    caller = tmp_path / "caller"
+    root.mkdir()
+    caller.mkdir()
+    (caller / "script.R").write_text("# dummy")
+    monkeypatch.chdir(caller)
+    monkeypatch.setattr(rrc, "cfg", {"project_root": str(root)})
+    monkeypatch.setattr(rrc, "find_rscript", lambda cfg: Path("Rscript"))
+
+    seen = {}
+
+    def fake_run(command, **kwargs):
+        seen["command"], seen["kwargs"] = command, kwargs
+        return _FakeCompleted(0)
+    monkeypatch.setattr(rrc.subprocess, "run", fake_run)
+
+    # A relative script path (str), a relative folder (Path) and plain non-path strings.
+    rrc.run_r_script("script.R", [Path("residuals"), "asc,sslab", "_tail.csv", 3])
+
+    assert Path(seen["kwargs"]["cwd"]) == root.resolve()
+    command = seen["command"]
+    # The script and the Path argument are absolute and point where the caller meant them,
+    # i.e. relative to the caller's folder, not to the project root.
+    assert Path(command[1]).is_absolute() and Path(command[1]) == (caller / "script.R").resolve()
+    assert Path(command[2]).is_absolute() and Path(command[2]) == (caller / "residuals").resolve()
+    # Non-path arguments are passed through unchanged (as strings).
+    assert command[3:] == ["asc,sslab", "_tail.csv", "3"]
