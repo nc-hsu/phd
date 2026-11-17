@@ -23,3 +23,10 @@ also empty). One row per record, no duplicates, sorted on the four columns.
 nb 002 rebuilds each regional flatfile by selecting these records from the ESM flatfile
 (`manage_flatfiles.load_esm_record_ids` and `extract_flatfile_for_record_ids`). The lists
 are written by nb `002c-extract_gfz_esm_record_ids`.
+
+## Licence
+
+These lists are licensed under the GNU General Public License v3.0 or later (SPDX
+`GPL-3.0-or-later`); the full text is in `LICENSE` at the root of the repository. The ESM
+flatfile they point into is published by INGV under CC BY 4.0; cite it as Lanzano et al.
+(2019), DOI `10.13127/esm/flatfile.1.0`.
