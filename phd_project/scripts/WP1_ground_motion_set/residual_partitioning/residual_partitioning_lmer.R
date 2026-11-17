@@ -68,10 +68,15 @@ if (length(args) > 0) {
   n_records_min       <- as.integer(args[6])
   
 } else {
-  # Standalone Mode: Use hardcoded values for manual R execution
-  print("Running in Standalone Mode (Using hardcoded defaults)")
+  # Standalone Mode: defaults for running the script by hand. The folder is relative to
+  # the repository root, so start R there. In the public repo that is also where the
+  # pinned packages are available: its .Rprofile only activates the renv project library
+  # when R starts in the repo root. file.path() joins with "/", which R accepts on every
+  # platform.
+  print("Running in Standalone Mode (Using defaults relative to the repo root)")
   
-  residuals_folder <- "C:\\Users\\clemettn\\Documents\\phd\\data_processed\\02_im_correlation_model\\reverse\\residual_partitioning"
+  residuals_folder <- file.path("data_processed", "02_im_correlation_model",
+                                "reverse", "residual_partitioning")
   model_tags <-  c("asc", "sslab", "sinter", "vran")
   
   residuals_file_tail <- "_reverse_total_residuals.csv"
@@ -85,11 +90,12 @@ if (length(args) > 0) {
 
 for (model in model_tags) {
   print(paste0("Partitioning Residuals for model: ", model))
-  data_output_file <- paste0(residuals_folder,"\\", model, output_csv_tail)
-  json_results_file <- paste0(residuals_folder, "\\", model, output_json_tail)
+  # file.path() joins with "/", which works on Windows, Linux and macOS alike.
+  data_output_file <- file.path(residuals_folder, paste0(model, output_csv_tail))
+  json_results_file <- file.path(residuals_folder, paste0(model, output_json_tail))
   
   # load the data and periods
-  residuals_file <-  paste0(residuals_folder, "\\", model, residuals_file_tail)
+  residuals_file <- file.path(residuals_folder, paste0(model, residuals_file_tail))
   # check.names = FALSE keeps the IM column names exactly as Python wrote them (e.g.
   # "rotD50_AvgSA([0, 3])_3.0_Delta"); R would otherwise rewrite the brackets, comma and
   # space as dots. The unnamed first column (the row index) is then read as "" rather than
