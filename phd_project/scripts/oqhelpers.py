@@ -4,7 +4,7 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import ast
 
-from hazrisk.hazard import mafe_to_poe, poe_to_rtp
+from hazrisk.convert import mafe_to_poe, poe_to_rtp
 
 def get_hcurve_from_dstore(dstore, site_idx, imt , stat, investigation_time,
                            mafe:bool=True):

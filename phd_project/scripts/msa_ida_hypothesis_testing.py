@@ -50,7 +50,7 @@ import pandas as pd
 from scipy.special import psi
 from scipy.stats import kurtosis, lognorm, norm, skew, spearmanr
 
-from hazrisk.hazard import mafe_to_poe
+from hazrisk.convert import mafe_to_poe
 from hazrisk.risk import numerical_mafe
 from standes.fitting import lognorm_mle_fit, lognorm_moment_fit
 from standes.fragility_curves import (
